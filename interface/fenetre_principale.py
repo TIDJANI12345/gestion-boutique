@@ -26,12 +26,14 @@ class FenetrePrincipale:
         self.creer_interface()
         self.appliquer_permissions()
 
-        # 2. Premier chargement des données
-        # Correction ici : s'assurer que le nom correspond à la méthode définie plus bas
-        self.actualiser_stats() 
+        # 2. Premier chargement des donnees
+        self.actualiser_stats()
 
-        # 3. Lancement de la boucle infinie d'actualisation (toutes les 10s)
+        # 3. Actualisation periodique (toutes les 10s)
         self.actualisation_periodique()
+
+        # 4. Timeout de session (inactivite)
+        self._setup_session_timeout()
 
     def actualisation_periodique(self):
         """Boucle de rafraîchissement automatique"""
@@ -490,6 +492,40 @@ class FenetrePrincipale:
             messagebox.showerror("Erreur", f"❌ Erreur de sauvegarde:\n{e}")
     
     
+    def _setup_session_timeout(self):
+        """Configurer le timeout de session par inactivite"""
+        from database import db
+        timeout_str = db.get_parametre('session_timeout', '900')
+        try:
+            self._session_timeout = int(timeout_str) * 1000  # en ms
+        except ValueError:
+            self._session_timeout = 900000  # 15 min par defaut
+
+        self._timeout_id = None
+        self._reset_timeout()
+
+        # Detecter toute activite
+        self.root.bind_all('<Any-KeyPress>', self._on_activity)
+        self.root.bind_all('<Any-ButtonPress>', self._on_activity)
+
+    def _on_activity(self, event=None):
+        """Reset le timer a chaque activite"""
+        self._reset_timeout()
+
+    def _reset_timeout(self):
+        """Rearmer le timer de session"""
+        if self._timeout_id:
+            self.root.after_cancel(self._timeout_id)
+        self._timeout_id = self.root.after(self._session_timeout, self._session_expired)
+
+    def _session_expired(self):
+        """Session expiree : deconnecter l'utilisateur"""
+        messagebox.showinfo("Session expiree", "Vous avez ete deconnecte pour inactivite.")
+        self.root.destroy()
+        # Relancer le login
+        from main import demander_login
+        demander_login()
+
     def lancer(self):
         """Lancer l'application"""
         self.root.mainloop()

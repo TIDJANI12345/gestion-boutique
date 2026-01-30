@@ -1,6 +1,7 @@
 """
-Système de synchronisation cloud-only
-Synchronise les données via le serveur PythonAnywhere
+Systeme de synchronisation cloud-only
+Synchronise les donnees via le serveur PythonAnywhere
+Avec file d'attente hors-ligne
 """
 import requests
 import json
@@ -10,16 +11,19 @@ import time
 from datetime import datetime
 from database import db
 from config import DB_PATH, SYNC_SERVER_URL, SYNC_INTERVAL
+from modules.logger import get_logger
+
+logger = get_logger('sync')
 
 
 class Synchronisation:
     def __init__(self):
-        self.mode = 'offline'  # 'offline' ou 'cloud'
+        self.mode = 'offline'
         self._licence_key = None
         self._machine_id = None
 
     def _get_licence_info(self):
-        """Récupère la clé de licence et le machine_id depuis le fichier licence local"""
+        """Recupere la cle de licence et le machine_id depuis le fichier licence local"""
         if self._licence_key and self._machine_id:
             return self._licence_key, self._machine_id
 
@@ -41,11 +45,11 @@ class Synchronisation:
 
             return self._licence_key, self._machine_id
         except Exception as e:
-            print(f"⚠️ Impossible de lire la licence: {e}")
+            logger.warning(f"Impossible de lire la licence: {e}")
             return '', ''
 
     def _get_headers(self):
-        """Headers d'authentification pour les requêtes sync"""
+        """Headers d'authentification pour les requetes sync"""
         licence_key, machine_id = self._get_licence_info()
         return {
             'X-Licence-Key': licence_key,
@@ -54,16 +58,16 @@ class Synchronisation:
         }
 
     def _get_dernier_sync(self):
-        """Récupère le timestamp de la dernière sync depuis la table parametres"""
+        """Recupere le timestamp de la derniere sync depuis la table parametres"""
         val = db.get_parametre('dernier_sync', '')
         return val if val else None
 
     def _set_dernier_sync(self, timestamp):
-        """Sauvegarde le timestamp de dernière sync dans la table parametres"""
+        """Sauvegarde le timestamp de derniere sync dans la table parametres"""
         db.set_parametre('dernier_sync', timestamp)
 
     def detecter_mode(self):
-        """Teste la connectivité au serveur cloud uniquement"""
+        """Teste la connectivite au serveur cloud uniquement"""
         try:
             response = requests.get(
                 f'{SYNC_SERVER_URL}/api/sync/ping',
@@ -84,24 +88,27 @@ class Synchronisation:
         mode = self.detecter_mode()
 
         if mode == 'offline':
-            print("Mode offline - Pas de synchronisation")
+            logger.info("Mode offline - synchronisation reportee")
             return False
 
         try:
-            # 1. Push : envoyer les changements locaux
+            # 1. Vider la file d'attente en premier
+            self._flush_queue()
+
+            # 2. Push : envoyer les changements locaux
             succes_push = self._push()
 
-            # 2. Pull : récupérer les changements distants
+            # 3. Pull : recuperer les changements distants
             succes_pull = self._pull()
 
             if succes_push or succes_pull:
                 self._set_dernier_sync(datetime.now().isoformat())
-                print("Synchronisation cloud terminée")
+                logger.info("Synchronisation cloud terminee")
                 return True
 
             return False
         except Exception as e:
-            print(f"Erreur synchronisation: {e}")
+            logger.error(f"Erreur synchronisation: {e}")
             return False
 
     def _push(self):
@@ -109,7 +116,6 @@ class Synchronisation:
         try:
             changements = self.obtenir_changements_locaux()
 
-            # Rien à envoyer
             if not any(changements.get(k) for k in ('produits', 'ventes', 'details_ventes', 'historique_stock', 'utilisateurs')):
                 return True
 
@@ -121,17 +127,22 @@ class Synchronisation:
             )
 
             if response.status_code == 200:
-                print("Push réussi")
+                logger.info("Push reussi")
                 return True
             else:
-                print(f"Erreur push: {response.status_code}")
+                logger.warning(f"Erreur push: {response.status_code}")
+                self._enqueue(changements)
                 return False
         except Exception as e:
-            print(f"Erreur push: {e}")
+            logger.error(f"Erreur push: {e}")
+            try:
+                self._enqueue(changements)
+            except Exception:
+                pass
             return False
 
     def _pull(self):
-        """Récupère les changements distants depuis le serveur"""
+        """Recupere les changements distants depuis le serveur"""
         try:
             dernier_sync = self._get_dernier_sync()
             payload = {
@@ -148,17 +159,64 @@ class Synchronisation:
             if response.status_code == 200:
                 data = response.json()
                 self.appliquer_changements_distants(data)
-                print("Pull réussi")
+                logger.info("Pull reussi")
                 return True
             else:
-                print(f"Erreur pull: {response.status_code}")
+                logger.warning(f"Erreur pull: {response.status_code}")
                 return False
         except Exception as e:
-            print(f"Erreur pull: {e}")
+            logger.error(f"Erreur pull: {e}")
             return False
 
+    # --- File d'attente hors-ligne ---
+
+    def _enqueue(self, changements):
+        """Stocker les changements en attente dans sync_queue"""
+        try:
+            data_json = json.dumps(changements, default=str)
+            db.execute_query(
+                "INSERT INTO sync_queue (action, table_name, data_json) VALUES (?, ?, ?)",
+                ('push', 'all', data_json)
+            )
+            logger.info("Changements mis en file d'attente")
+        except Exception as e:
+            logger.error(f"Erreur enqueue: {e}")
+
+    def _flush_queue(self):
+        """Envoyer tous les changements en attente"""
+        try:
+            queue = db.fetch_all("SELECT id, data_json FROM sync_queue ORDER BY created_at ASC")
+            if not queue:
+                return
+
+            logger.info(f"Vidage de la file d'attente ({len(queue)} elements)")
+
+            for item in queue:
+                item_id, data_json = item[0], item[1]
+                try:
+                    changements = json.loads(data_json)
+                    response = requests.post(
+                        f'{SYNC_SERVER_URL}/api/sync/push',
+                        headers=self._get_headers(),
+                        json=changements,
+                        timeout=15
+                    )
+                    if response.status_code == 200:
+                        db.execute_query("DELETE FROM sync_queue WHERE id = ?", (item_id,))
+                        logger.info(f"Element {item_id} de la queue envoye")
+                    else:
+                        logger.warning(f"Echec envoi element {item_id}: {response.status_code}")
+                        break  # Arreter si un envoi echoue
+                except Exception as e:
+                    logger.error(f"Erreur flush element {item_id}: {e}")
+                    break
+        except Exception as e:
+            logger.error(f"Erreur flush_queue: {e}")
+
+    # --- Donnees locales ---
+
     def obtenir_changements_locaux(self):
-        """Récupère toutes les données modifiées depuis le dernier sync"""
+        """Recupere toutes les donnees modifiees depuis le dernier sync"""
         dernier_sync = self._get_dernier_sync()
         depuis = dernier_sync or '2000-01-01T00:00:00'
 
@@ -171,7 +229,7 @@ class Synchronisation:
             'timestamp': datetime.now().isoformat()
         }
 
-        # Produits modifiés (utilise updated_at)
+        # Produits modifies
         produits = db.fetch_all(
             "SELECT id, nom, categorie, prix_achat, prix_vente, stock_actuel, "
             "stock_alerte, code_barre, type_code_barre, date_ajout, description, updated_at "
@@ -188,7 +246,7 @@ class Synchronisation:
                 'updated_at': p[11]
             })
 
-        # Ventes depuis dernier sync
+        # Ventes
         ventes = db.fetch_all(
             "SELECT id, numero_vente, date_vente, total, client, statut, deleted_at "
             "FROM ventes WHERE date_vente > ?",
@@ -201,7 +259,7 @@ class Synchronisation:
                 'deleted_at': v[6]
             })
 
-        # Détails des ventes liées
+        # Details des ventes liees
         if changements['ventes']:
             vente_ids = [v['id'] for v in changements['ventes']]
             placeholders = ','.join('?' * len(vente_ids))
@@ -229,7 +287,7 @@ class Synchronisation:
                 'operation': h[4], 'date_operation': h[5]
             })
 
-        # Utilisateurs modifiés
+        # Utilisateurs modifies
         utilisateurs = db.fetch_all(
             "SELECT id, nom, prenom, email, mot_de_passe, role, actif, date_creation, dernier_login, updated_at "
             "FROM utilisateurs WHERE updated_at > ?",
@@ -246,21 +304,20 @@ class Synchronisation:
         return changements
 
     def appliquer_changements_distants(self, data):
-        """Applique les changements reçus du serveur (INSERT OR REPLACE / INSERT OR IGNORE)"""
+        """Applique les changements recus du serveur"""
         try:
             conn = sqlite3.connect(DB_PATH)
             cursor = conn.cursor()
 
-            # Produits : INSERT OR REPLACE sur code_barre (last write wins)
+            # Produits : last write wins
             for p in data.get('produits', []):
-                # Vérifier si le produit local est plus récent
                 existant = cursor.execute(
                     "SELECT updated_at FROM produits WHERE code_barre = ?",
                     (p['code_barre'],)
                 ).fetchone()
 
                 if existant and existant[0] and existant[0] > p.get('updated_at', ''):
-                    continue  # Le local est plus récent, on ignore
+                    continue
 
                 cursor.execute('''
                     INSERT INTO produits (nom, categorie, prix_achat, prix_vente, stock_actuel,
@@ -279,7 +336,7 @@ class Synchronisation:
                     p.get('updated_at', datetime.now().isoformat())
                 ))
 
-            # Ventes : INSERT OR IGNORE sur numero_vente (pas de conflit possible)
+            # Ventes : INSERT OR IGNORE
             for v in data.get('ventes', []):
                 cursor.execute('''
                     INSERT OR IGNORE INTO ventes (numero_vente, date_vente, total, client, statut, deleted_at)
@@ -289,35 +346,27 @@ class Synchronisation:
                     v['client'], v['statut'], v.get('deleted_at')
                 ))
 
-            # Détails ventes : INSERT OR IGNORE (liés aux ventes)
+            # Details ventes
             for d in data.get('details_ventes', []):
-                # Trouver l'id local de la vente par numero_vente
                 vente_locale = cursor.execute(
                     "SELECT id FROM ventes WHERE numero_vente = (SELECT numero_vente FROM ventes WHERE id = ? LIMIT 1)",
                     (d['vente_id'],)
                 ).fetchone()
 
-                # Chercher aussi par le numero_vente direct si le vente_id distant ne correspond pas
-                if not vente_locale:
-                    # On insère quand même avec le vente_id original
-                    cursor.execute('''
-                        INSERT OR IGNORE INTO details_ventes (vente_id, produit_id, quantite, prix_unitaire, sous_total)
-                        VALUES (?, ?, ?, ?, ?)
-                    ''', (d['vente_id'], d['produit_id'], d['quantite'], d['prix_unitaire'], d['sous_total']))
-                else:
-                    cursor.execute('''
-                        INSERT OR IGNORE INTO details_ventes (vente_id, produit_id, quantite, prix_unitaire, sous_total)
-                        VALUES (?, ?, ?, ?, ?)
-                    ''', (vente_locale[0], d['produit_id'], d['quantite'], d['prix_unitaire'], d['sous_total']))
+                vente_id = vente_locale[0] if vente_locale else d['vente_id']
+                cursor.execute('''
+                    INSERT OR IGNORE INTO details_ventes (vente_id, produit_id, quantite, prix_unitaire, sous_total)
+                    VALUES (?, ?, ?, ?, ?)
+                ''', (vente_id, d['produit_id'], d['quantite'], d['prix_unitaire'], d['sous_total']))
 
-            # Historique stock : INSERT simple
+            # Historique stock
             for h in data.get('historique_stock', []):
                 cursor.execute('''
                     INSERT OR IGNORE INTO historique_stock (produit_id, quantite_avant, quantite_apres, operation, date_operation)
                     VALUES (?, ?, ?, ?, ?)
                 ''', (h['produit_id'], h['quantite_avant'], h['quantite_apres'], h['operation'], h['date_operation']))
 
-            # Utilisateurs : INSERT OR REPLACE sur email (last write wins)
+            # Utilisateurs : last write wins
             for u in data.get('utilisateurs', []):
                 existant = cursor.execute(
                     "SELECT updated_at FROM utilisateurs WHERE email = ?",
@@ -343,21 +392,19 @@ class Synchronisation:
 
             conn.commit()
             conn.close()
-            print("Changements distants appliqués")
+            logger.info("Changements distants appliques")
         except Exception as e:
-            print(f"Erreur application changements: {e}")
-            import traceback
-            traceback.print_exc()
+            logger.error(f"Erreur application changements: {e}")
 
     def sync_automatique_arriere_plan(self):
-        """Synchronisation automatique en arrière-plan"""
+        """Synchronisation automatique en arriere-plan"""
         def sync_loop():
             while True:
                 time.sleep(SYNC_INTERVAL)
                 try:
                     self.synchroniser()
                 except Exception as e:
-                    print(f"Erreur sync auto: {e}")
+                    logger.error(f"Erreur sync auto: {e}")
 
         thread = threading.Thread(target=sync_loop, daemon=True)
         thread.start()

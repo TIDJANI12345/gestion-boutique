@@ -2,11 +2,15 @@
 Dashboard ultra-simple pour les caissiers
 Interface épurée et efficace
 """
+import os
 import tkinter as tk
 from tkinter import messagebox
 from modules.rapports import Rapport
 from modules.ventes import Vente
+from modules.logger import get_logger
 from config import *
+
+logger = get_logger('fenetre_caissier')
 
 class FenetrePrincipaleCaissier:
     def __init__(self, utilisateur):
@@ -20,6 +24,9 @@ class FenetrePrincipaleCaissier:
         self.creer_interface()
         self.actualiser_stats()
         
+        # Timeout session
+        self._setup_session_timeout()
+
         # Actualisation automatique
         self.root.after(30000, self.actualisation_periodique)
     
@@ -200,7 +207,7 @@ class FenetrePrincipaleCaissier:
             self.label_ventes.config(text=str(stats['nb_ventes']))
             self.label_ca.config(text=f"{stats['ca_jour']:,.0f} FCFA")
         except Exception as e:
-            print(f"Erreur actualisation: {e}")
+            logger.error(f"Erreur actualisation: {e}")
     
     def actualisation_periodique(self):
         """Actualiser périodiquement"""
@@ -242,6 +249,40 @@ class FenetrePrincipaleCaissier:
         b = max(0, b - 20)
         return f'#{r:02x}{g:02x}{b:02x}'
     
+    def _setup_session_timeout(self):
+        """Configurer le timeout de session par inactivite"""
+        from database import db
+        timeout_str = db.get_parametre('session_timeout', '900')
+        try:
+            self._session_timeout = int(timeout_str) * 1000  # en ms
+        except ValueError:
+            self._session_timeout = 900000  # 15 min par defaut
+
+        self._timeout_id = None
+        self._reset_timeout()
+
+        # Detecter toute activite
+        self.root.bind_all('<Any-KeyPress>', self._on_activity)
+        self.root.bind_all('<Any-ButtonPress>', self._on_activity)
+
+    def _on_activity(self, event=None):
+        """Reset le timer a chaque activite"""
+        self._reset_timeout()
+
+    def _reset_timeout(self):
+        """Rearmer le timer de session"""
+        if self._timeout_id:
+            self.root.after_cancel(self._timeout_id)
+        self._timeout_id = self.root.after(self._session_timeout, self._session_expired)
+
+    def _session_expired(self):
+        """Session expiree : deconnecter l'utilisateur"""
+        messagebox.showinfo("Session expiree", "Vous avez ete deconnecte pour inactivite.")
+        self.root.destroy()
+        # Relancer le login
+        from main import demander_login
+        demander_login()
+
     def lancer(self):
         """Lancer l'application"""
         self.root.mainloop()

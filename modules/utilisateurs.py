@@ -5,12 +5,15 @@ import bcrypt
 import sqlite3
 from database import db
 from datetime import datetime
+from modules.logger import get_logger
+
+logger = get_logger('utilisateurs')
+
 
 class Utilisateur:
     @staticmethod
     def initialiser_tables():
-        """Créer les tables utilisateurs et logs si elles n'existent pas"""
-        # Table Utilisateurs
+        """Creer les tables utilisateurs et logs si elles n'existent pas"""
         sql_users = """
         CREATE TABLE IF NOT EXISTS utilisateurs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -26,7 +29,6 @@ class Utilisateur:
         """
         db.execute_query(sql_users)
 
-        # Table Logs
         sql_logs = """
         CREATE TABLE IF NOT EXISTS logs_actions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -39,44 +41,63 @@ class Utilisateur:
         """
         db.execute_query(sql_logs)
 
-        # Créer l'admin par défaut s'il n'existe pas
-        if not db.fetch_one("SELECT * FROM utilisateurs"):
-            # Mot de passe par défaut : admin123
-            mdp_hash = bcrypt.hashpw("admin123".encode(), bcrypt.gensalt())
-            sql_admin = """
-            INSERT INTO utilisateurs (nom, prenom, email, mot_de_passe, role)
-            VALUES (?, ?, ?, ?, ?)
-            """
-            db.execute_query(sql_admin, ('Admin', 'Principal', 'admin@boutique.com', mdp_hash.decode(), 'patron'))
-            print("✅ Utilisateur Admin créé par défaut (admin@boutique.com / admin123)")
+    @staticmethod
+    def compte_existe():
+        """Verifier s'il existe au moins un utilisateur dans la base"""
+        result = db.fetch_one("SELECT COUNT(*) FROM utilisateurs")
+        return result and result[0] > 0
+
+    @staticmethod
+    def valider_mot_de_passe(mot_de_passe):
+        """Valider la complexite du mot de passe. Retourne (bool, message)"""
+        if len(mot_de_passe) < 8:
+            return False, "Le mot de passe doit contenir au moins 8 caracteres"
+        if not any(c.isdigit() for c in mot_de_passe):
+            return False, "Le mot de passe doit contenir au moins 1 chiffre"
+        return True, "Mot de passe valide"
 
     @staticmethod
     def creer_utilisateur(nom, prenom, email, mot_de_passe, role='caissier'):
-        """Créer un nouvel utilisateur"""
+        """Creer un nouvel utilisateur"""
+        # Valider le mot de passe
+        valide, message = Utilisateur.valider_mot_de_passe(mot_de_passe)
+        if not valide:
+            logger.warning(f"Creation utilisateur refusee : {message}")
+            return False, message
+
         try:
             hashed = bcrypt.hashpw(mot_de_passe.encode(), bcrypt.gensalt())
             query = """
                 INSERT INTO utilisateurs (nom, prenom, email, mot_de_passe, role)
                 VALUES (?, ?, ?, ?, ?)
             """
-            return db.execute_query(query, (nom, prenom, email, hashed.decode(), role))
+            result = db.execute_query(query, (nom, prenom, email, hashed.decode(), role))
+            if result:
+                logger.info(f"Utilisateur cree : {email} ({role})")
+                return True, "Utilisateur cree avec succes"
+            return False, "Erreur lors de la creation"
         except sqlite3.IntegrityError:
-            return False # Email déjà existant
+            logger.warning(f"Email deja existant : {email}")
+            return False, "Cet email existe deja"
+        except Exception as e:
+            logger.error(f"Erreur creation utilisateur : {e}")
+            return False, f"Erreur : {e}"
 
     @staticmethod
     def authentifier(email, mot_de_passe):
-        """Vérifier les identifiants"""
+        """Verifier les identifiants"""
         query = "SELECT * FROM utilisateurs WHERE email = ? AND actif = 1"
         user = db.fetch_one(query, (email,))
-        
-        # user structure: 0:id, 1:nom, 2:prenom, 3:email, 4:hash, 5:role
+
         if user and bcrypt.checkpw(mot_de_passe.encode(), user[4].encode()):
-            # Mettre à jour dernier login
             db.execute_query(
                 "UPDATE utilisateurs SET dernier_login = CURRENT_TIMESTAMP WHERE id = ?",
                 (user[0],)
             )
+            logger.info(f"Connexion reussie : {email}")
             return user
+
+        logger.warning(f"Echec connexion pour : {email}")
         return None
 
     @staticmethod
@@ -86,19 +107,25 @@ class Utilisateur:
 
     @staticmethod
     def modifier_role(user_id, nouveau_role):
-        """Changer le rôle d'un utilisateur"""
-        return db.execute_query(
+        """Changer le role d'un utilisateur"""
+        result = db.execute_query(
             "UPDATE utilisateurs SET role = ? WHERE id = ?",
             (nouveau_role, user_id)
         )
+        if result:
+            logger.info(f"Role modifie pour utilisateur {user_id} : {nouveau_role}")
+        return result
 
     @staticmethod
     def changer_statut(user_id, actif):
-        """Activer/Désactiver un utilisateur"""
-        return db.execute_query(
+        """Activer/Desactiver un utilisateur"""
+        result = db.execute_query(
             "UPDATE utilisateurs SET actif = ? WHERE id = ?",
             (1 if actif else 0, user_id)
         )
+        if result:
+            logger.info(f"Statut utilisateur {user_id} : {'actif' if actif else 'inactif'}")
+        return result
 
     @staticmethod
     def logger_action(user_id, action, details=""):
@@ -107,9 +134,8 @@ class Utilisateur:
             INSERT INTO logs_actions (utilisateur_id, action, details)
             VALUES (?, ?, ?)
         """
-        # On utilise try/except au cas où l'ID utilisateur est None (ex: système)
         try:
             if user_id:
                 db.execute_query(query, (user_id, action, details))
         except Exception as e:
-            print(f"Erreur log: {e}")
+            logger.error(f"Erreur log action: {e}")

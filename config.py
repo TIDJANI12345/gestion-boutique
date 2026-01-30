@@ -4,8 +4,17 @@ Design inspiré de l'interface PHP moderne
 """
 import os
 import sys
+import io
 
-# ✅ CORRECTION : Utiliser AppData pour données utilisateur
+# Forcer UTF-8 sur stdout/stderr pour eviter les erreurs d'encodage Windows (cp1252)
+if sys.stdout and hasattr(sys.stdout, 'reconfigure'):
+    try:
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+        sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+    except Exception:
+        pass
+
+# Utiliser AppData pour donnees utilisateur
 if getattr(sys, 'frozen', False):
     # Mode .exe - Données dans AppData
     APPDATA = os.getenv('APPDATA') or os.path.expanduser('~')
@@ -27,7 +36,9 @@ for directory in [DATA_DIR, IMAGES_DIR, RECUS_DIR, EXPORTS_DIR]:
         if not os.path.exists(directory):
             os.makedirs(directory, exist_ok=True)
     except Exception as e:
-        print(f"⚠️ Impossible de créer {directory}: {e}")
+        # Logger pas encore disponible (depend de DATA_DIR), utiliser logging directement
+        import logging
+        logging.warning(f"Impossible de creer {directory}: {e}")
 
 # Configuration de l'application
 APP_NAME = "Gestion Boutique"

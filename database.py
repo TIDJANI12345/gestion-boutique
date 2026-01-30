@@ -1,10 +1,13 @@
 """
-Gestion de la base de données SQLite
-Structure inspirée du projet PHP
+Gestion de la base de donnees SQLite
 """
 import sqlite3
 from config import DB_PATH
 from datetime import datetime
+from modules.logger import get_logger
+
+logger = get_logger('database')
+
 
 class Database:
     def __init__(self):
@@ -12,19 +15,27 @@ class Database:
         self.cursor = None
         self.connect()
         self.create_tables()
-    
+
     def connect(self):
-        """Connexion à la base de données"""
+        """Connexion a la base de donnees"""
         try:
             self.conn = sqlite3.connect(DB_PATH)
             self.cursor = self.conn.cursor()
-            print("✅ Connexion à la base de données réussie")
+            logger.info("Connexion a la base de donnees reussie")
         except Exception as e:
-            print(f"❌ Erreur de connexion : {e}")
-    
+            logger.error(f"Erreur de connexion : {e}")
+
+    def _ensure_connection(self):
+        """Reconnexion automatique si la connexion est perdue"""
+        try:
+            self.conn.execute("SELECT 1")
+        except Exception:
+            logger.warning("Connexion perdue, reconnexion...")
+            self.connect()
+
     def create_tables(self):
-        """Création des tables avec support du Soft Delete"""
-        
+        """Creation des tables"""
+
         # Table Produits
         self.cursor.execute('''
             CREATE TABLE IF NOT EXISTS produits (
@@ -41,7 +52,7 @@ class Database:
                 description TEXT
             )
         ''')
-        
+
         # Table Ventes
         self.cursor.execute('''
             CREATE TABLE IF NOT EXISTS ventes (
@@ -50,12 +61,12 @@ class Database:
                 date_vente TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 total REAL NOT NULL,
                 client TEXT,
-                statut TEXT DEFAULT 'terminée',
+                statut TEXT DEFAULT 'terminee',
                 deleted_at TIMESTAMP DEFAULT NULL
             )
         ''')
-        
-        # Table Détails des ventes
+
+        # Table Details des ventes
         self.cursor.execute('''
             CREATE TABLE IF NOT EXISTS details_ventes (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -68,7 +79,7 @@ class Database:
                 FOREIGN KEY (produit_id) REFERENCES produits(id)
             )
         ''')
-        
+
         # Table Historique du stock
         self.cursor.execute('''
             CREATE TABLE IF NOT EXISTS historique_stock (
@@ -81,8 +92,8 @@ class Database:
                 FOREIGN KEY (produit_id) REFERENCES produits(id)
             )
         ''')
-        
-        # Table Paramètres (nouvelle)
+
+        # Table Parametres
         self.cursor.execute('''
             CREATE TABLE IF NOT EXISTS parametres (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -119,109 +130,128 @@ class Database:
             )
         ''')
 
-        # --- AJOUTEZ CECI POUR L'ADMIN PAR DÉFAUT ---
-        # On vérifie si la table est vide pour créer le premier patron
-        self.cursor.execute("SELECT COUNT(*) FROM utilisateurs")
-        if self.cursor.fetchone()[0] == 0:
-            import bcrypt # Assurez-vous d'avoir fait pip install bcrypt
-            mdp_hash = bcrypt.hashpw("admin123".encode(), bcrypt.gensalt()).decode()
-            self.cursor.execute('''
-                INSERT INTO utilisateurs (nom, prenom, email, mot_de_passe, role)
-                VALUES (?, ?, ?, ?, ?)
-            ''', ('Admin', 'Principal', 'admin@boutique.com', mdp_hash, 'patron'))
-        
+        # Table file d'attente sync hors-ligne
+        self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS sync_queue (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                action TEXT NOT NULL,
+                table_name TEXT NOT NULL,
+                data_json TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+
         # Migration : ajouter updated_at aux tables existantes
         self.migrer_updated_at()
 
-        # Insérer paramètres par défaut
+        # Inserer parametres par defaut
         self.init_parametres()
 
         self.conn.commit()
-        print("✅ Tables créées avec succès")
-    
+        logger.info("Tables creees/verifiees avec succes")
+
     def migrer_updated_at(self):
         """Ajouter la colonne updated_at aux tables produits et utilisateurs si absente"""
         for table in ('produits', 'utilisateurs'):
             try:
                 colonnes = [row[1] for row in self.cursor.execute(f"PRAGMA table_info({table})").fetchall()]
                 if 'updated_at' not in colonnes:
-                    self.cursor.execute(f"ALTER TABLE {table} ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
-                    self.cursor.execute(f"UPDATE {table} SET updated_at = CURRENT_TIMESTAMP WHERE updated_at IS NULL")
-                    print(f"✅ Colonne updated_at ajoutée à {table}")
+                    self.cursor.execute(f"ALTER TABLE {table} ADD COLUMN updated_at TIMESTAMP")
+                    self.cursor.execute(f"UPDATE {table} SET updated_at = datetime('now') WHERE updated_at IS NULL")
+                    logger.info(f"Colonne updated_at ajoutee a {table}")
             except Exception as e:
-                print(f"⚠️ Migration updated_at pour {table}: {e}")
+                logger.warning(f"Migration updated_at pour {table}: {e}")
 
     def init_parametres(self):
-        """Initialiser les paramètres par défaut"""
+        """Initialiser les parametres par defaut"""
         from config import BOUTIQUE_NOM, BOUTIQUE_ADRESSE, BOUTIQUE_TELEPHONE, BOUTIQUE_EMAIL
-        
+
         parametres_defaut = [
             ('boutique_nom', BOUTIQUE_NOM, 'Nom de la boutique'),
             ('boutique_adresse', BOUTIQUE_ADRESSE, 'Adresse de la boutique'),
-            ('boutique_telephone', BOUTIQUE_TELEPHONE, 'Téléphone de la boutique'),
+            ('boutique_telephone', BOUTIQUE_TELEPHONE, 'Telephone de la boutique'),
             ('boutique_email', BOUTIQUE_EMAIL, 'Email de la boutique'),
+            ('session_timeout', '900', 'Timeout session en secondes (defaut 15 min)'),
         ]
-        
+
         for cle, valeur, description in parametres_defaut:
             self.cursor.execute(
                 'INSERT OR IGNORE INTO parametres (cle, valeur, description) VALUES (?, ?, ?)',
                 (cle, valeur, description)
             )
         self.conn.commit()
-    
+
     def execute_query(self, query, params=()):
-        """
-        Exécuter une requête INSERT/UPDATE/DELETE
-        Retourne lastrowid pour les INSERT, True/False sinon
-        """
+        """Executer une requete INSERT/UPDATE/DELETE avec rollback en cas d'erreur"""
+        self._ensure_connection()
         try:
             self.cursor.execute(query, params)
             self.conn.commit()
-            
-            # ✅ CORRECTION : Retourner lastrowid pour les INSERT
+
             if query.strip().upper().startswith('INSERT'):
                 return self.cursor.lastrowid
             return True
-            
+
         except Exception as e:
-            print(f"❌ Erreur SQL : {e}")
-            import traceback
-            traceback.print_exc()
+            logger.error(f"Erreur SQL : {e} | Requete: {query[:100]}")
+            try:
+                self.conn.rollback()
+            except Exception:
+                pass
             return None
-    
+
+    def execute_transaction(self, queries_params_list):
+        """Executer plusieurs requetes dans une transaction atomique"""
+        self._ensure_connection()
+        try:
+            for query, params in queries_params_list:
+                self.cursor.execute(query, params)
+            self.conn.commit()
+            return True
+        except Exception as e:
+            logger.error(f"Erreur transaction : {e}")
+            try:
+                self.conn.rollback()
+            except Exception:
+                pass
+            return None
+
     def fetch_all(self, query, params=()):
-        """Récupérer tous les résultats"""
+        """Recuperer tous les resultats"""
+        self._ensure_connection()
         try:
             self.cursor.execute(query, params)
             return self.cursor.fetchall()
         except Exception as e:
-            print(f"❌ Erreur : {e}")
+            logger.error(f"Erreur fetch_all : {e}")
             return []
-    
+
     def fetch_one(self, query, params=()):
-        """Récupérer un seul résultat"""
+        """Recuperer un seul resultat"""
+        self._ensure_connection()
         try:
             self.cursor.execute(query, params)
             return self.cursor.fetchone()
         except Exception as e:
-            print(f"❌ Erreur : {e}")
+            logger.error(f"Erreur fetch_one : {e}")
             return None
-    
+
     def get_parametre(self, cle, defaut=""):
-        """Récupérer un paramètre"""
+        """Recuperer un parametre"""
         result = self.fetch_one("SELECT valeur FROM parametres WHERE cle = ?", (cle,))
         return result[0] if result else defaut
-    
+
     def set_parametre(self, cle, valeur):
-        """Définir un paramètre"""
+        """Definir un parametre"""
         query = "INSERT OR REPLACE INTO parametres (cle, valeur) VALUES (?, ?)"
         return self.execute_query(query, (cle, valeur))
-    
+
     def close(self):
         """Fermer la connexion"""
         if self.conn:
             self.conn.close()
-            print("✅ Connexion fermée")
+            logger.info("Connexion fermee")
 
-# Instance globale de la base de données
+
+# Instance globale de la base de donnees
 db = Database()
