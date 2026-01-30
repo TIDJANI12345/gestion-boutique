@@ -141,6 +141,42 @@ class Database:
             )
         ''')
 
+        # Table Paiements
+        self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS paiements (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                vente_id INTEGER NOT NULL,
+                mode TEXT NOT NULL,
+                montant REAL NOT NULL,
+                reference TEXT,
+                montant_recu REAL,
+                monnaie_rendue REAL,
+                date_paiement TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (vente_id) REFERENCES ventes(id)
+            )
+        ''')
+
+        # Table Taux TVA par categorie
+        self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS taux_tva (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                categorie TEXT UNIQUE NOT NULL,
+                taux REAL NOT NULL,
+                description TEXT
+            )
+        ''')
+
+        # Table Devises
+        self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS devises (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                code TEXT UNIQUE NOT NULL,
+                symbole TEXT NOT NULL,
+                taux_change REAL NOT NULL,
+                actif BOOLEAN DEFAULT 1
+            )
+        ''')
+
         # Migration : ajouter updated_at aux tables existantes
         self.migrer_updated_at()
 
@@ -172,6 +208,20 @@ class Database:
             ('boutique_telephone', BOUTIQUE_TELEPHONE, 'Telephone de la boutique'),
             ('boutique_email', BOUTIQUE_EMAIL, 'Email de la boutique'),
             ('session_timeout', '900', 'Timeout session en secondes (defaut 15 min)'),
+            # Parametres imprimante
+            ('imprimante_mode', 'usb', 'Mode imprimante: usb, reseau, serie'),
+            ('imprimante_format', '80mm', 'Format papier: 58mm ou 80mm'),
+            ('imprimante_usb_vendor', '0x0', 'Vendor ID USB imprimante'),
+            ('imprimante_usb_product', '0x0', 'Product ID USB imprimante'),
+            ('imprimante_ip', '', 'Adresse IP imprimante reseau'),
+            ('imprimante_port', '9100', 'Port imprimante reseau'),
+            ('imprimante_serie_port', 'COM1', 'Port serie imprimante'),
+            ('imprimante_serie_baudrate', '9600', 'Baudrate port serie'),
+            # Parametres fiscaux
+            ('tva_active', '0', 'TVA active: 0 ou 1'),
+            ('tva_taux_defaut', '18', 'Taux TVA par defaut en %'),
+            ('devise_principale', 'XOF', 'Code devise principale'),
+            ('devise_symbole', 'FCFA', 'Symbole devise principale'),
         ]
 
         for cle, valeur, description in parametres_defaut:
@@ -179,6 +229,19 @@ class Database:
                 'INSERT OR IGNORE INTO parametres (cle, valeur, description) VALUES (?, ?, ?)',
                 (cle, valeur, description)
             )
+
+        # Devises par defaut
+        devises_defaut = [
+            ('XOF', 'FCFA', 1.0),
+            ('EUR', '€', 655.957),
+            ('USD', '$', 600.0),
+        ]
+        for code, symbole, taux in devises_defaut:
+            self.cursor.execute(
+                'INSERT OR IGNORE INTO devises (code, symbole, taux_change, actif) VALUES (?, ?, ?, 1)',
+                (code, symbole, taux)
+            )
+
         self.conn.commit()
 
     def execute_query(self, query, params=()):

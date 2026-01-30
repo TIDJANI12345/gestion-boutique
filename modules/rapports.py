@@ -172,5 +172,93 @@ class Rapport:
             
         except Exception as e:
             print(f"❌ Erreur rapport journalier: {e}")
-        
+
         return rapport
+
+    @staticmethod
+    def rapport_caisse_jour(date=None):
+        """Rapport de rapprochement de caisse avec details par mode de paiement"""
+        from modules.paiements import Paiement
+        return Paiement.rapport_caisse_jour(date)
+
+    @staticmethod
+    def statistiques_paiements(date_debut=None, date_fin=None):
+        """Statistiques des paiements par mode sur une periode"""
+        if date_debut and date_fin:
+            query = """
+                SELECT p.mode, SUM(p.montant) as total, COUNT(*) as nb
+                FROM paiements p
+                JOIN ventes v ON p.vente_id = v.id
+                WHERE v.date_vente BETWEEN ? AND ?
+                GROUP BY p.mode
+                ORDER BY total DESC
+            """
+            return db.fetch_all(query, (date_debut, date_fin))
+        else:
+            query = """
+                SELECT p.mode, SUM(p.montant) as total, COUNT(*) as nb
+                FROM paiements p
+                GROUP BY p.mode
+                ORDER BY total DESC
+            """
+            return db.fetch_all(query)
+
+    @staticmethod
+    def rapport_tva_mensuel(mois=None, annee=None):
+        """Rapport TVA mensuel"""
+        from modules.fiscalite import Fiscalite
+        return Fiscalite.rapport_tva_mensuel(mois, annee)
+
+    @staticmethod
+    def comparaison_jour_precedent():
+        """Comparer les ventes du jour avec celles d'hier"""
+        aujourd_hui = datetime.now().strftime("%Y-%m-%d")
+        hier = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+
+        query = """
+            SELECT DATE(date_vente) as jour, COUNT(*) as nb, COALESCE(SUM(total), 0) as ca
+            FROM ventes
+            WHERE DATE(date_vente) IN (?, ?)
+            GROUP BY DATE(date_vente)
+        """
+        results = db.fetch_all(query, (aujourd_hui, hier))
+
+        data = {'aujourd_hui': {'nb': 0, 'ca': 0}, 'hier': {'nb': 0, 'ca': 0}}
+        for row in results:
+            if row[0] == aujourd_hui:
+                data['aujourd_hui'] = {'nb': row[1], 'ca': row[2]}
+            elif row[0] == hier:
+                data['hier'] = {'nb': row[1], 'ca': row[2]}
+
+        if data['hier']['ca'] > 0:
+            data['variation_ca_pct'] = ((data['aujourd_hui']['ca'] - data['hier']['ca']) / data['hier']['ca']) * 100
+        else:
+            data['variation_ca_pct'] = 100.0 if data['aujourd_hui']['ca'] > 0 else 0.0
+
+        return data
+
+    @staticmethod
+    def donnees_graphique_ventes(periode='semaine'):
+        """Donnees formatees pour graphique matplotlib: list de (label, ca)"""
+        if periode == 'jour':
+            aujourd_hui = datetime.now().strftime("%Y-%m-%d")
+            query = """
+                SELECT strftime('%H', date_vente) as heure, COALESCE(SUM(total), 0)
+                FROM ventes WHERE DATE(date_vente) = ?
+                GROUP BY heure ORDER BY heure
+            """
+            results = db.fetch_all(query, (aujourd_hui,))
+            return [(f"{r[0]}h", r[1]) for r in results]
+        elif periode == 'semaine':
+            data = Rapport.evolution_ventes_7_jours()
+            return [(r[0][-5:], r[2]) for r in data]
+        elif periode == 'mois':
+            debut_mois = datetime.now().replace(day=1).strftime("%Y-%m-%d")
+            query = """
+                SELECT DATE(date_vente), COALESCE(SUM(total), 0)
+                FROM ventes WHERE date_vente >= ?
+                GROUP BY DATE(date_vente) ORDER BY DATE(date_vente)
+            """
+            results = db.fetch_all(query, (debut_mois,))
+            return [(r[0][-2:], r[1]) for r in results]
+        return []

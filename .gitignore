@@ -6,3 +6,5 @@ output/
 data/
 *.db
 *.spec
+sauvegardes/
+recus/

@@ -95,11 +95,19 @@ class FenetreVentes:
         )
         self.entry_scan.pack(side='left', fill='x', expand=True, ipady=12)
         self.entry_scan.bind('<Return>', self.scanner_produit)
-        
+
+        # Bouton scanner camera
+        tk.Button(
+            scan_frame, text="Camera",
+            font=("Segoe UI", 11, "bold"),
+            bg=COLORS['info'], fg="white", relief='flat', cursor='hand2',
+            command=self.ouvrir_scanner_camera, padx=12
+        ).pack(side='left', padx=(8, 0), ipady=12)
+
         # Indication visuelle
         tk.Label(
             scanner_inner,
-            text="💡 Scannez ou tapez le code-barres puis appuyez sur ENTRÉE",
+            text="Scannez ou tapez le code-barres puis appuyez sur ENTREE",
             font=("Segoe UI", 9, "italic"),
             bg="white",
             fg=COLORS['gray']
@@ -297,8 +305,24 @@ class FenetreVentes:
         self.fenetre.bind('<F5>', lambda e: self.entry_scan.focus())
         self.fenetre.bind('<F2>', lambda e: self.valider_vente())
     
+    def ouvrir_scanner_camera(self):
+        """Ouvrir le scanner par webcam"""
+        from modules.scanner_camera import SCANNER_DISPONIBLE, ScannerCamera
+        if not SCANNER_DISPONIBLE:
+            messagebox.showinfo("Info",
+                "Scanner camera non disponible.\n"
+                "Installez: pip install opencv-python pyzbar")
+            return
+
+        def on_code_scanne(code):
+            self.entry_scan.delete(0, 'end')
+            self.entry_scan.insert(0, code)
+            self.scanner_produit()
+
+        ScannerCamera(self.fenetre, on_code_scanne)
+
     def scanner_produit(self, event=None):
-        """Scanner un produit et l'ajouter au panier MÉMOIRE"""
+        """Scanner un produit et l'ajouter au panier MEMOIRE"""
         code_barre = self.entry_scan.get().strip()
         
         if not code_barre:
@@ -498,29 +522,37 @@ class FenetreVentes:
             self.actualiser_panier()
     
     def valider_vente(self):
-        """Valider la vente - MAINTENANT on écrit dans la BD"""
+        """Valider la vente - Ouvrir la fenetre de paiement"""
         if not self.panier:
             messagebox.showwarning("Attention", "Le panier est vide!")
             return
-        
+
+        total = sum(item['sous_total'] for item in self.panier)
+
+        from interface.fenetre_paiement import FenetrePaiement
+        FenetrePaiement(self.fenetre, total, self._finaliser_vente)
+
+    def _finaliser_vente(self, paiements_result):
+        """Finaliser la vente apres paiement confirme"""
+        if paiements_result is None:
+            return  # Paiement annule
+
         client = self.entry_client.get().strip()
-        
+
         try:
-            # ==========================================
-            # CRÉER LA VENTE DANS LA BD
-            # ==========================================
             from modules.ventes import Vente
+            from modules.paiements import Paiement
             from database import db
-            
-            # Générer le numéro de vente
+
+            # Generer le numero de vente
             date_str = datetime.now().strftime("%Y%m%d")
             random_str = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
             numero_vente = f"V{date_str}-{random_str}"
-            
+
             # Calculer le total
             total = sum(item['sous_total'] for item in self.panier)
-            
-            # Insérer la vente
+
+            # Inserer la vente
             query_vente = """
                 INSERT INTO ventes (numero_vente, date_vente, total, client)
                 VALUES (?, ?, ?, ?)
@@ -529,47 +561,56 @@ class FenetreVentes:
                 query_vente,
                 (numero_vente, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), total, client or None)
             )
-            
-            # Insérer les détails
+
+            # Inserer les details
             query_detail = """
                 INSERT INTO details_ventes (vente_id, produit_id, quantite, prix_unitaire, sous_total)
                 VALUES (?, ?, ?, ?, ?)
             """
-            
+
             for item in self.panier:
                 db.execute_query(
                     query_detail,
                     (vente_id, item['produit_id'], item['quantite'], item['prix_vente'], item['sous_total'])
                 )
-                
-                # Déduire du stock
+
+                # Deduire du stock
                 db.execute_query(
                     "UPDATE produits SET stock_actuel = stock_actuel - ? WHERE id = ?",
                     (item['quantite'], item['produit_id'])
                 )
-            
-            # ==========================================
-            # GÉNÉRER LE REÇU PDF
-            # ==========================================
+
+            # Enregistrer les paiements
+            for p in paiements_result:
+                Paiement.enregistrer_paiement(
+                    vente_id, p['mode'], p['montant'],
+                    reference=p.get('reference'),
+                    montant_recu=p.get('montant_recu'),
+                    monnaie_rendue=p.get('monnaie_rendue')
+                )
+
+            # Generer le recu PDF
             from modules.recus import generer_recu_pdf
             chemin_recu = generer_recu_pdf(vente_id)
-            
-            # Préparer les infos pour la confirmation
+
+            # Preparer les infos pour la confirmation
             vente_info = {
                 'numero': numero_vente,
-                'date': datetime.now().strftime("%d/%m/%Y à %H:%M"),
+                'date': datetime.now().strftime("%d/%m/%Y a %H:%M"),
                 'total': total,
                 'client': client,
-                'items': self.panier.copy()
+                'items': self.panier.copy(),
+                'vente_id': vente_id,
+                'paiements': paiements_result,
             }
-            
-            # Fermer cette fenêtre
+
+            # Fermer cette fenetre
             self.fenetre.destroy()
-            
+
             # Afficher la confirmation
             from interface.fenetre_confirmation_vente import FenetreConfirmationVente
             FenetreConfirmationVente(self.fenetre.master, vente_info, chemin_recu, callback=self.callback)
-            
+
         except Exception as e:
             messagebox.showerror("Erreur", f"Impossible de valider la vente:\n{e}")
             import traceback

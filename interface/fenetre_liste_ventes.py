@@ -4,6 +4,7 @@ Fenêtre Liste des Ventes - Voir l'historique complet
 import tkinter as tk
 from tkinter import ttk, messagebox
 from modules.ventes import Vente
+from modules.paiements import Paiement, MODE_LABELS
 from config import *
 from datetime import datetime
 
@@ -16,6 +17,16 @@ class FenetreListeVentes:
         
         self.creer_interface()
         self.charger_ventes()
+
+    def _obtenir_mode_paiement(self, vente_id):
+        """Obtenir le libellé du mode de paiement d'une vente"""
+        paiements = Paiement.obtenir_paiements_vente(vente_id)
+        if not paiements:
+            return "—"
+        if len(paiements) > 1:
+            return "Mixte"
+        mode = paiements[0][2]
+        return MODE_LABELS.get(mode, mode)
     
     def creer_interface(self):
         """Créer l'interface"""
@@ -60,13 +71,28 @@ class FenetreListeVentes:
             bd=1,
             width=30
         )
-        self.entry_recherche.pack(side='left', ipady=8, padx=(0, 15))
+        self.entry_recherche.pack(side='left', ipady=8, padx=(0, 10))
         self.entry_recherche.bind('<KeyRelease>', lambda e: self.rechercher_ventes())
-        
+
+        # Filtres de date
+        tk.Label(top_inner, text="Du:", font=("Segoe UI", 10), bg="white").pack(side='left', padx=(5, 3))
+        self.entry_date_debut = tk.Entry(top_inner, width=10, font=("Segoe UI", 10), relief='solid', bd=1)
+        self.entry_date_debut.pack(side='left', ipady=4)
+
+        tk.Label(top_inner, text="Au:", font=("Segoe UI", 10), bg="white").pack(side='left', padx=(8, 3))
+        self.entry_date_fin = tk.Entry(top_inner, width=10, font=("Segoe UI", 10), relief='solid', bd=1)
+        self.entry_date_fin.pack(side='left', ipady=4)
+
+        tk.Button(
+            top_inner, text="Filtrer", font=("Segoe UI", 9, "bold"),
+            bg=COLORS['info'], fg="white", relief='flat', cursor='hand2',
+            command=self.charger_ventes, padx=10
+        ).pack(side='left', padx=(8, 5))
+
         # Boutons
         tk.Button(
             top_inner,
-            text="🔄 Actualiser",
+            text="Actualiser",
             font=("Segoe UI", 10, "bold"),
             bg=COLORS['primary'],
             fg="white",
@@ -147,7 +173,7 @@ class FenetreListeVentes:
         scrollbar_x.pack(side='bottom', fill='x')
         
         # Colonnes
-        colonnes = ('ID', 'Numéro', 'Date', 'Heure', 'Client', 'Total', 'Articles')
+        colonnes = ('ID', 'Numéro', 'Date', 'Heure', 'Client', 'Total', 'Paiement', 'Articles')
         self.tree = ttk.Treeview(
             tree_container,
             columns=colonnes,
@@ -156,10 +182,10 @@ class FenetreListeVentes:
             xscrollcommand=scrollbar_x.set,
             height=20
         )
-        
+
         scrollbar_y.config(command=self.tree.yview)
         scrollbar_x.config(command=self.tree.xview)
-        
+
         # En-têtes
         self.tree.heading('ID', text='ID')
         self.tree.heading('Numéro', text='Numéro Vente')
@@ -167,16 +193,18 @@ class FenetreListeVentes:
         self.tree.heading('Heure', text='Heure')
         self.tree.heading('Client', text='Client')
         self.tree.heading('Total', text='Total (FCFA)')
+        self.tree.heading('Paiement', text='Paiement')
         self.tree.heading('Articles', text='Nb Articles')
-        
+
         # Largeurs
         self.tree.column('ID', width=50)
         self.tree.column('Numéro', width=200)
         self.tree.column('Date', width=120)
         self.tree.column('Heure', width=100)
-        self.tree.column('Client', width=200)
-        self.tree.column('Total', width=150)
-        self.tree.column('Articles', width=100)
+        self.tree.column('Client', width=180)
+        self.tree.column('Total', width=130)
+        self.tree.column('Paiement', width=150)
+        self.tree.column('Articles', width=90)
         
         self.tree.pack(fill='both', expand=True)
         
@@ -193,14 +221,30 @@ class FenetreListeVentes:
         self.tree.bind('<Button-3>', self.afficher_menu_contextuel)
     
     def charger_ventes(self):
-        """Charger les ventes depuis la base de données avec tri et statistiques"""
+        """Charger les ventes avec filtre de date optionnel"""
         # 1. Nettoyer le tableau actuel
         for item in self.tree.get_children():
             self.tree.delete(item)
-            
-        # 2. Récupérer les données (Triées par ID décroissant pour avoir les plus récentes)
+
+        # 2. Recuperer avec filtre de date
         from database import db
-        ventes = db.fetch_all("SELECT id, numero_vente, date_vente, total, client FROM ventes ORDER BY id DESC")
+        date_debut = self.entry_date_debut.get().strip() if hasattr(self, 'entry_date_debut') else ""
+        date_fin = self.entry_date_fin.get().strip() if hasattr(self, 'entry_date_fin') else ""
+
+        if date_debut and date_fin:
+            ventes = db.fetch_all(
+                "SELECT id, numero_vente, date_vente, total, client FROM ventes "
+                "WHERE DATE(date_vente) BETWEEN ? AND ? ORDER BY id DESC",
+                (date_debut, date_fin)
+            )
+        elif date_debut:
+            ventes = db.fetch_all(
+                "SELECT id, numero_vente, date_vente, total, client FROM ventes "
+                "WHERE DATE(date_vente) >= ? ORDER BY id DESC",
+                (date_debut,)
+            )
+        else:
+            ventes = db.fetch_all("SELECT id, numero_vente, date_vente, total, client FROM ventes ORDER BY id DESC")
         
         # 3. Gérer le cas où il n'y a pas de ventes
         if not ventes:
@@ -234,6 +278,9 @@ class FenetreListeVentes:
             details = Vente.obtenir_details_vente(vente_id)
             nb_articles = sum(d[2] for d in details) if details else 0
             
+            # Mode de paiement
+            mode_paiement = self._obtenir_mode_paiement(vente_id)
+
             # 6. Insertion unique dans le tableau visuel
             self.tree.insert('', 'end', values=(
                 vente_id,
@@ -242,6 +289,7 @@ class FenetreListeVentes:
                 heure_str,
                 client,
                 f"{total:,.0f}",
+                mode_paiement,
                 nb_articles
             ))
         
@@ -280,7 +328,8 @@ class FenetreListeVentes:
                 
                 details = Vente.obtenir_details_vente(vente_id)
                 nb_articles = sum(d[2] for d in details) if details else 0
-                
+                mode_paiement = self._obtenir_mode_paiement(vente_id)
+
                 self.tree.insert('', 'end', values=(
                     vente_id,
                     vente[1],
@@ -288,6 +337,7 @@ class FenetreListeVentes:
                     heure_str,
                     vente[4] if len(vente) > 4 and vente[4] else "—",
                     f"{total:,.0f}",
+                    mode_paiement,
                     nb_articles
                 ))
     
@@ -360,6 +410,40 @@ class FenetreListeVentes:
         
         tree_details.pack(fill='both', expand=True)
         
+        # Séparateur
+        tk.Frame(details_win, bg=COLORS['light'], height=1).pack(fill='x', padx=30, pady=10)
+
+        # Détails paiement
+        paiements = Paiement.obtenir_paiements_vente(vente_id)
+        if paiements:
+            tk.Label(
+                details_win,
+                text="Paiement:",
+                font=("Segoe UI", 12, "bold"),
+                bg="white"
+            ).pack(anchor='w', padx=30, pady=(0, 5))
+
+            for p in paiements:
+                mode = MODE_LABELS.get(p[2], p[2])
+                montant = p[3]
+                reference = p[4] if p[4] else ""
+                montant_recu = p[5] if len(p) > 5 and p[5] else None
+                monnaie_rendue = p[6] if len(p) > 6 and p[6] else None
+
+                ligne = f"  {mode}: {montant:,.0f} FCFA"
+                if reference:
+                    ligne += f"  (Ref: {reference})"
+                if montant_recu:
+                    ligne += f"  | Recu: {montant_recu:,.0f} | Rendu: {monnaie_rendue:,.0f}"
+
+                tk.Label(
+                    details_win,
+                    text=ligne,
+                    font=("Segoe UI", 10),
+                    bg="white",
+                    fg=COLORS['dark']
+                ).pack(anchor='w', padx=30)
+
         # Total
         tk.Label(
             details_win,

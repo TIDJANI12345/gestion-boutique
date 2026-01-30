@@ -323,9 +323,48 @@ class FenetreProduits:
         self.entry_recherche.pack(side='left', ipady=5)
         self.entry_recherche.bind('<KeyRelease>', lambda e: self.rechercher_produits())
         
-        # Séparateur
+        # Filtres
+        filter_frame = tk.Frame(list_panel, bg="white")
+        filter_frame.pack(fill='x', padx=15, pady=(8, 5))
+
+        tk.Label(filter_frame, text="Categorie:", font=("Segoe UI", 9), bg="white").pack(side='left', padx=(0, 3))
+        self.combo_categorie = ttk.Combobox(filter_frame, width=14, state='readonly', font=("Segoe UI", 9))
+        self.combo_categorie.pack(side='left', padx=(0, 8))
+        self.combo_categorie.bind('<<ComboboxSelected>>', lambda e: self.appliquer_filtres())
+
+        tk.Label(filter_frame, text="Stock:", font=("Segoe UI", 9), bg="white").pack(side='left', padx=(0, 3))
+        self.combo_stock = ttk.Combobox(filter_frame, width=12, state='readonly', font=("Segoe UI", 9),
+                                        values=["Tous", "Stock faible", "Rupture"])
+        self.combo_stock.set("Tous")
+        self.combo_stock.pack(side='left', padx=(0, 8))
+        self.combo_stock.bind('<<ComboboxSelected>>', lambda e: self.appliquer_filtres())
+
+        tk.Label(filter_frame, text="Prix:", font=("Segoe UI", 9), bg="white").pack(side='left', padx=(0, 3))
+        self.entry_prix_min = tk.Entry(filter_frame, width=7, font=("Segoe UI", 9), relief='solid', bd=1)
+        self.entry_prix_min.pack(side='left', padx=(0, 2))
+        self.entry_prix_min.insert(0, "Min")
+        self.entry_prix_min.bind('<FocusIn>', lambda e: self._clear_placeholder(self.entry_prix_min, "Min"))
+
+        tk.Label(filter_frame, text="-", bg="white").pack(side='left')
+        self.entry_prix_max = tk.Entry(filter_frame, width=7, font=("Segoe UI", 9), relief='solid', bd=1)
+        self.entry_prix_max.pack(side='left', padx=(2, 5))
+        self.entry_prix_max.insert(0, "Max")
+        self.entry_prix_max.bind('<FocusIn>', lambda e: self._clear_placeholder(self.entry_prix_max, "Max"))
+
+        tk.Button(filter_frame, text="Filtrer", font=("Segoe UI", 8, "bold"),
+                  bg=COLORS['primary'], fg="white", relief='flat',
+                  command=self.appliquer_filtres, padx=8).pack(side='left', padx=3)
+
+        tk.Button(filter_frame, text="Reset", font=("Segoe UI", 8, "bold"),
+                  bg=COLORS['gray'], fg="white", relief='flat',
+                  command=self.reset_filtres, padx=8).pack(side='left')
+
+        # Charger les categories dans le filtre
+        self._charger_categories_filtre()
+
+        # Separateur
         tk.Frame(list_panel, bg=COLORS['light'], height=1).pack(fill='x')
-        
+
         # Boutons actions
         actions_frame = tk.Frame(list_panel, bg="white")
         actions_frame.pack(fill='x', padx=15, pady=10)
@@ -413,8 +452,32 @@ class FenetreProduits:
         self.tree.column('Code-barre', width=150)
         
         self.tree.pack(fill='both', expand=True)
-        
-        # Événements
+
+        # Pagination
+        self.page_actuelle = 0
+        self.produits_par_page = PAGINATION['produits_par_page']
+
+        page_frame = tk.Frame(list_panel, bg="white")
+        page_frame.pack(fill='x', padx=15, pady=(5, 10))
+
+        self.btn_prev = tk.Button(page_frame, text="< Precedent", font=("Segoe UI", 9),
+                                   bg=COLORS['gray'], fg="white", relief='flat',
+                                   command=self.page_precedente, padx=10)
+        self.btn_prev.pack(side='left')
+
+        self.label_page = tk.Label(page_frame, text="Page 1", font=("Segoe UI", 9, "bold"), bg="white")
+        self.label_page.pack(side='left', padx=15)
+
+        self.btn_next = tk.Button(page_frame, text="Suivant >", font=("Segoe UI", 9),
+                                   bg=COLORS['gray'], fg="white", relief='flat',
+                                   command=self.page_suivante, padx=10)
+        self.btn_next.pack(side='left')
+
+        self.label_total_produits = tk.Label(page_frame, text="", font=("Segoe UI", 9),
+                                              bg="white", fg=COLORS['gray'])
+        self.label_total_produits.pack(side='right')
+
+        # Evenements
         self.tree.bind('<<TreeviewSelect>>', self.selectionner_produit)
         self.tree.bind('<Double-1>', self.voir_code_barre)
     
@@ -505,40 +568,118 @@ class FenetreProduits:
         except Exception as e:
             messagebox.showerror("Erreur", f"Une erreur est survenue:\n{e}")
     
+    def _clear_placeholder(self, entry, placeholder):
+        """Effacer le placeholder au focus"""
+        if entry.get() == placeholder:
+            entry.delete(0, 'end')
+
+    def _charger_categories_filtre(self):
+        """Charger les categories dans le combobox filtre"""
+        try:
+            categories = Produit.obtenir_categories()
+            self.combo_categorie['values'] = ["Toutes"] + categories
+            self.combo_categorie.set("Toutes")
+        except Exception:
+            self.combo_categorie['values'] = ["Toutes"]
+            self.combo_categorie.set("Toutes")
+
+    def _get_filtres(self):
+        """Recuperer les valeurs actuelles des filtres"""
+        terme = self.entry_recherche.get().strip()
+        categorie = self.combo_categorie.get() if hasattr(self, 'combo_categorie') else None
+        stock_filter = self.combo_stock.get() if hasattr(self, 'combo_stock') else "Tous"
+        if stock_filter == "Tous":
+            stock_filter = None
+
+        prix_min_str = self.entry_prix_min.get().strip() if hasattr(self, 'entry_prix_min') else ""
+        prix_max_str = self.entry_prix_max.get().strip() if hasattr(self, 'entry_prix_max') else ""
+
+        prix_min = None
+        prix_max = None
+        try:
+            if prix_min_str and prix_min_str != "Min":
+                prix_min = float(prix_min_str)
+        except ValueError:
+            pass
+        try:
+            if prix_max_str and prix_max_str != "Max":
+                prix_max = float(prix_max_str)
+        except ValueError:
+            pass
+
+        return terme, categorie, stock_filter, prix_min, prix_max
+
     def charger_produits(self):
-        """Charger tous les produits"""
+        """Charger les produits avec filtres et pagination"""
+        self.page_actuelle = 0
+        self._charger_page()
+
+    def _charger_page(self):
+        """Charger la page actuelle de produits"""
         for item in self.tree.get_children():
             self.tree.delete(item)
-        
-        produits = Produit.obtenir_tous()
+
+        terme, categorie, stock_filter, prix_min, prix_max = self._get_filtres()
+        offset = self.page_actuelle * self.produits_par_page
+
+        produits = Produit.rechercher_filtre(
+            terme=terme, categorie=categorie, stock_filter=stock_filter,
+            prix_min=prix_min, prix_max=prix_max,
+            limit=self.produits_par_page, offset=offset
+        )
+
+        total = Produit.compter_filtre(
+            terme=terme, categorie=categorie, stock_filter=stock_filter,
+            prix_min=prix_min, prix_max=prix_max
+        )
+
         for produit in produits:
             self.tree.insert('', 'end', values=(
-                produit[0],  # ID
-                produit[1],  # Nom
-                produit[2] or "Sans catégorie",  # Catégorie
-                f"{produit[4]:.0f} FCFA",  # Prix vente
-                produit[5],  # Stock
-                produit[8] or "code128",  # Type code-barres
-                produit[7]   # Code-barre
+                produit[0], produit[1], produit[2] or "Sans categorie",
+                f"{produit[4]:.0f} FCFA", produit[5],
+                produit[8] or "code128", produit[7]
             ))
-    
+
+        # Mise a jour pagination
+        nb_pages = max(1, (total + self.produits_par_page - 1) // self.produits_par_page)
+        self.label_page.config(text=f"Page {self.page_actuelle + 1} / {nb_pages}")
+        self.label_total_produits.config(text=f"{total} produit(s)")
+
+        self.btn_prev.config(state='normal' if self.page_actuelle > 0 else 'disabled')
+        self.btn_next.config(state='normal' if self.page_actuelle < nb_pages - 1 else 'disabled')
+
     def rechercher_produits(self):
-        """Rechercher des produits"""
-        terme = self.entry_recherche.get()
-        
-        for item in self.tree.get_children():
-            self.tree.delete(item)
-        
-        if terme == "":
-            self.charger_produits()
-        else:
-            produits = Produit.rechercher(terme)
-            for produit in produits:
-                self.tree.insert('', 'end', values=(
-                    produit[0], produit[1], produit[2] or "Sans catégorie",
-                    f"{produit[4]:.0f} FCFA", produit[5],
-                    produit[8] or "code128", produit[7]
-                ))
+        """Rechercher avec mise a jour de la pagination"""
+        self.page_actuelle = 0
+        self._charger_page()
+
+    def appliquer_filtres(self):
+        """Appliquer les filtres et recharger"""
+        self.page_actuelle = 0
+        self._charger_page()
+
+    def reset_filtres(self):
+        """Remettre tous les filtres a zero"""
+        self.entry_recherche.delete(0, 'end')
+        self.combo_categorie.set("Toutes")
+        self.combo_stock.set("Tous")
+        self.entry_prix_min.delete(0, 'end')
+        self.entry_prix_min.insert(0, "Min")
+        self.entry_prix_max.delete(0, 'end')
+        self.entry_prix_max.insert(0, "Max")
+        self.page_actuelle = 0
+        self._charger_page()
+
+    def page_precedente(self):
+        """Aller a la page precedente"""
+        if self.page_actuelle > 0:
+            self.page_actuelle -= 1
+            self._charger_page()
+
+    def page_suivante(self):
+        """Aller a la page suivante"""
+        self.page_actuelle += 1
+        self._charger_page()
     
     def selectionner_produit(self, event):
         """Remplir le formulaire avec le produit sélectionné"""

@@ -26,8 +26,9 @@ def reset_db():
     """Vider toutes les tables pour un test propre.
     Reutilise la meme instance db (et donc la meme connexion :memory:)."""
     db = database.db
-    for table in ['details_ventes', 'historique_stock', 'logs_actions',
-                  'sync_queue', 'ventes', 'produits', 'utilisateurs', 'parametres']:
+    for table in ['paiements', 'details_ventes', 'historique_stock', 'logs_actions',
+                  'sync_queue', 'ventes', 'produits', 'utilisateurs', 'parametres',
+                  'taux_tva', 'devises']:
         try:
             db.execute_query(f"DELETE FROM {table}")
         except Exception:

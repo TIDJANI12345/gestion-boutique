@@ -144,10 +144,10 @@ class FenetreConfirmationVente:
         btn_pdf.bind('<Enter>', lambda e: btn_pdf.config(bg=self.darken_color(COLORS['danger'])))
         btn_pdf.bind('<Leave>', lambda e: btn_pdf.config(bg=COLORS['danger']))
         
-        # Bouton IMPRIMER
+        # Bouton IMPRIMER PDF
         btn_print = tk.Button(
             content,
-            text="🖨️  Imprimer",
+            text="🖨️  Imprimer PDF",
             font=("Segoe UI", 13, "bold"),
             bg=COLORS['primary'],
             fg="white",
@@ -157,9 +157,26 @@ class FenetreConfirmationVente:
             activebackground=self.darken_color(COLORS['primary'])
         )
         btn_print.pack(fill='x', ipady=16, pady=(0, 12))
-        
+
         btn_print.bind('<Enter>', lambda e: btn_print.config(bg=self.darken_color(COLORS['primary'])))
         btn_print.bind('<Leave>', lambda e: btn_print.config(bg=COLORS['primary']))
+
+        # Bouton IMPRIMER TICKET THERMIQUE
+        btn_ticket = tk.Button(
+            content,
+            text="🧾  Imprimer ticket",
+            font=("Segoe UI", 13, "bold"),
+            bg=COLORS['warning'],
+            fg="white",
+            relief='flat',
+            cursor='hand2',
+            command=self.imprimer_ticket,
+            activebackground=self.darken_color(COLORS['warning'])
+        )
+        btn_ticket.pack(fill='x', ipady=16, pady=(0, 12))
+
+        btn_ticket.bind('<Enter>', lambda e: btn_ticket.config(bg=self.darken_color(COLORS['warning'])))
+        btn_ticket.bind('<Leave>', lambda e: btn_ticket.config(bg=COLORS['warning']))
         
         # Bouton NOUVELLE VENTE
         btn_new = tk.Button(
@@ -278,9 +295,33 @@ class FenetreConfirmationVente:
             messagebox.showerror("Erreur", "Fichier PDF introuvable")
     
     def imprimer(self):
-        """Imprimer le reçu"""
+        """Imprimer le reçu PDF"""
         self.ouvrir_pdf()
         messagebox.showinfo("Impression", "Le PDF s'est ouvert.\nUtilisez Ctrl+P pour imprimer.")
+
+    def imprimer_ticket(self):
+        """Imprimer sur imprimante thermique"""
+        vente_id = self.vente_info.get('vente_id')
+        if not vente_id:
+            messagebox.showerror("Erreur", "ID de vente non disponible")
+            return
+
+        from modules.imprimante import ImprimanteThermique
+
+        if not ImprimanteThermique.est_disponible():
+            messagebox.showwarning(
+                "Imprimante",
+                "L'impression thermique n'est pas disponible.\n\n"
+                "Verifiez que python-escpos est installe\n"
+                "et que l'imprimante est configuree."
+            )
+            return
+
+        succes, message = ImprimanteThermique.imprimer_recu(vente_id)
+        if succes:
+            messagebox.showinfo("Impression", "Ticket imprime avec succes!")
+        else:
+            messagebox.showerror("Erreur", f"Echec de l'impression:\n{message}")
     
     def nouvelle_vente(self):
         """Ouvrir une nouvelle vente"""

@@ -219,3 +219,71 @@ class Produit:
             categories[categorie].append(produit)
 
         return categories
+
+    @staticmethod
+    def rechercher_filtre(terme="", categorie=None, stock_filter=None,
+                          prix_min=None, prix_max=None, limit=50, offset=0):
+        """Rechercher des produits avec filtres multiples et pagination"""
+        conditions = []
+        params = []
+
+        if terme:
+            conditions.append("(nom LIKE ? OR categorie LIKE ? OR code_barre LIKE ?)")
+            t = f"%{terme}%"
+            params.extend([t, t, t])
+
+        if categorie and categorie != "Toutes":
+            conditions.append("categorie = ?")
+            params.append(categorie)
+
+        if stock_filter == "Stock faible":
+            conditions.append("stock_actuel <= stock_alerte AND stock_actuel > 0")
+        elif stock_filter == "Rupture":
+            conditions.append("stock_actuel = 0")
+
+        if prix_min is not None:
+            conditions.append("prix_vente >= ?")
+            params.append(prix_min)
+        if prix_max is not None:
+            conditions.append("prix_vente <= ?")
+            params.append(prix_max)
+
+        where = " AND ".join(conditions) if conditions else "1=1"
+        query = f"SELECT * FROM produits WHERE {where} ORDER BY id ASC LIMIT ? OFFSET ?"
+        params.extend([limit, offset])
+
+        return db.fetch_all(query, tuple(params))
+
+    @staticmethod
+    def compter_filtre(terme="", categorie=None, stock_filter=None,
+                       prix_min=None, prix_max=None):
+        """Compter les produits correspondant aux filtres (pour pagination)"""
+        conditions = []
+        params = []
+
+        if terme:
+            conditions.append("(nom LIKE ? OR categorie LIKE ? OR code_barre LIKE ?)")
+            t = f"%{terme}%"
+            params.extend([t, t, t])
+
+        if categorie and categorie != "Toutes":
+            conditions.append("categorie = ?")
+            params.append(categorie)
+
+        if stock_filter == "Stock faible":
+            conditions.append("stock_actuel <= stock_alerte AND stock_actuel > 0")
+        elif stock_filter == "Rupture":
+            conditions.append("stock_actuel = 0")
+
+        if prix_min is not None:
+            conditions.append("prix_vente >= ?")
+            params.append(prix_min)
+        if prix_max is not None:
+            conditions.append("prix_vente <= ?")
+            params.append(prix_max)
+
+        where = " AND ".join(conditions) if conditions else "1=1"
+        query = f"SELECT COUNT(*) FROM produits WHERE {where}"
+
+        result = db.fetch_one(query, tuple(params))
+        return result[0] if result else 0

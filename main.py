@@ -4,13 +4,17 @@ from interface.fenetre_principale import FenetrePrincipale
 from interface.fenetre_licence import FenetreLicence
 from modules.licence import GestionLicence
 from database import db
+from modules.theme import ThemeManager
 
 def main():
-    # 0. Splash screen
+    # 0. Charger le theme sauvegarde
+    ThemeManager.instance()
+
+    # 1. Splash screen
     splash = SplashScreen(duree=3000)
     splash.afficher()
 
-    # 1. Verifier licence
+    # 2. Verifier licence
     manager = GestionLicence()
     est_valide, message = manager.verifier_locale()
 

@@ -18,6 +18,7 @@ class FenetrePrincipaleCaissier:
         self.root = tk.Tk()
         self.root.title(f"{APP_NAME} - Caissier")
         self.root.geometry("900x700")
+        self.root.minsize(800, 550)
         self.root.configure(bg=COLORS['bg'])
         
         self.centrer_fenetre()
@@ -188,17 +189,22 @@ class FenetrePrincipaleCaissier:
             command=self.voir_mes_ventes
         ).pack(fill='x', ipady=15)
         
-        # Footer
+        # Footer avec raccourcis
         footer = tk.Frame(self.root, bg=COLORS['light'], height=40)
         footer.pack(fill='x', side='bottom')
-        
+
         tk.Label(
             footer,
-            text=f"© 2026 {APP_NAME} v{APP_VERSION} - Mode Caissier",
+            text="F1=Nouvelle vente | F3=Mes ventes | F5=Actualiser",
             font=("Segoe UI", 9),
             bg=COLORS['light'],
             fg=COLORS['gray']
         ).pack(pady=10)
+
+        # Raccourcis clavier
+        self.root.bind('<F1>', lambda e: self.ouvrir_ventes())
+        self.root.bind('<F3>', lambda e: self.voir_mes_ventes())
+        self.root.bind('<F5>', lambda e: self.actualiser_stats())
     
     def actualiser_stats(self):
         """Actualiser les statistiques du caissier"""

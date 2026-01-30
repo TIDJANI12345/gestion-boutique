@@ -55,8 +55,8 @@ SUCCESS_COLOR = "#10B981"
 DANGER_COLOR = "#EF4444"
 WARNING_COLOR = "#F59E0B"
 
-# Palette de couleurs complète
-COLORS = {
+# Themes
+THEME_CLAIR = {
     'primary': '#3B82F6',
     'success': '#10B981',
     'danger': '#EF4444',
@@ -69,6 +69,50 @@ COLORS = {
     'white': '#FFFFFF',
     'bg': '#F9FAFB',
     'text': '#1F2937',
+    'card_bg': '#FFFFFF',
+    'card_border': '#E5E7EB',
+    'input_bg': '#FFFFFF',
+    'input_fg': '#1F2937',
+    'separator': '#E5E7EB',
+}
+
+THEME_SOMBRE = {
+    'primary': '#3B82F6',
+    'success': '#10B981',
+    'danger': '#EF4444',
+    'warning': '#F59E0B',
+    'info': '#06B6D4',
+    'purple': '#8B5CF6',
+    'gray': '#9CA3AF',
+    'dark': '#F9FAFB',
+    'light': '#374151',
+    'white': '#1F2937',
+    'bg': '#111827',
+    'text': '#F9FAFB',
+    'card_bg': '#1F2937',
+    'card_border': '#374151',
+    'input_bg': '#374151',
+    'input_fg': '#F9FAFB',
+    'separator': '#374151',
+}
+
+# Palette active (mise a jour par ThemeManager au demarrage)
+COLORS = dict(THEME_CLAIR)
+
+# Raccourcis clavier
+RACCOURCIS_CLAVIER = {
+    'nouvelle_vente': '<F1>',
+    'rechercher_produit': '<F2>',
+    'liste_ventes': '<F3>',
+    'rapports': '<F4>',
+    'actualiser': '<F5>',
+    'export_whatsapp': '<F6>',
+}
+
+# Pagination
+PAGINATION = {
+    'produits_par_page': 50,
+    'ventes_par_page': 50,
 }
 
 # Configuration des codes-barres
@@ -116,3 +160,18 @@ BARCODE_PREFIX = "PRD"
 # Configuration de la synchronisation cloud
 SYNC_SERVER_URL = "https://gbserver.pythonanywhere.com"
 SYNC_INTERVAL = 300  # 5 minutes
+
+# Configuration des sauvegardes
+BACKUP_DIR = os.path.join(BASE_DIR, 'sauvegardes')
+BACKUP_MAX_COUNT = 10  # Nombre max de sauvegardes locales
+
+# Configuration imprimante thermique
+IMPRIMANTE_LARGEURS = {
+    '58mm': 32,
+    '80mm': 48,
+}
+
+# Configuration fiscale par defaut
+TVA_TAUX_DEFAUT = 18  # % - Standard Benin
+DEVISE_DEFAUT_CODE = 'XOF'
+DEVISE_DEFAUT_SYMBOLE = 'FCFA'

@@ -1,0 +1,378 @@
+2026-01-30 13:08:59 [INFO] database: Connexion a la base de donnees reussie
+2026-01-30 13:08:59 [INFO] database: Colonne updated_at ajoutee a produits
+2026-01-30 13:08:59 [INFO] database: Colonne updated_at ajoutee a utilisateurs
+2026-01-30 13:08:59 [INFO] database: Tables creees/verifiees avec succes
+2026-01-30 13:08:59 [INFO] produits: Produit ajoute : 'Savon' (code: PRD161432)
+2026-01-30 13:08:59 [INFO] ventes: Vente creee : ID=1, numero=V20260130-UXTBW7
+2026-01-30 13:08:59 [INFO] ventes: Produit 1 ajoute a vente 1 (qte: 2)
+2026-01-30 13:08:59 [INFO] paiements: Paiement enregistre: vente=1, mode=especes, montant=700
+2026-01-30 13:08:59 [INFO] produits: Produit ajoute : 'Savon' (code: PRD160503)
+2026-01-30 13:08:59 [INFO] ventes: Vente creee : ID=2, numero=V20260130-5CW5EK
+2026-01-30 13:08:59 [INFO] ventes: Produit 2 ajoute a vente 2 (qte: 2)
+2026-01-30 13:08:59 [INFO] paiements: Paiement enregistre: vente=2, mode=especes, montant=700
+2026-01-30 13:08:59 [INFO] produits: Produit ajoute : 'Savon' (code: PRD350993)
+2026-01-30 13:08:59 [INFO] ventes: Vente creee : ID=3, numero=V20260130-HRI87G
+2026-01-30 13:08:59 [INFO] ventes: Produit 3 ajoute a vente 3 (qte: 2)
+2026-01-30 13:08:59 [INFO] paiements: Paiement enregistre: vente=3, mode=especes, montant=700
+2026-01-30 13:08:59 [INFO] produits: Produit ajoute : 'Riz 5kg' (code: PRD813447)
+2026-01-30 13:08:59 [INFO] ventes: Vente creee : ID=4, numero=V20260130-W5N36R
+2026-01-30 13:08:59 [INFO] ventes: Produit 4 ajoute a vente 4 (qte: 1)
+2026-01-30 13:08:59 [INFO] paiements: Paiement mixte enregistre: vente=4, 2 paiements
+2026-01-30 13:08:59 [INFO] produits: Produit ajoute : 'Riz 5kg' (code: PRD772642)
+2026-01-30 13:08:59 [INFO] ventes: Vente creee : ID=5, numero=V20260130-9OAD4S
+2026-01-30 13:08:59 [INFO] ventes: Produit 5 ajoute a vente 5 (qte: 1)
+2026-01-30 13:08:59 [INFO] paiements: Paiement mixte enregistre: vente=5, 2 paiements
+2026-01-30 13:08:59 [INFO] produits: Produit ajoute : 'Huile' (code: PRD613595)
+2026-01-30 13:08:59 [INFO] ventes: Vente creee : ID=6, numero=V20260130-Z03YWQ
+2026-01-30 13:08:59 [INFO] ventes: Produit 6 ajoute a vente 6 (qte: 1)
+2026-01-30 13:08:59 [INFO] paiements: Paiement enregistre: vente=6, mode=moov_money, montant=2500
+2026-01-30 13:08:59 [INFO] produits: Produit ajoute : 'Huile' (code: PRD444182)
+2026-01-30 13:08:59 [INFO] ventes: Vente creee : ID=7, numero=V20260130-YWM1E9
+2026-01-30 13:08:59 [INFO] ventes: Produit 7 ajoute a vente 7 (qte: 1)
+2026-01-30 13:08:59 [INFO] paiements: Paiement enregistre: vente=7, mode=mtn_momo, montant=2500
+2026-01-30 13:08:59 [INFO] produits: Produit ajoute : 'Huile' (code: PRD743040)
+2026-01-30 13:08:59 [INFO] ventes: Vente creee : ID=8, numero=V20260130-JOWPOJ
+2026-01-30 13:08:59 [INFO] ventes: Produit 8 ajoute a vente 8 (qte: 1)
+2026-01-30 13:08:59 [INFO] paiements: Paiement enregistre: vente=8, mode=orange_money, montant=2500
+2026-01-30 13:08:59 [INFO] produits: Produit ajoute : 'Produit A' (code: PRD946119)
+2026-01-30 13:08:59 [INFO] ventes: Vente creee : ID=9, numero=V20260130-5U0NDT
+2026-01-30 13:08:59 [INFO] ventes: Produit 9 ajoute a vente 9 (qte: 2)
+2026-01-30 13:08:59 [INFO] paiements: Paiement enregistre: vente=9, mode=especes, montant=1000
+2026-01-30 13:08:59 [INFO] ventes: Vente creee : ID=10, numero=V20260130-T5QOGZ
+2026-01-30 13:08:59 [INFO] ventes: Produit 9 ajoute a vente 10 (qte: 3)
+2026-01-30 13:08:59 [INFO] paiements: Paiement enregistre: vente=10, mode=orange_money, montant=1500
+2026-01-30 13:08:59 [INFO] sauvegarde: Export ZIP cree: /tmp/tmpn2d28caj/backups/export_20260130_130859.zip
+2026-01-30 13:08:59 [INFO] sauvegarde: Export ZIP cree: /tmp/tmp2ilg69_8/backups/export_20260130_130859.zip
+2026-01-30 13:08:59 [INFO] sauvegarde: Sauvegarde locale creee: /tmp/tmpp7yu3j2l/backups/boutique_20260130_130859.db
+2026-01-30 13:09:00 [INFO] sauvegarde: Sauvegarde locale creee: /tmp/tmpp7yu3j2l/backups/boutique_20260130_130900.db
+2026-01-30 13:09:00 [INFO] sauvegarde: Sauvegarde locale creee: /tmp/tmpp7yu3j2l/backups/boutique_20260130_130900.db
+2026-01-30 13:09:00 [INFO] sauvegarde: Sauvegarde locale creee: /tmp/tmpp7yu3j2l/backups/boutique_20260130_130900.db
+2026-01-30 13:09:00 [INFO] sauvegarde: Sauvegarde locale creee: /tmp/tmpp7yu3j2l/backups/boutique_20260130_130900.db
+2026-01-30 13:09:00 [INFO] sauvegarde: Sauvegarde locale creee: /tmp/tmpi4rjyewl/backups/boutique_20260130_130900.db
+2026-01-30 13:09:01 [INFO] sauvegarde: Sauvegarde locale creee: /tmp/tmpi4rjyewl/backups/boutique_20260130_130901.db
+2026-01-30 13:09:01 [INFO] sauvegarde: Sauvegarde locale creee: /tmp/tmpbt7yiagc/backups/boutique_20260130_130901.db
+2026-01-30 13:09:01 [INFO] sauvegarde: Sauvegarde locale creee: /tmp/tmpn3w4r3rf/backups/boutique_20260130_130901.db
+2026-01-30 13:09:02 [INFO] sauvegarde: Sauvegarde locale creee: /tmp/tmpn3w4r3rf/backups/boutique_20260130_130902.db
+2026-01-30 13:09:14 [INFO] database: Connexion a la base de donnees reussie
+2026-01-30 13:09:14 [INFO] database: Colonne updated_at ajoutee a produits
+2026-01-30 13:09:14 [INFO] database: Colonne updated_at ajoutee a utilisateurs
+2026-01-30 13:09:14 [INFO] database: Tables creees/verifiees avec succes
+2026-01-30 13:09:14 [INFO] produits: Produit ajoute : 'Savon' (code: PRD425497)
+2026-01-30 13:09:14 [INFO] ventes: Vente creee : ID=1, numero=V20260130-99P4AU
+2026-01-30 13:09:14 [INFO] ventes: Produit 1 ajoute a vente 1 (qte: 3)
+2026-01-30 13:09:14 [INFO] produits: Produit ajoute : 'Savon' (code: PRD900997)
+2026-01-30 13:09:14 [INFO] ventes: Vente creee : ID=2, numero=V20260130-KEMJJ5
+2026-01-30 13:09:14 [WARNING] ventes: Quantite invalide : -5
+2026-01-30 13:09:14 [INFO] produits: Produit ajoute : 'Savon' (code: PRD541138)
+2026-01-30 13:09:14 [INFO] ventes: Vente creee : ID=3, numero=V20260130-AV858I
+2026-01-30 13:09:14 [WARNING] ventes: Quantite invalide : 0
+2026-01-30 13:09:14 [INFO] produits: Produit ajoute : 'Savon' (code: PRD959546)
+2026-01-30 13:09:14 [INFO] ventes: Vente creee : ID=4, numero=V20260130-YFXO54
+2026-01-30 13:09:14 [WARNING] ventes: Stock insuffisant pour produit 4 : 20 < 100
+2026-01-30 13:09:14 [INFO] produits: Produit ajoute : 'Savon' (code: PRD918661)
+2026-01-30 13:09:14 [INFO] ventes: Vente creee : ID=5, numero=V20260130-W6XZS8
+2026-01-30 13:09:14 [INFO] ventes: Produit 5 ajoute a vente 5 (qte: 5)
+2026-01-30 13:09:14 [INFO] ventes: Vente 5 annulee
+2026-01-30 13:09:14 [INFO] produits: Produit ajoute : 'Savon' (code: PRD025335)
+2026-01-30 13:09:14 [INFO] ventes: Vente creee : ID=6, numero=V20260130-NS91NK
+2026-01-30 13:09:14 [INFO] produits: Produit ajoute : 'Savon' (code: PRD725875)
+2026-01-30 13:09:14 [INFO] ventes: Vente creee : ID=7, numero=V20260130-6QNVRN
+2026-01-30 13:09:14 [INFO] ventes: Produit 7 ajoute a vente 7 (qte: 3)
+2026-01-30 13:09:14 [INFO] ventes: Ligne 3 supprimee de vente 7
+2026-01-30 13:09:14 [INFO] produits: Produit ajoute : 'Savon' (code: PRD248492)
+2026-01-30 13:09:14 [INFO] ventes: Vente creee : ID=8, numero=V20260130-RAB1PS
+2026-01-30 13:09:14 [INFO] ventes: Produit 8 ajoute a vente 8 (qte: 2)
+2026-01-30 13:09:14 [WARNING] produits: Ajout refuse : prix_achat negatif (-100)
+2026-01-30 13:09:14 [WARNING] produits: Ajout refuse : prix_vente negatif (-50)
+2026-01-30 13:09:14 [WARNING] produits: Ajout refuse : stock negatif (-5)
+2026-01-30 13:09:14 [INFO] produits: Produit ajoute : 'Savon' (code: PRD012369)
+2026-01-30 13:09:14 [INFO] produits: Produit ajoute : 'Savon' (code: PRD625011)
+2026-01-30 13:09:14 [WARNING] produits: Modification refusee : prix_achat negatif (-200)
+2026-01-30 13:09:14 [INFO] produits: Produit ajoute : 'Savon' (code: PRD532007)
+2026-01-30 13:09:14 [WARNING] produits: Modification refusee : prix_vente negatif (-100)
+2026-01-30 13:09:14 [INFO] produits: Produit ajoute : 'Savon' (code: PRD873554)
+2026-01-30 13:09:14 [INFO] produits: Produit modifie : ID 12
+2026-01-30 13:09:14 [INFO] produits: Produit ajoute : 'Savon' (code: PRD486626)
+2026-01-30 13:09:14 [WARNING] produits: Modification refusee : stock negatif (-10)
+2026-01-30 13:09:14 [INFO] produits: Produit ajoute : 'Savon Palmolive' (code: PRD822315)
+2026-01-30 13:09:14 [INFO] produits: Produit ajoute : 'Riz local' (code: PRD245178)
+2026-01-30 13:09:14 [INFO] produits: Produit ajoute : 'Savon Dove' (code: PRD321221)
+2026-01-30 13:09:14 [INFO] produits: Produit ajoute : 'Savon Palmolive' (code: PRD284254)
+2026-01-30 13:09:14 [INFO] produits: Produit ajoute : 'Riz local' (code: PRD878205)
+2026-01-30 13:09:14 [INFO] produits: Produit ajoute : 'Savon Dove' (code: PRD117762)
+2026-01-30 13:09:14 [INFO] produits: Produit ajoute : 'Savon Palmolive' (code: PRD193039)
+2026-01-30 13:09:14 [INFO] produits: Produit ajoute : 'Riz local' (code: PRD790195)
+2026-01-30 13:09:14 [INFO] produits: Produit ajoute : 'Savon Dove' (code: PRD509926)
+2026-01-30 13:09:14 [INFO] produits: Produit ajoute : 'Savon' (code: PRD903546)
+2026-01-30 13:09:14 [INFO] produits: Produit supprime : ID 23
+2026-01-30 13:09:14 [INFO] utilisateurs: Utilisateur cree : jean@test.com (patron)
+2026-01-30 13:09:14 [WARNING] utilisateurs: Echec connexion pour : inconnu@test.com
+2026-01-30 13:09:14 [INFO] utilisateurs: Utilisateur cree : jean@test.com (patron)
+2026-01-30 13:09:14 [WARNING] utilisateurs: Echec connexion pour : jean@test.com
+2026-01-30 13:09:15 [INFO] utilisateurs: Utilisateur cree : jean@test.com (patron)
+2026-01-30 13:09:15 [INFO] utilisateurs: Statut utilisateur 3 : inactif
+2026-01-30 13:09:15 [WARNING] utilisateurs: Echec connexion pour : jean@test.com
+2026-01-30 13:09:15 [INFO] utilisateurs: Utilisateur cree : jean@test.com (patron)
+2026-01-30 13:09:15 [INFO] utilisateurs: Connexion reussie : jean@test.com
+2026-01-30 13:09:15 [INFO] utilisateurs: Utilisateur cree : jean@test.com (patron)
+2026-01-30 13:09:16 [ERROR] database: Erreur SQL : UNIQUE constraint failed: utilisateurs.email | Requete: 
+                INSERT INTO utilisateurs (nom, prenom, email, mot_de_passe, role)
+                V
+2026-01-30 13:09:16 [WARNING] utilisateurs: Creation utilisateur refusee : Le mot de passe doit contenir au moins 8 caracteres
+2026-01-30 13:09:16 [INFO] utilisateurs: Utilisateur cree : jean@test.com (patron)
+2026-01-30 21:41:48 [INFO] database: Connexion a la base de donnees reussie
+2026-01-30 21:41:48 [INFO] database: Colonne updated_at ajoutee a produits
+2026-01-30 21:41:48 [INFO] database: Colonne updated_at ajoutee a utilisateurs
+2026-01-30 21:41:48 [INFO] database: Tables creees/verifiees avec succes
+2026-01-30 21:41:48 [INFO] produits: Produit ajoute : 'Savon' (code: PRD656715)
+2026-01-30 21:41:48 [INFO] ventes: Vente creee : ID=1, numero=V20260130-TH2IAA
+2026-01-30 21:41:48 [INFO] ventes: Produit 1 ajoute a vente 1 (qte: 2)
+2026-01-30 21:41:48 [INFO] paiements: Paiement enregistre: vente=1, mode=especes, montant=700
+2026-01-30 21:41:48 [INFO] produits: Produit ajoute : 'Savon' (code: PRD466247)
+2026-01-30 21:41:48 [INFO] ventes: Vente creee : ID=2, numero=V20260130-RQ64F2
+2026-01-30 21:41:48 [INFO] ventes: Produit 2 ajoute a vente 2 (qte: 2)
+2026-01-30 21:41:48 [INFO] paiements: Paiement enregistre: vente=2, mode=especes, montant=700
+2026-01-30 21:41:48 [INFO] produits: Produit ajoute : 'Savon' (code: PRD075599)
+2026-01-30 21:41:48 [INFO] ventes: Vente creee : ID=3, numero=V20260130-MEBZS2
+2026-01-30 21:41:48 [INFO] ventes: Produit 3 ajoute a vente 3 (qte: 2)
+2026-01-30 21:41:48 [INFO] paiements: Paiement enregistre: vente=3, mode=especes, montant=700
+2026-01-30 21:41:48 [INFO] produits: Produit ajoute : 'Riz 5kg' (code: PRD839487)
+2026-01-30 21:41:48 [INFO] ventes: Vente creee : ID=4, numero=V20260130-0CG1GH
+2026-01-30 21:41:48 [INFO] ventes: Produit 4 ajoute a vente 4 (qte: 1)
+2026-01-30 21:41:48 [INFO] paiements: Paiement mixte enregistre: vente=4, 2 paiements
+2026-01-30 21:41:48 [INFO] produits: Produit ajoute : 'Riz 5kg' (code: PRD497521)
+2026-01-30 21:41:48 [INFO] ventes: Vente creee : ID=5, numero=V20260130-4QIH17
+2026-01-30 21:41:48 [INFO] ventes: Produit 5 ajoute a vente 5 (qte: 1)
+2026-01-30 21:41:48 [INFO] paiements: Paiement mixte enregistre: vente=5, 2 paiements
+2026-01-30 21:41:48 [INFO] produits: Produit ajoute : 'Huile' (code: PRD124854)
+2026-01-30 21:41:48 [INFO] ventes: Vente creee : ID=6, numero=V20260130-6G7HF1
+2026-01-30 21:41:48 [INFO] ventes: Produit 6 ajoute a vente 6 (qte: 1)
+2026-01-30 21:41:48 [INFO] paiements: Paiement enregistre: vente=6, mode=moov_money, montant=2500
+2026-01-30 21:41:48 [INFO] produits: Produit ajoute : 'Huile' (code: PRD466019)
+2026-01-30 21:41:48 [INFO] ventes: Vente creee : ID=7, numero=V20260130-4V7927
+2026-01-30 21:41:48 [INFO] ventes: Produit 7 ajoute a vente 7 (qte: 1)
+2026-01-30 21:41:48 [INFO] paiements: Paiement enregistre: vente=7, mode=mtn_momo, montant=2500
+2026-01-30 21:41:48 [INFO] produits: Produit ajoute : 'Huile' (code: PRD990710)
+2026-01-30 21:41:48 [INFO] ventes: Vente creee : ID=8, numero=V20260130-OZVTD9
+2026-01-30 21:41:48 [INFO] ventes: Produit 8 ajoute a vente 8 (qte: 1)
+2026-01-30 21:41:48 [INFO] paiements: Paiement enregistre: vente=8, mode=orange_money, montant=2500
+2026-01-30 21:41:48 [INFO] produits: Produit ajoute : 'Produit A' (code: PRD035148)
+2026-01-30 21:41:48 [INFO] ventes: Vente creee : ID=9, numero=V20260130-SYJTEB
+2026-01-30 21:41:48 [INFO] ventes: Produit 9 ajoute a vente 9 (qte: 2)
+2026-01-30 21:41:48 [INFO] paiements: Paiement enregistre: vente=9, mode=especes, montant=1000
+2026-01-30 21:41:48 [INFO] ventes: Vente creee : ID=10, numero=V20260130-GIVXMD
+2026-01-30 21:41:48 [INFO] ventes: Produit 9 ajoute a vente 10 (qte: 3)
+2026-01-30 21:41:48 [INFO] paiements: Paiement enregistre: vente=10, mode=orange_money, montant=1500
+2026-01-30 21:41:48 [WARNING] produits: Ajout refuse : prix_achat negatif (-100)
+2026-01-30 21:41:48 [WARNING] produits: Ajout refuse : prix_vente negatif (-50)
+2026-01-30 21:41:48 [WARNING] produits: Ajout refuse : stock negatif (-5)
+2026-01-30 21:41:48 [INFO] produits: Produit ajoute : 'Savon' (code: PRD131740)
+2026-01-30 21:41:48 [INFO] produits: Produit ajoute : 'Savon' (code: PRD785975)
+2026-01-30 21:41:48 [WARNING] produits: Modification refusee : prix_achat negatif (-200)
+2026-01-30 21:41:48 [INFO] produits: Produit ajoute : 'Savon' (code: PRD689172)
+2026-01-30 21:41:48 [WARNING] produits: Modification refusee : prix_vente negatif (-100)
+2026-01-30 21:41:48 [INFO] produits: Produit ajoute : 'Savon' (code: PRD110355)
+2026-01-30 21:41:48 [INFO] produits: Produit modifie : ID 13
+2026-01-30 21:41:48 [INFO] produits: Produit ajoute : 'Savon' (code: PRD478386)
+2026-01-30 21:41:48 [WARNING] produits: Modification refusee : stock negatif (-10)
+2026-01-30 21:41:48 [INFO] produits: Produit ajoute : 'Savon Palmolive' (code: PRD171731)
+2026-01-30 21:41:48 [INFO] produits: Produit ajoute : 'Riz local' (code: PRD971498)
+2026-01-30 21:41:48 [INFO] produits: Produit ajoute : 'Savon Dove' (code: PRD167086)
+2026-01-30 21:41:48 [INFO] produits: Produit ajoute : 'Savon Palmolive' (code: PRD810746)
+2026-01-30 21:41:48 [INFO] produits: Produit ajoute : 'Riz local' (code: PRD747072)
+2026-01-30 21:41:48 [INFO] produits: Produit ajoute : 'Savon Dove' (code: PRD218650)
+2026-01-30 21:41:48 [INFO] produits: Produit ajoute : 'Savon Palmolive' (code: PRD046810)
+2026-01-30 21:41:48 [INFO] produits: Produit ajoute : 'Riz local' (code: PRD287190)
+2026-01-30 21:41:48 [INFO] produits: Produit ajoute : 'Savon Dove' (code: PRD055008)
+2026-01-30 21:41:48 [INFO] produits: Produit ajoute : 'Savon' (code: PRD007980)
+2026-01-30 21:41:48 [INFO] produits: Produit supprime : ID 24
+2026-01-30 21:41:48 [INFO] sauvegarde: Export ZIP cree: /tmp/tmpq0s54m79/backups/export_20260130_214148.zip
+2026-01-30 21:41:48 [INFO] sauvegarde: Export ZIP cree: /tmp/tmp00o2bmz4/backups/export_20260130_214148.zip
+2026-01-30 21:41:48 [INFO] sauvegarde: Sauvegarde locale creee: /tmp/tmpy0iorqya/backups/boutique_20260130_214148.db
+2026-01-30 21:41:48 [INFO] sauvegarde: Sauvegarde locale creee: /tmp/tmpy0iorqya/backups/boutique_20260130_214148.db
+2026-01-30 21:41:48 [INFO] sauvegarde: Sauvegarde locale creee: /tmp/tmpy0iorqya/backups/boutique_20260130_214148.db
+2026-01-30 21:41:48 [INFO] sauvegarde: Sauvegarde locale creee: /tmp/tmpy0iorqya/backups/boutique_20260130_214148.db
+2026-01-30 21:41:48 [INFO] sauvegarde: Sauvegarde locale creee: /tmp/tmpy0iorqya/backups/boutique_20260130_214148.db
+2026-01-30 21:41:48 [INFO] sauvegarde: Sauvegarde locale creee: /tmp/tmprgkevi_4/backups/boutique_20260130_214148.db
+2026-01-30 21:41:50 [INFO] sauvegarde: Sauvegarde locale creee: /tmp/tmprgkevi_4/backups/boutique_20260130_214150.db
+2026-01-30 21:41:50 [INFO] sauvegarde: Sauvegarde locale creee: /tmp/tmp1mtehmxi/backups/boutique_20260130_214150.db
+2026-01-30 21:41:50 [INFO] sauvegarde: Sauvegarde locale creee: /tmp/tmp570pqebw/backups/boutique_20260130_214150.db
+2026-01-30 21:41:51 [INFO] sauvegarde: Sauvegarde locale creee: /tmp/tmp570pqebw/backups/boutique_20260130_214151.db
+2026-01-30 21:41:51 [INFO] utilisateurs: Utilisateur cree : jean@test.com (patron)
+2026-01-30 21:41:51 [WARNING] utilisateurs: Echec connexion pour : inconnu@test.com
+2026-01-30 21:41:51 [INFO] utilisateurs: Utilisateur cree : jean@test.com (patron)
+2026-01-30 21:41:51 [WARNING] utilisateurs: Echec connexion pour : jean@test.com
+2026-01-30 21:41:52 [INFO] utilisateurs: Utilisateur cree : jean@test.com (patron)
+2026-01-30 21:41:52 [INFO] utilisateurs: Statut utilisateur 3 : inactif
+2026-01-30 21:41:52 [WARNING] utilisateurs: Echec connexion pour : jean@test.com
+2026-01-30 21:41:52 [INFO] utilisateurs: Utilisateur cree : jean@test.com (patron)
+2026-01-30 21:41:52 [INFO] utilisateurs: Connexion reussie : jean@test.com
+2026-01-30 21:41:52 [INFO] utilisateurs: Utilisateur cree : jean@test.com (patron)
+2026-01-30 21:41:53 [ERROR] database: Erreur SQL : UNIQUE constraint failed: utilisateurs.email | Requete: 
+                INSERT INTO utilisateurs (nom, prenom, email, mot_de_passe, role)
+                V
+2026-01-30 21:41:53 [WARNING] utilisateurs: Creation utilisateur refusee : Le mot de passe doit contenir au moins 8 caracteres
+2026-01-30 21:41:53 [INFO] utilisateurs: Utilisateur cree : jean@test.com (patron)
+2026-01-30 21:41:53 [INFO] produits: Produit ajoute : 'Savon' (code: PRD051723)
+2026-01-30 21:41:53 [INFO] ventes: Vente creee : ID=11, numero=V20260130-9IEMFV
+2026-01-30 21:41:53 [INFO] ventes: Produit 25 ajoute a vente 11 (qte: 3)
+2026-01-30 21:41:53 [INFO] produits: Produit ajoute : 'Savon' (code: PRD022388)
+2026-01-30 21:41:53 [INFO] ventes: Vente creee : ID=12, numero=V20260130-VGKFYR
+2026-01-30 21:41:53 [WARNING] ventes: Quantite invalide : -5
+2026-01-30 21:41:53 [INFO] produits: Produit ajoute : 'Savon' (code: PRD852751)
+2026-01-30 21:41:53 [INFO] ventes: Vente creee : ID=13, numero=V20260130-V6CCUY
+2026-01-30 21:41:53 [WARNING] ventes: Quantite invalide : 0
+2026-01-30 21:41:53 [INFO] produits: Produit ajoute : 'Savon' (code: PRD795993)
+2026-01-30 21:41:53 [INFO] ventes: Vente creee : ID=14, numero=V20260130-AJCLUP
+2026-01-30 21:41:53 [WARNING] ventes: Stock insuffisant pour produit 28 : 20 < 100
+2026-01-30 21:41:53 [INFO] produits: Produit ajoute : 'Savon' (code: PRD029957)
+2026-01-30 21:41:53 [INFO] ventes: Vente creee : ID=15, numero=V20260130-BJV2WQ
+2026-01-30 21:41:53 [INFO] ventes: Produit 29 ajoute a vente 15 (qte: 5)
+2026-01-30 21:41:53 [INFO] ventes: Vente 15 annulee
+2026-01-30 21:41:53 [INFO] produits: Produit ajoute : 'Savon' (code: PRD406585)
+2026-01-30 21:41:53 [INFO] ventes: Vente creee : ID=16, numero=V20260130-QPXZU9
+2026-01-30 21:41:53 [INFO] produits: Produit ajoute : 'Savon' (code: PRD533326)
+2026-01-30 21:41:53 [INFO] ventes: Vente creee : ID=17, numero=V20260130-216682
+2026-01-30 21:41:53 [INFO] ventes: Produit 31 ajoute a vente 17 (qte: 3)
+2026-01-30 21:41:53 [INFO] ventes: Ligne 13 supprimee de vente 17
+2026-01-30 21:41:53 [INFO] produits: Produit ajoute : 'Savon' (code: PRD198239)
+2026-01-30 21:41:53 [INFO] ventes: Vente creee : ID=18, numero=V20260130-AWECYW
+2026-01-30 21:41:53 [INFO] ventes: Produit 32 ajoute a vente 18 (qte: 2)
+2026-01-30 22:13:48 [INFO] database: Connexion a la base de donnees reussie
+2026-01-30 22:13:48 [INFO] database: Colonne updated_at ajoutee a produits
+2026-01-30 22:13:48 [INFO] database: Colonne updated_at ajoutee a utilisateurs
+2026-01-30 22:13:48 [INFO] database: Tables creees/verifiees avec succes
+2026-01-30 22:13:48 [INFO] produits: Produit ajoute : 'Savon' (code: PRD211874)
+2026-01-30 22:13:48 [INFO] ventes: Vente creee : ID=1, numero=V20260130-UWTVL5
+2026-01-30 22:13:48 [INFO] ventes: Produit 1 ajoute a vente 1 (qte: 2)
+2026-01-30 22:13:48 [INFO] paiements: Paiement enregistre: vente=1, mode=especes, montant=700
+2026-01-30 22:13:48 [INFO] produits: Produit ajoute : 'Savon' (code: PRD409299)
+2026-01-30 22:13:48 [INFO] ventes: Vente creee : ID=2, numero=V20260130-0CJ1DJ
+2026-01-30 22:13:48 [INFO] ventes: Produit 2 ajoute a vente 2 (qte: 2)
+2026-01-30 22:13:48 [INFO] paiements: Paiement enregistre: vente=2, mode=especes, montant=700
+2026-01-30 22:13:48 [INFO] produits: Produit ajoute : 'Savon' (code: PRD409745)
+2026-01-30 22:13:48 [INFO] ventes: Vente creee : ID=3, numero=V20260130-Q4W30B
+2026-01-30 22:13:48 [INFO] ventes: Produit 3 ajoute a vente 3 (qte: 2)
+2026-01-30 22:13:48 [INFO] paiements: Paiement enregistre: vente=3, mode=especes, montant=700
+2026-01-30 22:13:48 [INFO] produits: Produit ajoute : 'Riz 5kg' (code: PRD229484)
+2026-01-30 22:13:48 [INFO] ventes: Vente creee : ID=4, numero=V20260130-ZX616V
+2026-01-30 22:13:48 [INFO] ventes: Produit 4 ajoute a vente 4 (qte: 1)
+2026-01-30 22:13:48 [INFO] paiements: Paiement mixte enregistre: vente=4, 2 paiements
+2026-01-30 22:13:48 [INFO] produits: Produit ajoute : 'Riz 5kg' (code: PRD998322)
+2026-01-30 22:13:48 [INFO] ventes: Vente creee : ID=5, numero=V20260130-B3VNY5
+2026-01-30 22:13:48 [INFO] ventes: Produit 5 ajoute a vente 5 (qte: 1)
+2026-01-30 22:13:48 [INFO] paiements: Paiement mixte enregistre: vente=5, 2 paiements
+2026-01-30 22:13:48 [INFO] produits: Produit ajoute : 'Huile' (code: PRD672922)
+2026-01-30 22:13:48 [INFO] ventes: Vente creee : ID=6, numero=V20260130-6F62NP
+2026-01-30 22:13:48 [INFO] ventes: Produit 6 ajoute a vente 6 (qte: 1)
+2026-01-30 22:13:48 [INFO] paiements: Paiement enregistre: vente=6, mode=moov_money, montant=2500
+2026-01-30 22:13:48 [INFO] produits: Produit ajoute : 'Huile' (code: PRD772800)
+2026-01-30 22:13:48 [INFO] ventes: Vente creee : ID=7, numero=V20260130-81QAJL
+2026-01-30 22:13:48 [INFO] ventes: Produit 7 ajoute a vente 7 (qte: 1)
+2026-01-30 22:13:48 [INFO] paiements: Paiement enregistre: vente=7, mode=mtn_momo, montant=2500
+2026-01-30 22:13:48 [INFO] produits: Produit ajoute : 'Huile' (code: PRD376247)
+2026-01-30 22:13:48 [INFO] ventes: Vente creee : ID=8, numero=V20260130-07XDGJ
+2026-01-30 22:13:48 [INFO] ventes: Produit 8 ajoute a vente 8 (qte: 1)
+2026-01-30 22:13:48 [INFO] paiements: Paiement enregistre: vente=8, mode=orange_money, montant=2500
+2026-01-30 22:13:48 [INFO] produits: Produit ajoute : 'Produit A' (code: PRD429281)
+2026-01-30 22:13:48 [INFO] ventes: Vente creee : ID=9, numero=V20260130-0BTC2K
+2026-01-30 22:13:48 [INFO] ventes: Produit 9 ajoute a vente 9 (qte: 2)
+2026-01-30 22:13:48 [INFO] paiements: Paiement enregistre: vente=9, mode=especes, montant=1000
+2026-01-30 22:13:48 [INFO] ventes: Vente creee : ID=10, numero=V20260130-WYLSXW
+2026-01-30 22:13:48 [INFO] ventes: Produit 9 ajoute a vente 10 (qte: 3)
+2026-01-30 22:13:48 [INFO] paiements: Paiement enregistre: vente=10, mode=orange_money, montant=1500
+2026-01-30 22:13:48 [WARNING] produits: Ajout refuse : prix_achat negatif (-100)
+2026-01-30 22:13:48 [WARNING] produits: Ajout refuse : prix_vente negatif (-50)
+2026-01-30 22:13:48 [WARNING] produits: Ajout refuse : stock negatif (-5)
+2026-01-30 22:13:48 [INFO] produits: Produit ajoute : 'Savon' (code: PRD271206)
+2026-01-30 22:13:48 [INFO] produits: Produit ajoute : 'Savon' (code: PRD378531)
+2026-01-30 22:13:48 [WARNING] produits: Modification refusee : prix_achat negatif (-200)
+2026-01-30 22:13:48 [INFO] produits: Produit ajoute : 'Savon' (code: PRD815219)
+2026-01-30 22:13:48 [WARNING] produits: Modification refusee : prix_vente negatif (-100)
+2026-01-30 22:13:48 [INFO] produits: Produit ajoute : 'Savon' (code: PRD982787)
+2026-01-30 22:13:48 [INFO] produits: Produit modifie : ID 13
+2026-01-30 22:13:48 [INFO] produits: Produit ajoute : 'Savon' (code: PRD900025)
+2026-01-30 22:13:48 [WARNING] produits: Modification refusee : stock negatif (-10)
+2026-01-30 22:13:48 [INFO] produits: Produit ajoute : 'Savon Palmolive' (code: PRD810068)
+2026-01-30 22:13:48 [INFO] produits: Produit ajoute : 'Riz local' (code: PRD088435)
+2026-01-30 22:13:48 [INFO] produits: Produit ajoute : 'Savon Dove' (code: PRD911774)
+2026-01-30 22:13:48 [INFO] produits: Produit ajoute : 'Savon Palmolive' (code: PRD850737)
+2026-01-30 22:13:48 [INFO] produits: Produit ajoute : 'Riz local' (code: PRD421672)
+2026-01-30 22:13:48 [INFO] produits: Produit ajoute : 'Savon Dove' (code: PRD543790)
+2026-01-30 22:13:48 [INFO] produits: Produit ajoute : 'Savon Palmolive' (code: PRD987134)
+2026-01-30 22:13:48 [INFO] produits: Produit ajoute : 'Riz local' (code: PRD967493)
+2026-01-30 22:13:48 [INFO] produits: Produit ajoute : 'Savon Dove' (code: PRD304380)
+2026-01-30 22:13:48 [INFO] produits: Produit ajoute : 'Savon' (code: PRD156279)
+2026-01-30 22:13:48 [INFO] produits: Produit supprime : ID 24
+2026-01-30 22:13:48 [INFO] sauvegarde: Export ZIP cree: /tmp/tmphnp7r9rp/backups/export_20260130_221348.zip
+2026-01-30 22:13:48 [INFO] sauvegarde: Export ZIP cree: /tmp/tmpelj6zfbh/backups/export_20260130_221348.zip
+2026-01-30 22:13:48 [INFO] sauvegarde: Sauvegarde locale creee: /tmp/tmpjlfddkyq/backups/boutique_20260130_221348.db
+2026-01-30 22:13:48 [INFO] sauvegarde: Sauvegarde locale creee: /tmp/tmpjlfddkyq/backups/boutique_20260130_221348.db
+2026-01-30 22:13:48 [INFO] sauvegarde: Sauvegarde locale creee: /tmp/tmpjlfddkyq/backups/boutique_20260130_221348.db
+2026-01-30 22:13:48 [INFO] sauvegarde: Sauvegarde locale creee: /tmp/tmpjlfddkyq/backups/boutique_20260130_221348.db
+2026-01-30 22:13:48 [INFO] sauvegarde: Sauvegarde locale creee: /tmp/tmpjlfddkyq/backups/boutique_20260130_221348.db
+2026-01-30 22:13:48 [INFO] sauvegarde: Sauvegarde locale creee: /tmp/tmpwdpsx4pk/backups/boutique_20260130_221348.db
+2026-01-30 22:13:50 [INFO] sauvegarde: Sauvegarde locale creee: /tmp/tmpwdpsx4pk/backups/boutique_20260130_221350.db
+2026-01-30 22:13:50 [INFO] sauvegarde: Sauvegarde locale creee: /tmp/tmp2in97oin/backups/boutique_20260130_221350.db
+2026-01-30 22:13:50 [INFO] sauvegarde: Sauvegarde locale creee: /tmp/tmpb_8xn5u5/backups/boutique_20260130_221350.db
+2026-01-30 22:13:51 [INFO] sauvegarde: Sauvegarde locale creee: /tmp/tmpb_8xn5u5/backups/boutique_20260130_221351.db
+2026-01-30 22:13:51 [INFO] utilisateurs: Utilisateur cree : jean@test.com (patron)
+2026-01-30 22:13:51 [WARNING] utilisateurs: Echec connexion pour : inconnu@test.com
+2026-01-30 22:13:51 [INFO] utilisateurs: Utilisateur cree : jean@test.com (patron)
+2026-01-30 22:13:51 [WARNING] utilisateurs: Echec connexion pour : jean@test.com
+2026-01-30 22:13:52 [INFO] utilisateurs: Utilisateur cree : jean@test.com (patron)
+2026-01-30 22:13:52 [INFO] utilisateurs: Statut utilisateur 3 : inactif
+2026-01-30 22:13:52 [WARNING] utilisateurs: Echec connexion pour : jean@test.com
+2026-01-30 22:13:52 [INFO] utilisateurs: Utilisateur cree : jean@test.com (patron)
+2026-01-30 22:13:52 [INFO] utilisateurs: Connexion reussie : jean@test.com
+2026-01-30 22:13:52 [INFO] utilisateurs: Utilisateur cree : jean@test.com (patron)
+2026-01-30 22:13:53 [ERROR] database: Erreur SQL : UNIQUE constraint failed: utilisateurs.email | Requete: 
+                INSERT INTO utilisateurs (nom, prenom, email, mot_de_passe, role)
+                V
+2026-01-30 22:13:53 [WARNING] utilisateurs: Creation utilisateur refusee : Le mot de passe doit contenir au moins 8 caracteres
+2026-01-30 22:13:53 [INFO] utilisateurs: Utilisateur cree : jean@test.com (patron)
+2026-01-30 22:13:53 [INFO] produits: Produit ajoute : 'Savon' (code: PRD197019)
+2026-01-30 22:13:53 [INFO] ventes: Vente creee : ID=11, numero=V20260130-HMCB8N
+2026-01-30 22:13:53 [INFO] ventes: Produit 25 ajoute a vente 11 (qte: 3)
+2026-01-30 22:13:53 [INFO] produits: Produit ajoute : 'Savon' (code: PRD590682)
+2026-01-30 22:13:53 [INFO] ventes: Vente creee : ID=12, numero=V20260130-JYS3WW
+2026-01-30 22:13:53 [WARNING] ventes: Quantite invalide : -5
+2026-01-30 22:13:53 [INFO] produits: Produit ajoute : 'Savon' (code: PRD837549)
+2026-01-30 22:13:53 [INFO] ventes: Vente creee : ID=13, numero=V20260130-YCSFSX
+2026-01-30 22:13:53 [WARNING] ventes: Quantite invalide : 0
+2026-01-30 22:13:53 [INFO] produits: Produit ajoute : 'Savon' (code: PRD114836)
+2026-01-30 22:13:53 [INFO] ventes: Vente creee : ID=14, numero=V20260130-9P3URF
+2026-01-30 22:13:53 [WARNING] ventes: Stock insuffisant pour produit 28 : 20 < 100
+2026-01-30 22:13:53 [INFO] produits: Produit ajoute : 'Savon' (code: PRD235390)
+2026-01-30 22:13:53 [INFO] ventes: Vente creee : ID=15, numero=V20260130-AKML7J
+2026-01-30 22:13:53 [INFO] ventes: Produit 29 ajoute a vente 15 (qte: 5)
+2026-01-30 22:13:53 [INFO] ventes: Vente 15 annulee
+2026-01-30 22:13:53 [INFO] produits: Produit ajoute : 'Savon' (code: PRD649259)
+2026-01-30 22:13:53 [INFO] ventes: Vente creee : ID=16, numero=V20260130-0KEXFE
+2026-01-30 22:13:53 [INFO] produits: Produit ajoute : 'Savon' (code: PRD449629)
+2026-01-30 22:13:53 [INFO] ventes: Vente creee : ID=17, numero=V20260130-POQW1K
+2026-01-30 22:13:53 [INFO] ventes: Produit 31 ajoute a vente 17 (qte: 3)
+2026-01-30 22:13:53 [INFO] ventes: Ligne 13 supprimee de vente 17
+2026-01-30 22:13:53 [INFO] produits: Produit ajoute : 'Savon' (code: PRD262358)
+2026-01-30 22:13:53 [INFO] ventes: Vente creee : ID=18, numero=V20260130-I7WCG4
+2026-01-30 22:13:53 [INFO] ventes: Produit 32 ajoute a vente 18 (qte: 2)
+2026-01-30 22:14:38 [INFO] database: Connexion a la base de donnees reussie
+2026-01-30 22:14:38 [INFO] database: Colonne updated_at ajoutee a produits
+2026-01-30 22:14:38 [INFO] database: Colonne updated_at ajoutee a utilisateurs
+2026-01-30 22:14:38 [INFO] database: Tables creees/verifiees avec succes
+2026-01-30 22:14:38 [INFO] produits: Produit ajoute : 'Produit_0' (code: PRD516529)
+2026-01-30 22:14:38 [INFO] produits: Produit ajoute : 'Produit_1' (code: PRD181476)
+2026-01-30 22:14:38 [INFO] produits: Produit ajoute : 'Produit_2' (code: PRD753546)
+2026-01-30 22:14:38 [INFO] produits: Produit ajoute : 'Produit_3' (code: PRD471364)
+2026-01-30 22:14:38 [INFO] produits: Produit ajoute : 'Produit_4' (code: PRD951450)
+2026-01-30 22:14:38 [INFO] produits: Produit ajoute : 'Produit_5' (code: PRD024978)
+2026-01-30 22:14:38 [INFO] produits: Produit ajoute : 'Produit_6' (code: PRD953852)
+2026-01-30 22:14:38 [INFO] produits: Produit ajoute : 'Produit_7' (code: PRD699742)
+2026-01-30 22:14:38 [INFO] produits: Produit ajoute : 'Produit_8' (code: PRD788222)
+2026-01-30 22:14:38 [INFO] produits: Produit ajoute : 'Produit_9' (code: PRD333318)
+2026-01-30 22:14:38 [INFO] produits: Produit ajoute : 'Article_0' (code: PRD971426)
+2026-01-30 22:14:38 [INFO] produits: Produit ajoute : 'Article_1' (code: PRD023034)
+2026-01-30 22:14:38 [INFO] produits: Produit ajoute : 'Article_2' (code: PRD263206)
+2026-01-30 22:14:38 [INFO] produits: Produit ajoute : 'Article_3' (code: PRD050747)
+2026-01-30 22:14:38 [INFO] produits: Produit ajoute : 'Article_4' (code: PRD511811)
+2026-01-30 22:14:38 [INFO] produits: Produit ajoute : 'Rupture_item' (code: PRD835453)
