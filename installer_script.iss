@@ -1,8 +1,10 @@
 [Setup]
+AppId={{B3F7A2E1-5C4D-4E8F-9A1B-2D3E4F5A6B7C}
 AppName=Gestion Boutique
 AppVersion=2.0.0
-AppPublisher=Votre Entreprise
-AppPublisherURL=https://www.votresite.bj
+AppVerName=Gestion Boutique 2.0.0
+AppPublisher=TIDJANI
+AppPublisherURL=https://github.com/TIDJANI12345/gestion-boutique
 DefaultDirName={autopf}\GestionBoutique
 DefaultGroupName=Gestion Boutique
 OutputDir=output
@@ -12,7 +14,7 @@ SolidCompression=yes
 WizardStyle=modern
 SetupIconFile=logo.ico
 UninstallDisplayIcon={app}\logo.ico
-PrivilegesRequired=admin
+PrivilegesRequired=lowest
 
 [Languages]
 Name: "french"; MessagesFile: "compiler:Languages\French.isl"
@@ -29,15 +31,14 @@ Name: "{app}\data"
 
 [Files]
 ; Fichier exécutable principal
-Source: "dist\GestionBoutique.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "dist\gestionboutique.exe"; DestDir: "{app}"; DestName: "GestionBoutique.exe"; Flags: ignoreversion
 
 ; Fichiers de base
 Source: "logo.ico"; DestDir: "{app}"; Flags: ignoreversion
 Source: "logo.png"; DestDir: "{app}"; Flags: ignoreversion
-Source: "README.txt"; DestDir: "{app}"; Flags: ignoreversion isreadme
 
 ; Gestion des données (Base de données et licence)
-Source: "data\*"; DestDir: "{app}\data"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "data\*"; DestDir: "{app}\data"; Flags: ignoreversion recursesubdirs createallsubdirs skipifsourcedoesntexist
 
 ; Utilisation du flag 'skipifsourcedoesntexist' pour éviter les erreurs de compilation si vide
 Source: "images\*"; DestDir: "{app}\images"; Flags: ignoreversion recursesubdirs createallsubdirs skipifsourcedoesntexist
@@ -51,3 +52,9 @@ Name: "{group}\Désinstaller Gestion Boutique"; Filename: "{uninstallexe}"; Icon
 
 [Run]
 Filename: "{app}\GestionBoutique.exe"; Description: "Lancer Gestion Boutique"; Flags: nowait postinstall skipifsilent
+
+[UninstallDelete]
+Type: filesandordirs; Name: "{app}\data"
+Type: filesandordirs; Name: "{app}\recus"
+Type: filesandordirs; Name: "{app}\exports"
+Type: filesandordirs; Name: "{app}\images"
