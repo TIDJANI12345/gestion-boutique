@@ -102,7 +102,7 @@ class UtilisateursWindow(QDialog):
 
         fl.addWidget(QLabel("Role"))
         self._combo_role = QComboBox()
-        self._combo_role.addItems(["caissier", "patron"])
+        self._combo_role.addItems(["caissier", "gestionnaire"])
         fl.addWidget(self._combo_role)
 
         btn_enregistrer = QPushButton("Enregistrer")
@@ -135,25 +135,30 @@ class UtilisateursWindow(QDialog):
         # Boutons d'action
         actions_row = QHBoxLayout()
 
-        btn_activer = QPushButton("Activer/Desactiver")
-        btn_activer.setCursor(Qt.PointingHandCursor)
-        btn_activer.setProperty("class", "primary")
-        btn_activer.clicked.connect(self._toggle_statut)
-        actions_row.addWidget(btn_activer)
+        self._btn_activer = QPushButton("Activer/Desactiver")
+        self._btn_activer.setCursor(Qt.PointingHandCursor)
+        self._btn_activer.setProperty("class", "primary")
+        self._btn_activer.clicked.connect(self._toggle_statut)
+        actions_row.addWidget(self._btn_activer)
 
-        btn_patron = QPushButton("Passer en Patron")
-        btn_patron.setCursor(Qt.PointingHandCursor)
-        btn_patron.clicked.connect(lambda: self._changer_role("patron"))
-        actions_row.addWidget(btn_patron)
+        self._btn_super_admin = QPushButton("Passer en Super-Admin")
+        self._btn_super_admin.setCursor(Qt.PointingHandCursor)
+        self._btn_super_admin.clicked.connect(lambda: self._changer_role("patron"))
+        actions_row.addWidget(self._btn_super_admin)
 
-        btn_caissier = QPushButton("Passer en Caissier")
-        btn_caissier.setCursor(Qt.PointingHandCursor)
-        btn_caissier.clicked.connect(lambda: self._changer_role("caissier"))
-        actions_row.addWidget(btn_caissier)
+        self._btn_gestionnaire = QPushButton("Passer en Gestionnaire")
+        self._btn_gestionnaire.setCursor(Qt.PointingHandCursor)
+        self._btn_gestionnaire.clicked.connect(lambda: self._changer_role("gestionnaire"))
+        actions_row.addWidget(self._btn_gestionnaire)
 
-        btn_reset_mdp = QPushButton("🔑 Réinitialiser MDP")
-        btn_reset_mdp.setCursor(Qt.PointingHandCursor)
-        btn_reset_mdp.setStyleSheet(f"""
+        self._btn_caissier = QPushButton("Passer en Caissier")
+        self._btn_caissier.setCursor(Qt.PointingHandCursor)
+        self._btn_caissier.clicked.connect(lambda: self._changer_role("caissier"))
+        actions_row.addWidget(self._btn_caissier)
+
+        self._btn_reset_mdp = QPushButton("🔑 Réinitialiser MDP")
+        self._btn_reset_mdp.setCursor(Qt.PointingHandCursor)
+        self._btn_reset_mdp.setStyleSheet(f"""
             QPushButton {{
                 background-color: {Theme.c('warning')};
                 color: white;
@@ -165,8 +170,8 @@ class UtilisateursWindow(QDialog):
                 background-color: #D97706;
             }}
         """)
-        btn_reset_mdp.clicked.connect(self._reinitialiser_mot_de_passe)
-        actions_row.addWidget(btn_reset_mdp)
+        self._btn_reset_mdp.clicked.connect(self._reinitialiser_mot_de_passe)
+        actions_row.addWidget(self._btn_reset_mdp)
 
         btn_actualiser = QPushButton("Actualiser")
         btn_actualiser.setCursor(Qt.PointingHandCursor)
@@ -188,12 +193,16 @@ class UtilisateursWindow(QDialog):
         lignes = []
         for u in utilisateurs:
             statut = "Actif" if u[6] else "Inactif"
+            role_display = u[5] or ""
+            # Si super-admin, ajouter badge
+            if len(u) > 8 and u[8] == 1:  # super_admin column
+                role_display = f"⭐ {role_display}"
             lignes.append([
                 u[0],          # ID
                 u[1] or "",     # Nom
                 u[2] or "",     # Prenom
                 u[3] or "",     # Email
-                u[5] or "",     # Role
+                role_display,   # Role (avec badge si super-admin)
                 statut,         # Statut
             ])
 
@@ -205,8 +214,26 @@ class UtilisateursWindow(QDialog):
     def _selectionner_utilisateur(self, row: int):
         ligne = self._table_model.obtenir_ligne(row)
         if not ligne:
+            self._user_selectionne_id = None
+            # Re-enable all buttons if no user is selected
+            self._btn_activer.setEnabled(True)
+            self._btn_super_admin.setEnabled(True)
+            self._btn_gestionnaire.setEnabled(True)
+            self._btn_caissier.setEnabled(True)
+            self._btn_reset_mdp.setEnabled(True)
             return
         self._user_selectionne_id = ligne[0]
+
+        from modules.utilisateurs import Utilisateur
+        is_super_admin = Utilisateur.est_super_admin(self._user_selectionne_id)
+
+        # Disable buttons if the selected user is a super-admin
+        self._btn_activer.setEnabled(not is_super_admin)
+        self._btn_super_admin.setEnabled(not is_super_admin) # Cannot change role of super-admin
+        self._btn_gestionnaire.setEnabled(not is_super_admin)
+        self._btn_caissier.setEnabled(not is_super_admin)
+        self._btn_reset_mdp.setEnabled(True) # Super-admin's password can be reset by another super-admin
+
 
     # === Actions ===
 
@@ -291,9 +318,9 @@ class UtilisateursWindow(QDialog):
             erreur(self, "Erreur", "Sélectionnez un utilisateur.")
             return
 
-        # Vérifier que c'est bien un admin/patron
-        if self._utilisateur_connecte.get('role') not in ['admin', 'patron']:
-            erreur(self, "Accès refusé", "Seul le patron peut réinitialiser les mots de passe.")
+        # Vérifier que l'utilisateur connecté est un super-admin
+        if self._utilisateur_connecte.get('super_admin') != 1:
+            erreur(self, "Accès refusé", "Seul le Super-Admin peut réinitialiser les mots de passe.")
             return
 
         # Empêcher la réinitialisation de son propre mot de passe (utiliser changement normal)

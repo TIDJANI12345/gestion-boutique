@@ -63,12 +63,23 @@ def demander_login() -> dict | None:
 def lancer_dashboard(app: QApplication, utilisateur: dict):
     """Lance le dashboard selon le role et gere la session."""
 
-    if utilisateur['role'] == 'caissier':
+    from modules.utilisateurs import ROLES_DISPONIBLES # Import here to avoid circular dependency
+
+    # Determine which window to launch based on role
+    if utilisateur.get('super_admin') == 1:
+        from ui.windows.principale import PrincipaleWindow
+        fenetre = PrincipaleWindow(utilisateur)
+    elif utilisateur['role'] == 'gestionnaire':
+        from ui.windows.principale_gestionnaire import PrincipaleGestionnaireWindow
+        fenetre = PrincipaleGestionnaireWindow(utilisateur)
+    elif utilisateur['role'] == 'caissier':
         from ui.windows.principale_caissier import PrincipaleCaissierWindow
         fenetre = PrincipaleCaissierWindow(utilisateur)
     else:
-        from ui.windows.principale import PrincipaleWindow
-        fenetre = PrincipaleWindow(utilisateur)
+        from ui.windows.dialogs import erreur
+        erreur(None, "Erreur de rôle", "Votre rôle n'est pas reconnu. Contactez l'administrateur.")
+        app.quit()
+        return
 
     def on_session_expiree():
         fenetre.close()

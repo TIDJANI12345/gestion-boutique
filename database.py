@@ -132,9 +132,29 @@ class Database:
                 role TEXT DEFAULT 'caissier',
                 actif BOOLEAN DEFAULT 1,
                 date_creation TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                dernier_login TIMESTAMP
+                dernier_login TIMESTAMP,
+                super_admin BOOLEAN DEFAULT 0
             )
         ''')
+
+        # Migration: Ajouter colonne super_admin a la table utilisateurs si elle n'existe pas
+        try:
+            self.cursor.execute("SELECT super_admin FROM utilisateurs LIMIT 1")
+        except sqlite3.OperationalError:
+            logger.info("Migration: Ajout colonne super_admin a table utilisateurs")
+            self.cursor.execute("ALTER TABLE utilisateurs ADD COLUMN super_admin BOOLEAN DEFAULT 0")
+            self.conn.commit()
+
+        # Si aucun super-admin n'existe, marquer le premier utilisateur comme super-admin
+        result = self.fetch_one("SELECT COUNT(*) FROM utilisateurs WHERE super_admin = 1")
+        if result and result[0] == 0:
+            # Marquer le premier utilisateur actif comme super-admin
+            self.execute_query("""
+                UPDATE utilisateurs
+                SET super_admin = 1, role = 'patron'
+                WHERE id = (SELECT id FROM utilisateurs ORDER BY id LIMIT 1)
+            """)
+            logger.info("Le premier utilisateur a ete marque comme Super-Admin.")
 
         # Table Logs d'actions
         self.cursor.execute('''
@@ -296,6 +316,7 @@ class Database:
             ('fidelite_points_par_fcfa', '1000', '1 point par X FCFA depenses'),
             ('fidelite_remise_seuil', '100', 'Nombre de points pour une remise'),
             ('fidelite_remise_pct', '5', 'Pourcentage de remise fidelite'),
+            ('gestionnaire_peut_vendre', '1', 'Permettre aux gestionnaires d\'effectuer des ventes: 0=non, 1=oui'),
         ]
 
         for cle, valeur, description in parametres_defaut:
