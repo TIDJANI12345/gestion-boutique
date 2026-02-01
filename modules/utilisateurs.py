@@ -128,6 +128,19 @@ class Utilisateur:
         return result
 
     @staticmethod
+    def modifier_mot_de_passe(user_id, nouveau_mot_de_passe):
+        """Modifier le mot de passe d'un utilisateur (admin)"""
+        import bcrypt
+        hashed = bcrypt.hashpw(nouveau_mot_de_passe.encode('utf-8'), bcrypt.gensalt())
+        result = db.execute_query(
+            "UPDATE utilisateurs SET mot_de_passe = ? WHERE id = ?",
+            (hashed.decode('utf-8'), user_id)
+        )
+        if result:
+            logger.info(f"Mot de passe modifié pour utilisateur {user_id}")
+        return result
+
+    @staticmethod
     def logger_action(user_id, action, details=""):
         """Enregistrer une action dans les logs"""
         query = """

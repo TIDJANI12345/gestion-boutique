@@ -23,27 +23,18 @@ Name: "french"; MessagesFile: "compiler:Languages\French.isl"
 Name: "desktopicon"; Description: "Créer un raccourci sur le bureau"; GroupDescription: "Raccourcis:"; Flags: unchecked
 
 [Dirs]
-; On s'assure que les dossiers existent, même s'ils sont vides
-Name: "{app}\images"
-Name: "{app}\exports"
-Name: "{app}\recus"
-Name: "{app}\data"
+; L'application cree ces dossiers automatiquement dans %APPDATA%
+; Pas besoin de les creer ici
 
 [Files]
-; Fichier exécutable principal
-Source: "dist\gestionboutique.exe"; DestDir: "{app}"; DestName: "GestionBoutique.exe"; Flags: ignoreversion
+; Fichier exécutable principal et dépendances
+Source: "dist\GestionBoutique\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
-; Fichiers de base
-Source: "logo.ico"; DestDir: "{app}"; Flags: ignoreversion
-Source: "logo.png"; DestDir: "{app}"; Flags: ignoreversion
+; NE PAS copier data/ - l'application cree la base de donnees au premier lancement
+; NE PAS copier recus/ exports/ - crees automatiquement dans %APPDATA%
 
-; Gestion des données (Base de données et licence)
-Source: "data\*"; DestDir: "{app}\data"; Flags: ignoreversion recursesubdirs createallsubdirs skipifsourcedoesntexist
-
-; Utilisation du flag 'skipifsourcedoesntexist' pour éviter les erreurs de compilation si vide
+; Images produits optionnelles (si elles existent)
 Source: "images\*"; DestDir: "{app}\images"; Flags: ignoreversion recursesubdirs createallsubdirs skipifsourcedoesntexist
-Source: "exports\*"; DestDir: "{app}\exports"; Flags: ignoreversion recursesubdirs createallsubdirs onlyifdoesntexist skipifsourcedoesntexist
-Source: "recus\*"; DestDir: "{app}\recus"; Flags: ignoreversion recursesubdirs createallsubdirs onlyifdoesntexist skipifsourcedoesntexist
 
 [Icons]
 Name: "{group}\Gestion Boutique"; Filename: "{app}\GestionBoutique.exe"; IconFilename: "{app}\logo.ico"

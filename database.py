@@ -61,10 +61,28 @@ class Database:
                 date_vente TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 total REAL NOT NULL,
                 client TEXT,
+                utilisateur_id INTEGER,
                 statut TEXT DEFAULT 'terminee',
-                deleted_at TIMESTAMP DEFAULT NULL
+                deleted_at TIMESTAMP DEFAULT NULL,
+                FOREIGN KEY (utilisateur_id) REFERENCES utilisateurs(id)
             )
         ''')
+
+        # Migration : Ajouter colonne utilisateur_id si absente
+        try:
+            self.cursor.execute("SELECT utilisateur_id FROM ventes LIMIT 1")
+        except sqlite3.OperationalError:
+            logger.info("Migration: Ajout colonne utilisateur_id à table ventes")
+            self.cursor.execute("ALTER TABLE ventes ADD COLUMN utilisateur_id INTEGER")
+            self.conn.commit()
+
+        # Migration : Ajouter colonne client_id si absente
+        try:
+            self.cursor.execute("SELECT client_id FROM ventes LIMIT 1")
+        except sqlite3.OperationalError:
+            logger.info("Migration: Ajout colonne client_id à table ventes")
+            self.cursor.execute("ALTER TABLE ventes ADD COLUMN client_id INTEGER")
+            self.conn.commit()
 
         # Table Details des ventes
         self.cursor.execute('''
@@ -141,6 +159,21 @@ class Database:
             )
         ''')
 
+        # Table Clients
+        self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS clients (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                nom TEXT NOT NULL,
+                telephone TEXT,
+                email TEXT,
+                points_fidelite INTEGER DEFAULT 0,
+                total_achats REAL DEFAULT 0,
+                nombre_achats INTEGER DEFAULT 0,
+                date_creation TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                notes TEXT
+            )
+        ''')
+
         # Table Paiements
         self.cursor.execute('''
             CREATE TABLE IF NOT EXISTS paiements (
@@ -180,8 +213,22 @@ class Database:
         # Migration : ajouter updated_at aux tables existantes
         self.migrer_updated_at()
 
+        # Migration : ajouter client_id aux ventes
+        self.migrer_clients()
+
         # Inserer parametres par defaut
         self.init_parametres()
+
+        # TRIGGER : Empêcher stock négatif (sécurité supplémentaire)
+        self.cursor.execute('''
+            CREATE TRIGGER IF NOT EXISTS verifier_stock_positif
+            BEFORE UPDATE ON produits
+            FOR EACH ROW
+            WHEN NEW.stock_actuel < 0
+            BEGIN
+                SELECT RAISE(ABORT, 'Le stock ne peut pas être négatif');
+            END
+        ''')
 
         self.conn.commit()
         logger.info("Tables creees/verifiees avec succes")
@@ -197,6 +244,28 @@ class Database:
                     logger.info(f"Colonne updated_at ajoutee a {table}")
             except Exception as e:
                 logger.warning(f"Migration updated_at pour {table}: {e}")
+
+    def migrer_clients(self):
+        """Ajouter la colonne client_id a la table ventes et migrer les noms existants"""
+        try:
+            colonnes = [row[1] for row in self.cursor.execute("PRAGMA table_info(ventes)").fetchall()]
+            if 'client_id' not in colonnes:
+                self.cursor.execute("ALTER TABLE ventes ADD COLUMN client_id INTEGER REFERENCES clients(id)")
+                # Migrer les noms existants vers la table clients
+                noms = self.cursor.execute(
+                    "SELECT DISTINCT client FROM ventes WHERE client IS NOT NULL AND client != ''"
+                ).fetchall()
+                for (nom,) in noms:
+                    self.cursor.execute(
+                        "INSERT INTO clients (nom) VALUES (?)", (nom,)
+                    )
+                    client_id = self.cursor.lastrowid
+                    self.cursor.execute(
+                        "UPDATE ventes SET client_id = ? WHERE client = ?", (client_id, nom)
+                    )
+                logger.info("Migration client_id effectuee sur la table ventes")
+        except Exception as e:
+            logger.warning(f"Migration clients: {e}")
 
     def init_parametres(self):
         """Initialiser les parametres par defaut"""
@@ -222,6 +291,11 @@ class Database:
             ('tva_taux_defaut', '18', 'Taux TVA par defaut en %'),
             ('devise_principale', 'XOF', 'Code devise principale'),
             ('devise_symbole', 'FCFA', 'Symbole devise principale'),
+            # Parametres fidelite
+            ('fidelite_active', '1', 'Programme fidelite actif: 0 ou 1'),
+            ('fidelite_points_par_fcfa', '1000', '1 point par X FCFA depenses'),
+            ('fidelite_remise_seuil', '100', 'Nombre de points pour une remise'),
+            ('fidelite_remise_pct', '5', 'Pourcentage de remise fidelite'),
         ]
 
         for cle, valeur, description in parametres_defaut:

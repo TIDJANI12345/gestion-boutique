@@ -56,7 +56,33 @@ class Rapport:
             print(f"❌ Erreur statistiques: {e}")
         
         return stats
-    
+
+    @staticmethod
+    def statistiques_utilisateur(utilisateur_id):
+        """Statistiques filtrées pour un utilisateur spécifique (caissier)"""
+        stats = {
+            'nb_ventes': 0,
+            'ca_jour': 0,
+        }
+
+        try:
+            # Ventes du jour pour cet utilisateur
+            aujourd_hui = datetime.now().strftime("%Y-%m-%d")
+            query_jour = """
+                SELECT COUNT(*), COALESCE(SUM(total), 0)
+                FROM ventes
+                WHERE DATE(date_vente) = ? AND utilisateur_id = ?
+            """
+            result = db.fetch_one(query_jour, (aujourd_hui, utilisateur_id))
+            if result:
+                stats['nb_ventes'] = result[0] or 0
+                stats['ca_jour'] = result[1] or 0
+
+        except Exception as e:
+            print(f"❌ Erreur statistiques utilisateur: {e}")
+
+        return stats
+
     @staticmethod
     def top_produits(limite=20):
         """Obtenir les produits les plus vendus"""

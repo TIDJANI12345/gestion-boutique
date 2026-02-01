@@ -6,7 +6,6 @@ import requests
 import uuid
 from datetime import datetime
 from cryptography.fernet import Fernet
-from tkinter import messagebox
 from config import DATA_DIR
 from modules.logger import get_logger
 
@@ -37,6 +36,28 @@ class GestionLicence:
         """Genere un identifiant unique pour cet ordinateur"""
         info = f"{platform.node()}-{platform.system()}-{platform.machine()}-{uuid.getnode()}"
         return hashlib.sha256(info.encode()).hexdigest()
+
+    def obtenir_info_locale(self):
+        """Retourne les informations de licence stockees localement"""
+        if not os.path.exists(FICHIER_LICENCE):
+            return None
+
+        try:
+            with open(FICHIER_LICENCE, 'rb') as f:
+                data_crypt = f.read()
+
+            data_json = self.cipher.decrypt(data_crypt).decode()
+            data = json.loads(data_json)
+
+            return {
+                'cle_licence': data.get('cle', 'N/A'),
+                'type_licence': data.get('type', 'N/A'),
+                'date_expiration': data.get('expiration', 'N/A')
+            }
+
+        except Exception as e:
+            logger.error(f"Erreur lecture info licence : {e}")
+            return None
 
     def verifier_locale(self):
         """Verifie si une licence valide est stockee localement"""

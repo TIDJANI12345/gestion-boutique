@@ -1,27 +1,42 @@
 """
 Configuration du logiciel de gestion de boutique - Version 2.0
-Design inspiré de l'interface PHP moderne
+Multiplateforme : Windows, Linux, macOS
 """
 import os
 import sys
-import io
+import platform
 
-# Forcer UTF-8 sur stdout/stderr pour eviter les erreurs d'encodage Windows (cp1252)
-if sys.stdout and hasattr(sys.stdout, 'reconfigure'):
+# Forcer UTF-8 sur stdout/stderr (necessaire uniquement sur Windows cp1252)
+if platform.system() == 'Windows' and sys.stdout and hasattr(sys.stdout, 'reconfigure'):
     try:
         sys.stdout.reconfigure(encoding='utf-8', errors='replace')
         sys.stderr.reconfigure(encoding='utf-8', errors='replace')
     except Exception:
         pass
 
-# Utiliser AppData pour donnees utilisateur
-if getattr(sys, 'frozen', False):
-    # Mode .exe - Données dans AppData
-    APPDATA = os.getenv('APPDATA') or os.path.expanduser('~')
-    BASE_DIR = os.path.join(APPDATA, 'GestionBoutique')
-else:
-    # Mode dev - Dossier projet
-    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+def _get_base_dir() -> str:
+    """Retourne le dossier de donnees selon l'OS et le mode d'execution."""
+    if not getattr(sys, 'frozen', False):
+        # Mode dev - dossier projet
+        return os.path.dirname(os.path.abspath(__file__))
+
+    # Mode compile (PyInstaller)
+    systeme = platform.system()
+    if systeme == 'Windows':
+        base = os.getenv('APPDATA', os.path.expanduser('~'))
+    elif systeme == 'Darwin':  # macOS
+        base = os.path.join(os.path.expanduser('~'), 'Library',
+                            'Application Support')
+    else:  # Linux et autres
+        base = os.environ.get(
+            'XDG_DATA_HOME',
+            os.path.join(os.path.expanduser('~'), '.local', 'share')
+        )
+    return os.path.join(base, 'GestionBoutique')
+
+
+BASE_DIR = _get_base_dir()
 
 # Chemins des dossiers de données
 DATA_DIR = os.path.join(BASE_DIR, 'data')
@@ -107,12 +122,14 @@ RACCOURCIS_CLAVIER = {
     'rapports': '<F4>',
     'actualiser': '<F5>',
     'export_whatsapp': '<F6>',
+    'clients': '<F7>',
 }
 
 # Pagination
 PAGINATION = {
     'produits_par_page': 50,
     'ventes_par_page': 50,
+    'clients_par_page': 50,
 }
 
 # Configuration des codes-barres

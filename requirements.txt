@@ -1,15 +1,26 @@
+# === Interface ===
+PySide6>=6.6.0
+
+# === Logique metier ===
 pillow==10.1.0
 python-barcode==0.15.1
 reportlab==4.0.7
-pyinstaller==6.3.0
-ttkthemes==3.2.2
 pyperclip==1.8.2
 requests==2.31.0
 cryptography==41.0.7
 qrcode==7.4.2
-python-escpos==3.1
 matplotlib==3.8.2
 pandas==2.1.4
 openpyxl==3.1.2
+bcrypt>=4.0.0
+
+# === Peripheriques ===
+python-escpos==3.1
 opencv-python==4.8.1.78
 pyzbar==0.1.9
+
+# === Packaging ===
+pyinstaller==6.3.0
+
+# === Tests ===
+pytest>=7.0.0

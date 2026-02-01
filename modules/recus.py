@@ -267,6 +267,15 @@ def generer_recu_pdf(vente_id):
         if client:
             info_data.append(['Client:', client])
 
+        # Informations client enrichies (telephone, points fidelite)
+        client_info = db.fetch_one(
+            "SELECT c.nom, c.telephone, c.points_fidelite FROM clients c "
+            "JOIN ventes v ON v.client_id = c.id WHERE v.id = ?", (vente_id,))
+        if client_info:
+            if client_info[1]:
+                info_data.append(['Tel. client:', client_info[1]])
+            info_data.append(['Points fidelite:', str(client_info[2])])
+
         info_table = Table(info_data, colWidths=[5*cm, 11*cm])
         info_table.setStyle(TableStyle([
             ('BOX', (0, 0), (-1, -1), 1, colors.black),

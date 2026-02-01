@@ -23,10 +23,11 @@ echo [4/4] Copie fichiers...
 if exist dist\GestionBoutique (
     copy logo.ico dist\GestionBoutique\ >nul 2>&1
     copy logo.png dist\GestionBoutique\ >nul 2>&1
-    xcopy /E /I /Y data dist\GestionBoutique\data >nul 2>&1
-    xcopy /E /I /Y images dist\GestionBoutique\images >nul 2>&1
-    mkdir dist\GestionBoutique\recus >nul 2>&1
-    mkdir dist\GestionBoutique\exports >nul 2>&1
+    REM Ne PAS copier data/ - l'app cree la DB au premier lancement
+    REM Copier seulement les images produits (optionnel)
+    if exist images (
+        xcopy /E /I /Y images dist\GestionBoutique\images >nul 2>&1
+    )
 )
 
 echo.

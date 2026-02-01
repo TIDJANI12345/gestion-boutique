@@ -21,14 +21,14 @@ class Vente:
         return f"V{date_str}-{random_str}"
 
     @staticmethod
-    def creer_vente(client=""):
+    def creer_vente(client="", utilisateur_id=None):
         """Creer une nouvelle vente"""
         numero_vente = Vente.generer_numero_vente()
-        query = "INSERT INTO ventes (numero_vente, client, total) VALUES (?, ?, 0)"
-        vente_id = db.execute_query(query, (numero_vente, client))
+        query = "INSERT INTO ventes (numero_vente, client, total, utilisateur_id) VALUES (?, ?, 0, ?)"
+        vente_id = db.execute_query(query, (numero_vente, client, utilisateur_id))
 
         if vente_id:
-            logger.info(f"Vente creee : ID={vente_id}, numero={numero_vente}")
+            logger.info(f"Vente creee : ID={vente_id}, numero={numero_vente}, utilisateur={utilisateur_id}")
         return vente_id
 
     @staticmethod
@@ -99,14 +99,22 @@ class Vente:
         return db.fetch_one(query, (vente_id,))
 
     @staticmethod
-    def obtenir_toutes_ventes(date_debut=None, date_fin=None):
-        """Obtenir toutes les ventes"""
+    def obtenir_toutes_ventes(date_debut=None, date_fin=None, utilisateur_id=None):
+        """Obtenir toutes les ventes (avec filtre optionnel utilisateur)"""
         if date_debut and date_fin:
-            query = "SELECT * FROM ventes WHERE date_vente BETWEEN ? AND ? ORDER BY date_vente DESC"
-            return db.fetch_all(query, (date_debut, date_fin))
+            if utilisateur_id is not None:
+                query = "SELECT * FROM ventes WHERE date_vente BETWEEN ? AND ? AND utilisateur_id = ? ORDER BY date_vente DESC"
+                return db.fetch_all(query, (date_debut, date_fin, utilisateur_id))
+            else:
+                query = "SELECT * FROM ventes WHERE date_vente BETWEEN ? AND ? ORDER BY date_vente DESC"
+                return db.fetch_all(query, (date_debut, date_fin))
         else:
-            query = "SELECT * FROM ventes ORDER BY date_vente DESC"
-            return db.fetch_all(query)
+            if utilisateur_id is not None:
+                query = "SELECT * FROM ventes WHERE utilisateur_id = ? ORDER BY date_vente DESC"
+                return db.fetch_all(query, (utilisateur_id,))
+            else:
+                query = "SELECT * FROM ventes ORDER BY date_vente DESC"
+                return db.fetch_all(query)
 
     @staticmethod
     def supprimer_ligne_vente(detail_id, vente_id):

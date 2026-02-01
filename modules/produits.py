@@ -176,6 +176,11 @@ class Produit:
     @staticmethod
     def mettre_a_jour_stock(id_produit, nouvelle_quantite, operation="Mise a jour"):
         """Mettre a jour le stock d'un produit"""
+        # VALIDATION : Stock ne peut pas être négatif
+        if nouvelle_quantite < 0:
+            logger.error(f"Tentative de mise à jour stock négatif: {nouvelle_quantite} pour produit {id_produit}")
+            return False
+
         ancien = db.fetch_one("SELECT stock_actuel FROM produits WHERE id = ?", (id_produit,))
         if ancien:
             ancien_stock = ancien[0]
@@ -240,6 +245,8 @@ class Produit:
             conditions.append("stock_actuel <= stock_alerte AND stock_actuel > 0")
         elif stock_filter == "Rupture":
             conditions.append("stock_actuel = 0")
+        elif stock_filter == "Stock négatif":
+            conditions.append("stock_actuel < 0")
 
         if prix_min is not None:
             conditions.append("prix_vente >= ?")
@@ -274,6 +281,8 @@ class Produit:
             conditions.append("stock_actuel <= stock_alerte AND stock_actuel > 0")
         elif stock_filter == "Rupture":
             conditions.append("stock_actuel = 0")
+        elif stock_filter == "Stock négatif":
+            conditions.append("stock_actuel < 0")
 
         if prix_min is not None:
             conditions.append("prix_vente >= ?")
