@@ -127,7 +127,7 @@ class LoginWindow(QDialog):
                 'prenom': user[2],
                 'email': user[3],
                 'role': user[5],
-                'super_admin': user[8] if len(user) > 8 else 0
+                'super_admin': user[9] if len(user) > 9 else 0
             }
             Utilisateur.logger_action(user[0], 'connexion', "Connexion reussie")
             self.login_success.emit(infos_user)
