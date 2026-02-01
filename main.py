@@ -76,7 +76,7 @@ def lancer_dashboard(app: QApplication, utilisateur: dict):
         from ui.windows.principale_caissier import PrincipaleCaissierWindow
         fenetre = PrincipaleCaissierWindow(utilisateur)
     else:
-        from ui.windows.dialogs import erreur
+        from ui.components.dialogs import erreur
         erreur(None, "Erreur de rôle", "Votre rôle n'est pas reconnu. Contactez l'administrateur.")
         app.quit()
         return
