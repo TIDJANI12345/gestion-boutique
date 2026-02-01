@@ -330,7 +330,8 @@ class UtilisateursWindow(QDialog):
 
         # Récupérer infos utilisateur
         from modules.utilisateurs import Utilisateur
-        user = Utilisateur.obtenir_par_id(self._user_selectionne_id)
+        from database import db
+        user = db.fetch_one("SELECT * FROM utilisateurs WHERE id = ?", (self._user_selectionne_id,))
         if not user:
             erreur(self, "Erreur", "Utilisateur introuvable.")
             return
