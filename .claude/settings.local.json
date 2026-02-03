@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nPhase 1 - Fiabilite et Securite : hardening complet de l''application\n\nSecurite:\n- Suppression du mot de passe admin en dur, ajout fenetre premier lancement\n- Protection brute-force sur le login \\(5 tentatives, blocage 30s\\)\n- Timeout de session apres inactivite \\(15 min configurable\\)\n- Validation mot de passe \\(min 8 chars + 1 chiffre\\)\n- Cle de chiffrement licence via variable d''environnement\n\nGestion d''erreurs:\n- Systeme de logging centralise \\(RotatingFileHandler, 5x1Mo\\)\n- Remplacement de tous les print\\(\\) par logging\n- Rollback et reconnexion automatique sur les transactions DB\n- Validation des donnees metier \\(prix, stock, quantites\\)\n- File d''attente sync hors-ligne \\(sync_queue\\)\n\nTests:\n- 32 tests unitaires \\(produits, ventes, utilisateurs\\)\n- Base de test SQLite en memoire via conftest.py\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(python3 -m pip install:*)",
+      "Bash(grep:*)",
+      "Bash(/mnt/c/Users/hp/AppData/Local/Programs/Python/Python311/python.exe:*)",
+      "Bash(python3:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(sqlite3:*)"
+    ]
+  }
+}
