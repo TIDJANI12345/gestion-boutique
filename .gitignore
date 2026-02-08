@@ -8,3 +8,4 @@ data/
 *.spec
 sauvegardes/
 recus/
+version.json
