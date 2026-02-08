@@ -9,7 +9,7 @@ import platform
 # ===== VERSION DE L'APPLICATION =====
 # Format: MAJEUR.MINEUR.PATCH (Semantic Versioning)
 # À incrémenter à chaque release
-APP_VERSION = "2.0.0"
+APP_VERSION = "2.2.0"
 APP_NAME = "Gestion Boutique"
 
 # Forcer UTF-8 sur stdout/stderr (necessaire uniquement sur Windows cp1252)
@@ -63,7 +63,7 @@ for directory in [DATA_DIR, IMAGES_DIR, RECUS_DIR, EXPORTS_DIR]:
 
 # Configuration de l'application
 APP_NAME = "Gestion Boutique"
-APP_VERSION = "2.0.0"
+APP_VERSION = "2.2.0"
 
 # Configuration de l'interface
 WINDOW_WIDTH = 1400
