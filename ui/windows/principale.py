@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (
     QLabel, QPushButton, QFrame, QMessageBox, QMenuBar, QMenu,
     QStatusBar, QComboBox, QTextEdit, QSplitter, QFileDialog
 )
-from PySide6.QtCore import Qt, QTimer, Signal
+from PySide6.QtCore import Qt, QTimer, Signal, QThread
 from PySide6.QtGui import QFont, QShortcut, QKeySequence, QAction
 
 from config import APP_NAME, APP_VERSION, WINDOW_WIDTH, WINDOW_HEIGHT
@@ -25,6 +25,20 @@ try:
     MATPLOTLIB_DISPONIBLE = True
 except ImportError:
     MATPLOTLIB_DISPONIBLE = False
+
+
+class UpdateCheckerThread(QThread):
+    """Thread pour vérifier les MAJ sans bloquer l'interface"""
+    finished = Signal(bool, object)  # (nouvelle_dispo, infos)
+
+    def __init__(self, version_actuelle):
+        super().__init__()
+        self.version_actuelle = version_actuelle
+
+    def run(self):
+        from modules.updater import Updater
+        nouvelle_dispo, infos = Updater.verifier_mise_a_jour(self.version_actuelle)
+        self.finished.emit(nouvelle_dispo, infos)
 
 
 class CarteStatistique(QFrame):
@@ -619,22 +633,31 @@ class PrincipaleWindow(QMainWindow):
 
     def verifier_mises_a_jour_manuel(self):
         """Vérification manuelle des mises à jour (menu Aide)"""
-        from modules.updater import Updater
         from ui.dialogs.update_notification import UpdateNotificationDialog
         from config import APP_VERSION
-        from PySide6.QtWidgets import QMessageBox, QApplication
+        from PySide6.QtWidgets import QMessageBox
 
         # Afficher "Vérification en cours..."
-        progress = QMessageBox(self)
-        progress.setWindowTitle("Vérification")
-        progress.setText("⏳ Vérification des mises à jour en cours...\n\nVeuillez patienter.")
-        progress.setStandardButtons(QMessageBox.NoButton)
-        progress.show()
-        QApplication.processEvents()  # Forcer l'affichage
+        self.progress_dialog = QMessageBox(self)
+        self.progress_dialog.setWindowTitle("Vérification")
+        self.progress_dialog.setText("⏳ Vérification des mises à jour en cours...\n\nVeuillez patienter.")
+        self.progress_dialog.setStandardButtons(QMessageBox.NoButton)
+        self.progress_dialog.show()
 
-        # Vérifier les mises à jour
-        nouvelle_dispo, infos = Updater.verifier_mise_a_jour(APP_VERSION)
-        progress.close()
+        # Lancer vérification en arrière-plan (non bloquant)
+        self.update_thread = UpdateCheckerThread(APP_VERSION)
+        self.update_thread.finished.connect(self._on_update_check_finished)
+        self.update_thread.start()
+
+    def _on_update_check_finished(self, nouvelle_dispo, infos):
+        """Callback quand vérification MAJ terminée"""
+        from ui.dialogs.update_notification import UpdateNotificationDialog
+        from config import APP_VERSION
+        from PySide6.QtWidgets import QMessageBox
+
+        # Fermer dialog de chargement
+        if hasattr(self, 'progress_dialog'):
+            self.progress_dialog.close()
 
         if nouvelle_dispo and infos:
             # Afficher le dialog de notification (même si version ignorée)
