@@ -17,9 +17,24 @@ class ScannerHTTPHandler(SimpleHTTPRequestHandler):
         self.resources_dir = resources_dir
         super().__init__(*args, directory=resources_dir, **kwargs)
 
+    def do_GET(self):
+        """Gérer les requêtes GET"""
+        # Ignorer favicon.ico
+        if self.path == '/favicon.ico':
+            self.send_response(204)
+            self.end_headers()
+            return
+        super().do_GET()
+
     def log_message(self, format, *args):
         """Rediriger les logs vers le logger"""
-        logger.info(f"{self.address_string()} - {format % args}")
+        # Ignorer les logs de requêtes binaires (tentatives HTTPS)
+        try:
+            msg = format % args
+            if msg.isprintable() or 'GET' in msg or 'POST' in msg:
+                logger.info(f"{self.address_string()} - {msg}")
+        except Exception:
+            pass
 
     def end_headers(self):
         """Ajouter headers CORS et cache"""

@@ -74,7 +74,7 @@ class ScannerMobileServer(QThread):
 
         try:
             async for message in websocket:
-                await self._process_message(message, client_ip)
+                await self._process_message(websocket, message, client_ip)
         except websockets.exceptions.ConnectionClosed:
             logger.info(f"Client déconnecté : {client_ip}")
         except Exception as e:
@@ -83,7 +83,7 @@ class ScannerMobileServer(QThread):
             self.clients.discard(websocket)
             self.client_deconnecte.emit(client_ip)
 
-    async def _process_message(self, message: str, client_ip: str):
+    async def _process_message(self, websocket, message: str, client_ip: str):
         """Traiter un message reçu"""
         try:
             data = json.loads(message)
