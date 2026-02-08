@@ -60,6 +60,25 @@ def demander_login() -> dict | None:
     return None
 
 
+def verifier_mises_a_jour_auto(fenetre_parent):
+    """
+    Vérifier automatiquement les mises à jour disponibles
+    Appelé 3 secondes après l'ouverture du dashboard
+    """
+    from modules.updater import Updater
+    from ui.dialogs.update_notification import UpdateNotificationDialog
+
+    # Vérifier en arrière-plan (non bloquant)
+    nouvelle_dispo, infos = Updater.verifier_mise_a_jour(APP_VERSION)
+
+    if nouvelle_dispo and infos:
+        # Vérifier si l'utilisateur a déjà ignoré cette version
+        if not Updater.est_ignoree(infos.get('version', '')):
+            # Afficher le dialog de notification
+            dialog = UpdateNotificationDialog(infos, fenetre_parent)
+            dialog.exec()
+
+
 def lancer_dashboard(app: QApplication, utilisateur: dict):
     """Lance le dashboard selon le role et gere la session."""
 
@@ -103,6 +122,9 @@ def lancer_dashboard(app: QApplication, utilisateur: dict):
         fenetre.deconnexion_demandee.connect(on_deconnexion)
 
     fenetre.show()
+
+    # Vérifier les mises à jour après 3 secondes (ne pas bloquer le démarrage)
+    QTimer.singleShot(3000, lambda: verifier_mises_a_jour_auto(fenetre))
 
 
 def main():

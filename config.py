@@ -6,6 +6,12 @@ import os
 import sys
 import platform
 
+# ===== VERSION DE L'APPLICATION =====
+# Format: MAJEUR.MINEUR.PATCH (Semantic Versioning)
+# À incrémenter à chaque release
+APP_VERSION = "2.0.0"
+APP_NAME = "Gestion Boutique"
+
 # Forcer UTF-8 sur stdout/stderr (necessaire uniquement sur Windows cp1252)
 if platform.system() == 'Windows' and sys.stdout and hasattr(sys.stdout, 'reconfigure'):
     try:

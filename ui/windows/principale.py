@@ -152,6 +152,7 @@ class PrincipaleWindow(QMainWindow):
             menu_admin.addSeparator()
 
             for label, slot in [
+                ("Logs d'audit", self.ouvrir_logs_audit),
                 ("Sauvegarde", self.sauvegarder),
                 ("Restaurer", self.restaurer),
             ]:
@@ -171,6 +172,13 @@ class PrincipaleWindow(QMainWindow):
 
         # Aide
         menu_aide = menubar.addMenu("Aide")
+
+        action_verifier_maj = QAction("🔄 Vérifier les mises à jour", self)
+        action_verifier_maj.triggered.connect(self.verifier_mises_a_jour_manuel)
+        menu_aide.addAction(action_verifier_maj)
+
+        menu_aide.addSeparator()
+
         action_apropos = QAction("A propos", self)
         action_apropos.triggered.connect(self.ouvrir_a_propos)
         menu_aide.addAction(action_apropos)
@@ -609,6 +617,39 @@ class PrincipaleWindow(QMainWindow):
         dlg = AProposWindow(parent=self)
         dlg.exec()
 
+    def verifier_mises_a_jour_manuel(self):
+        """Vérification manuelle des mises à jour (menu Aide)"""
+        from modules.updater import Updater
+        from ui.dialogs.update_notification import UpdateNotificationDialog
+        from config import APP_VERSION
+        from PySide6.QtWidgets import QMessageBox, QApplication
+
+        # Afficher "Vérification en cours..."
+        progress = QMessageBox(self)
+        progress.setWindowTitle("Vérification")
+        progress.setText("⏳ Vérification des mises à jour en cours...\n\nVeuillez patienter.")
+        progress.setStandardButtons(QMessageBox.NoButton)
+        progress.show()
+        QApplication.processEvents()  # Forcer l'affichage
+
+        # Vérifier les mises à jour
+        nouvelle_dispo, infos = Updater.verifier_mise_a_jour(APP_VERSION)
+        progress.close()
+
+        if nouvelle_dispo and infos:
+            # Afficher le dialog de notification (même si version ignorée)
+            dialog = UpdateNotificationDialog(infos, self)
+            dialog.exec()
+        else:
+            # Aucune mise à jour disponible
+            QMessageBox.information(
+                self, "À jour ✅",
+                f"<h3>Vous utilisez la dernière version !</h3>"
+                f"<p><b>Version actuelle :</b> {APP_VERSION}</p>"
+                f"<br>"
+                f"<p>Aucune mise à jour disponible pour le moment.</p>"
+            )
+
     def ouvrir_utilisateurs(self):
         from ui.windows.utilisateurs import UtilisateursWindow
         dlg = UtilisateursWindow(self.utilisateur, parent=self)
@@ -627,6 +668,12 @@ class PrincipaleWindow(QMainWindow):
     def ouvrir_parametres_fiscaux(self):
         from ui.windows.parametres_fiscaux import ParametresFiscauxWindow
         dlg = ParametresFiscauxWindow(parent=self)
+        dlg.exec()
+
+    def ouvrir_logs_audit(self):
+        """Ouvrir la fenetre de consultation des logs d'audit"""
+        from ui.windows.logs_audit import LogsAuditWindow
+        dlg = LogsAuditWindow(self.utilisateur, parent=self)
         dlg.exec()
 
     def _fenetre_non_migree(self, nom: str):

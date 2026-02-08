@@ -95,10 +95,10 @@ class ImprimanteThermique:
             if not details:
                 return False, "Aucun detail de vente"
 
-            numero_vente = vente[1]
-            date_vente = vente[2]
-            total = vente[3]
-            client = vente[4] if len(vente) > 4 and vente[4] else ""
+            numero_vente = vente['numero_vente']
+            date_vente = vente['date_vente']
+            total = vente['total']
+            client = vente['client'] if vente['client'] else ""
 
             # Infos boutique
             nom_boutique = db.get_parametre('boutique_nom', BOUTIQUE_NOM)
@@ -147,10 +147,10 @@ class ImprimanteThermique:
 
             printer.set(align='left', bold=False)
             for detail in details:
-                nom = detail[1]
-                quantite = detail[2]
-                prix_unit = detail[3]
-                sous_total = detail[4]
+                nom = detail['nom']
+                quantite = detail['quantite']
+                prix_unit = detail['prix_unitaire']
+                sous_total = detail['sous_total']
 
                 if largeur >= 48:
                     # Tronquer le nom si trop long
@@ -196,15 +196,15 @@ class ImprimanteThermique:
                             'mtn_momo': 'MTN MoMo',
                             'moov_money': 'Moov Money',
                         }
-                        mode_label = mode_labels.get(p[0], p[0])
+                        mode_label = mode_labels.get(p['mode_paiement'], p['mode_paiement'])
                         printer.text(f"Paiement: {mode_label}\n")
-                        if p[0] == 'especes' and p[2] and p[3]:
-                            printer.text(f"Recu: {p[2]:,.0f} FCFA\n")
+                        if p['mode_paiement'] == 'especes' and p['montant_recu'] and p['monnaie_rendue']:
+                            printer.text(f"Recu: {p['montant_recu']:,.0f} FCFA\n")
                             printer.set(bold=True)
-                            printer.text(f"Monnaie: {p[3]:,.0f} FCFA\n")
+                            printer.text(f"Monnaie: {p['monnaie_rendue']:,.0f} FCFA\n")
                             printer.set(bold=False)
-                        if p[4]:
-                            printer.text(f"Ref: {p[4]}\n")
+                        if p['reference']:
+                            printer.text(f"Ref: {p['reference']}\n")
             except Exception:
                 pass  # Table paiements n'existe peut-etre pas encore
 

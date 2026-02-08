@@ -19,7 +19,7 @@ class TestVenteCycleComplet(unittest.TestCase):
         database.db.execute_query("DELETE FROM produits")
         self.code = Produit.ajouter("Savon", "Hygiene", 200, 350, 20, 5)
         produit = Produit.obtenir_par_code_barre(self.code)
-        self.produit_id = produit[0]
+        self.produit_id = produit['id']
 
     def test_creer_vente(self):
         vente_id = Vente.creer_vente("Client Test")
@@ -31,7 +31,7 @@ class TestVenteCycleComplet(unittest.TestCase):
         result = Vente.ajouter_produit(vente_id, self.produit_id, 3)
         self.assertTrue(result)
         produit = Produit.obtenir_par_id(self.produit_id)
-        self.assertEqual(produit[5], 17)  # 20 - 3
+        self.assertEqual(produit['stock_actuel'], 17)  # 20 - 3
 
     def test_ajouter_produit_stock_insuffisant(self):
         vente_id = Vente.creer_vente()
@@ -58,11 +58,11 @@ class TestVenteCycleComplet(unittest.TestCase):
         vente_id = Vente.creer_vente()
         Vente.ajouter_produit(vente_id, self.produit_id, 5)
         produit = Produit.obtenir_par_id(self.produit_id)
-        self.assertEqual(produit[5], 15)
+        self.assertEqual(produit['stock_actuel'], 15)
 
         Vente.annuler_vente(vente_id)
         produit = Produit.obtenir_par_id(self.produit_id)
-        self.assertEqual(produit[5], 20)
+        self.assertEqual(produit['stock_actuel'], 20)
         self.assertIsNone(Vente.obtenir_vente(vente_id))
 
     def test_supprimer_ligne_vente(self):
@@ -71,9 +71,25 @@ class TestVenteCycleComplet(unittest.TestCase):
         details = Vente.obtenir_details_vente(vente_id)
         self.assertEqual(len(details), 1)
 
-        Vente.supprimer_ligne_vente(details[0][0], vente_id)
+        Vente.supprimer_ligne_vente(details[0]['id'], vente_id)
         produit = Produit.obtenir_par_id(self.produit_id)
-        self.assertEqual(produit[5], 20)
+        self.assertEqual(produit['stock_actuel'], 20)
+
+    def test_annulation_vente_restore_stock(self):
+        """Annulation restaure le stock correctement"""
+        vente_id = Vente.creer_vente()
+        Vente.ajouter_produit(vente_id, self.produit_id, 5)
+
+        # Verifier stock reduit
+        produit = Produit.obtenir_par_id(self.produit_id)
+        self.assertEqual(produit['stock_actuel'], 15)
+
+        # Annuler vente
+        Vente.annuler_vente(vente_id)
+
+        # Verifier stock restaure
+        produit = Produit.obtenir_par_id(self.produit_id)
+        self.assertEqual(produit['stock_actuel'], 20)
 
 
 if __name__ == '__main__':

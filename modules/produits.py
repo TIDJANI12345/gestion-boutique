@@ -139,12 +139,16 @@ class Produit:
         return False
 
     @staticmethod
-    def supprimer(id_produit):
+    def supprimer(id_produit, user_id=None):
         """Supprimer un produit"""
         query = "DELETE FROM produits WHERE id = ?"
         result = db.execute_query(query, (id_produit,))
         if result:
             logger.info(f"Produit supprime : ID {id_produit}")
+            if user_id:
+                from modules.utilisateurs import Utilisateur
+                Utilisateur.logger_action(user_id, 'suppression_produit',
+                                          f"Produit {id_produit} supprimé")
             return True
         return False
 
@@ -174,7 +178,7 @@ class Produit:
         return db.fetch_all(query, (terme, terme, terme))
 
     @staticmethod
-    def mettre_a_jour_stock(id_produit, nouvelle_quantite, operation="Mise a jour"):
+    def mettre_a_jour_stock(id_produit, nouvelle_quantite, operation="Mise a jour", user_id=None):
         """Mettre a jour le stock d'un produit"""
         # VALIDATION : Stock ne peut pas être négatif
         if nouvelle_quantite < 0:
@@ -183,7 +187,7 @@ class Produit:
 
         ancien = db.fetch_one("SELECT stock_actuel FROM produits WHERE id = ?", (id_produit,))
         if ancien:
-            ancien_stock = ancien[0]
+            ancien_stock = ancien['stock_actuel']
             query = "UPDATE produits SET stock_actuel = ?, updated_at = datetime('now') WHERE id = ?"
             if db.execute_query(query, (nouvelle_quantite, id_produit)):
                 query_historique = """
@@ -191,6 +195,10 @@ class Produit:
                     VALUES (?, ?, ?, ?)
                 """
                 db.execute_query(query_historique, (id_produit, ancien_stock, nouvelle_quantite, operation))
+                if user_id and operation == "Ajustement":
+                    from modules.utilisateurs import Utilisateur
+                    Utilisateur.logger_action(user_id, 'ajustement_stock',
+                                              f"Produit {id_produit}: stock ajusté ({operation})")
                 return True
         return False
 
@@ -209,7 +217,7 @@ class Produit:
         """Obtenir toutes les categories distinctes"""
         query = "SELECT DISTINCT categorie FROM produits WHERE categorie IS NOT NULL AND categorie != '' ORDER BY categorie"
         results = db.fetch_all(query)
-        return [r[0] for r in results]
+        return [r['categorie'] for r in results]
 
     @staticmethod
     def obtenir_par_categorie():
@@ -218,7 +226,7 @@ class Produit:
         produits = Produit.obtenir_tous()
 
         for produit in produits:
-            categorie = produit[2] if produit[2] else "Sans categorie"
+            categorie = produit['categorie'] if produit['categorie'] else "Sans categorie"
             if categorie not in categories:
                 categories[categorie] = []
             categories[categorie].append(produit)
@@ -292,7 +300,7 @@ class Produit:
             params.append(prix_max)
 
         where = " AND ".join(conditions) if conditions else "1=1"
-        query = f"SELECT COUNT(*) FROM produits WHERE {where}"
+        query = f"SELECT COUNT(*) as count FROM produits WHERE {where}"
 
         result = db.fetch_one(query, tuple(params))
-        return result[0] if result else 0
+        return result['count'] if result else 0

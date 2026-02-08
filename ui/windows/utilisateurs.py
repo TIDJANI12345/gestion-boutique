@@ -192,18 +192,18 @@ class UtilisateursWindow(QDialog):
 
         lignes = []
         for u in utilisateurs:
-            statut = "Actif" if u[6] else "Inactif"
-            role_display = u[5] or ""
+            statut = "Actif" if u['actif'] else "Inactif"
+            role_display = u['role'] or ""
             # Si super-admin, ajouter badge
-            if len(u) > 8 and u[8] == 1:  # super_admin column
+            if 'super_admin' in u.keys() and u['super_admin'] == 1:
                 role_display = f"⭐ {role_display}"
             lignes.append([
-                u[0],          # ID
-                u[1] or "",     # Nom
-                u[2] or "",     # Prenom
-                u[3] or "",     # Email
-                role_display,   # Role (avec badge si super-admin)
-                statut,         # Statut
+                u['id'],
+                u['nom'] or "",
+                u['prenom'] or "",
+                u['email'] or "",
+                role_display,
+                statut,
             ])
 
         self._table_model.charger_donnees(lignes)
@@ -336,7 +336,7 @@ class UtilisateursWindow(QDialog):
             erreur(self, "Erreur", "Utilisateur introuvable.")
             return
 
-        nom_complet = f"{user[2]} {user[1]}"  # prenom nom
+        nom_complet = f"{user['prenom']} {user['nom']}"
 
         # Dialog de saisie nouveau mot de passe
         from PySide6.QtWidgets import QInputDialog

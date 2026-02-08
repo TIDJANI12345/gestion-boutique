@@ -46,12 +46,12 @@ class Vente:
             logger.warning(f"Produit introuvable : ID {produit_id}")
             return False
 
-        stock_actuel = produit[5]
+        stock_actuel = produit['stock_actuel']
         if stock_actuel < quantite:
             logger.warning(f"Stock insuffisant pour produit {produit_id} : {stock_actuel} < {quantite}")
             return False
 
-        prix_unitaire = produit[4]
+        prix_unitaire = produit['prix_vente']
         sous_total = prix_unitaire * quantite
 
         query = """
@@ -73,9 +73,9 @@ class Vente:
     @staticmethod
     def calculer_total(vente_id):
         """Calculer le total d'une vente"""
-        query = "SELECT SUM(sous_total) FROM details_ventes WHERE vente_id = ?"
+        query = "SELECT SUM(sous_total) as total FROM details_ventes WHERE vente_id = ?"
         result = db.fetch_one(query, (vente_id,))
-        total = result[0] if result and result[0] else 0
+        total = result['total'] if result and result['total'] else 0
 
         query_update = "UPDATE ventes SET total = ? WHERE id = ?"
         db.execute_query(query_update, (total, vente_id))
@@ -123,13 +123,14 @@ class Vente:
         detail = db.fetch_one(query, (detail_id,))
 
         if detail:
-            produit_id, quantite = detail
+            produit_id = detail['produit_id']
+            quantite = detail['quantite']
 
             query_delete = "DELETE FROM details_ventes WHERE id = ?"
             if db.execute_query(query_delete, (detail_id,)):
                 produit = Produit.obtenir_par_id(produit_id)
                 if produit:
-                    nouveau_stock = produit[5] + quantite
+                    nouveau_stock = produit['stock_actuel'] + quantite
                     Produit.mettre_a_jour_stock(produit_id, nouveau_stock, "Annulation ligne")
 
                 Vente.calculer_total(vente_id)
@@ -139,16 +140,17 @@ class Vente:
         return False
 
     @staticmethod
-    def annuler_vente(vente_id):
+    def annuler_vente(vente_id, user_id=None):
         """Annuler une vente complete"""
         query = "SELECT produit_id, quantite FROM details_ventes WHERE vente_id = ?"
         details = db.fetch_all(query, (vente_id,))
 
         for detail in details:
-            produit_id, quantite = detail
+            produit_id = detail['produit_id']
+            quantite = detail['quantite']
             produit = Produit.obtenir_par_id(produit_id)
             if produit:
-                nouveau_stock = produit[5] + quantite
+                nouveau_stock = produit['stock_actuel'] + quantite
                 Produit.mettre_a_jour_stock(produit_id, nouveau_stock, "Annulation vente")
 
         query_details = "DELETE FROM details_ventes WHERE vente_id = ?"
@@ -159,6 +161,10 @@ class Vente:
 
         if result:
             logger.info(f"Vente {vente_id} annulee")
+            if user_id:
+                from modules.utilisateurs import Utilisateur
+                Utilisateur.logger_action(user_id, 'annulation_vente',
+                                          f"Vente {vente_id} annulée")
         return result
 
     @staticmethod

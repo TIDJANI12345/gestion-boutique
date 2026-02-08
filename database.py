@@ -20,6 +20,7 @@ class Database:
         """Connexion a la base de donnees"""
         try:
             self.conn = sqlite3.connect(DB_PATH)
+            self.conn.row_factory = sqlite3.Row  # Activer Row Factory pour accès par clé
             self.cursor = self.conn.cursor()
             logger.info("Connexion a la base de donnees reussie")
         except Exception as e:
@@ -317,6 +318,10 @@ class Database:
             ('fidelite_remise_seuil', '100', 'Nombre de points pour une remise'),
             ('fidelite_remise_pct', '5', 'Pourcentage de remise fidelite'),
             ('gestionnaire_peut_vendre', '1', 'Permettre aux gestionnaires d\'effectuer des ventes: 0=non, 1=oui'),
+            ('camera_auto_start', '0', 'Démarrer la caméra automatiquement: 0=non, 1=oui'),
+            ('mode_scan_auto', '1', 'Mode de scan automatique (sans demander la quantité): 0=non, 1=oui'),
+            ('son_scan_actif', '1', 'Activer le son lors du scan: 0=non, 1=oui'),
+            ('son_scan_type', 'beep', 'Type de son de scan: beep ou fichier'),
         ]
 
         for cle, valeur, description in parametres_defaut:
@@ -394,10 +399,20 @@ class Database:
             logger.error(f"Erreur fetch_one : {e}")
             return None
 
+    def fetch_one_dict(self, query, params=()):
+        """Recuperer un seul resultat en dict explicite"""
+        row = self.fetch_one(query, params)
+        return dict(row) if row else None
+
+    def fetch_all_dicts(self, query, params=()):
+        """Recuperer tous les resultats en liste de dicts"""
+        rows = self.fetch_all(query, params)
+        return [dict(row) for row in rows] if rows else []
+
     def get_parametre(self, cle, defaut=""):
         """Recuperer un parametre"""
         result = self.fetch_one("SELECT valeur FROM parametres WHERE cle = ?", (cle,))
-        return result[0] if result else defaut
+        return result['valeur'] if result else defaut
 
     def set_parametre(self, cle, valeur):
         """Definir un parametre"""

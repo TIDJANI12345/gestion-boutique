@@ -1,95 +1,242 @@
-## RÈGLES DE RÉPONSE (Mode Éco)
-- Be concise. Code only. No chatty explanations.
-- When editing, use search/replace blocks. DO NOT output full files.
-- No obvious comments.
-- Focus on low token usage.
+# CLAUDE.md
+
+Ce fichier fournit des directives à Claude Code (claude.ai/code) pour travailler avec le code de ce dépôt.
+
+## Mode de Réponse
+- Concis. Code uniquement. Pas d'explications bavardes.
+- Utiliser des blocs rechercher/remplacer pour les modifications. NE PAS afficher les fichiers complets.
+- Pas de commentaires évidents.
+- Usage minimal de tokens.
 
 ---
-## INFOS DU PROJET
 
-# GestionBoutique v2
+## Aperçu du Projet
 
-## Qu'est-ce que c'est
-Logiciel de gestion de boutique / point de vente (POS) pour commerces. Gestion des ventes, produits, clients, stock, recus, imprimante thermique. Deploye au Benin (devise FCFA, TVA 18%).
+Système de point de vente (POS) pour commerces de détail. Déployé au Bénin (devise : FCFA, TVA : 18%).
+Fonctionnalités : ventes, inventaire, clients, reçus, intégration imprimante thermique.
 
-## Migration en cours : Tkinter → PySide6
-**Lire `MIGRATION_PYSIDE6.md` pour le plan complet.**
+**Migration :** Tkinter → PySide6 **TERMINÉE** ✅
 
-### Etat d'avancement
-- [x] Phase 0 : Fondation (ui/, theme, composants, config multiplateforme)
-- [x] Phase 1 : Authentification (licence, premier lancement, login)
-- [x] Phase 2 : Dashboard principal
-- [x] Phase 3 : Ventes (critique)
-- [x] Phase 4 : Gestion (produits, clients, utilisateurs)
-- [x] Phase 5 : Rapports et outils
-- [x] Phase 6 : Nettoyage final
-
-## Migration terminée ! ✅
-
-### Structure finale
-- `main.py` → PySide6 (point d'entree)
-- `main_tkinter_backup.py` → Backup Tkinter (ancien)
-- `ui/` → Fenetres PySide6
-- `modules/` → Logique metier (independant du framework UI)
-- `database.py` → Couche SQLite
+---
 
 ## Architecture
 
+### Principe Fondamental : Séparation des Responsabilités
+- **`modules/`** - Logique métier (18 modules). **NE JAMAIS** importer de frameworks UI (tkinter/PySide6)
+- **`database.py`** - Singleton SQLite. Tous les accès DB passent par ici
+- **`ui/`** - Couche d'interface PySide6
+- **`config.py`** - Configuration multiplateforme (Windows/Linux/macOS)
+
+### Fichiers Clés
 ```
-main.py / main_qt.py          # Points d'entree
-config.py                      # Configuration, couleurs, chemins (multiplateforme)
-database.py                    # SQLite singleton (db.execute_query, db.get_parametre)
-modules/                       # Logique metier (18 modules, aucun import UI)
-  produits.py, ventes.py, clients.py, utilisateurs.py,
-  paiements.py, rapports.py, recus.py, imprimante.py,
-  licence.py, synchronisation.py, sauvegarde.py,
-  codebarres.py, fiscalite.py, scanner_camera.py,
-  theme.py, logger.py, whatsapp.py, export.py
-interface/                     # UI Tkinter (ancien)
-ui/                            # UI PySide6 (nouveau)
-  components/                  # Composants reutilisables (table, dialogs, toolbar, scanner)
-  windows/                     # Fenetres de l'application
-  theme.py                     # Systeme de theme QSS
-  platform.py                  # Detection OS, chemins
-tests/
+main.py                    # Point d'entrée PySide6
+database.py                # Singleton DB : db.execute_query(), db.fetch_*()
+config.py                  # BASE_DIR, DB_PATH (détection OS)
+modules/                   # Logique métier (indépendant UI)
+  ventes.py                # Moteur de ventes
+  produits.py              # Produits
+  utilisateurs.py          # Utilisateurs + hiérarchie des rôles
+  permissions.py           # Système de rôles à 3 niveaux
+  imprimante.py            # Imprimante thermique (ESC/POS)
+  recus.py                 # Reçus PDF (ReportLab)
+ui/
+  theme.py                 # Styles QSS
+  platform.py              # Détection OS, chemins
+  components/              # Composants réutilisables (table, dialogs, toolbar, scanner)
+  windows/                 # Fenêtres de l'application
+    ventes.py              # Fenêtre ventes (CRITIQUE)
+    paiement.py            # Modal de paiement
+    principale*.py         # 3 dashboards (patron/gestionnaire/caissier)
 ```
 
-## Flux critique : Vente
+### Base de Données
+- SQLite : `{BASE_DIR}/data/boutique.db`
+- Pattern singleton : `from database import db`
+- Accès : `db.execute_query(sql, params)`, `db.fetch_one()`, `db.fetch_all()`
+- Config clé-valeur : `db.get_parametre(key)`, `db.set_parametre(key, val)`
+
+### Hiérarchie des Rôles (3 niveaux)
+1. **Super-Admin (patron)** - 1 seul compte, accès total
+2. **Gestionnaire** - Gestion produits/stocks, ne peut pas gérer les utilisateurs
+3. **Caissier** - Ventes uniquement, dashboard limité
+
+Appliqué via `modules/permissions.py` et `modules/utilisateurs.py::est_super_admin()`
+
+---
+
+## Flux Critiques
+
+### Flux de Vente
 ```
-Scanner/saisie → Panier (memoire) → Paiement (modal) → Transaction DB atomique
-→ MAJ stock → Recu PDF → Confirmation → Callback refresh dashboard
+Scanner/saisie manuelle → Panier (mémoire) → Modal paiement → Transaction DB atomique
+→ MAJ stock → Reçu PDF → Confirmation → Callback rafraîchissement dashboard
 ```
 
-## Base de donnees
-SQLite : `{BASE_DIR}/data/boutique.db`
-Tables principales : produits, ventes, details_ventes, clients, paiements, utilisateurs, parametres (key-value), historique_stock, logs_actions, taux_tva, devises, sync_queue
+**Fichiers :** `ui/windows/ventes.py`, `ui/windows/paiement.py`, `modules/ventes.py`
+
+### Flux d'Authentification
+```
+Splash → Vérif licence → Premier lancement (si aucun utilisateur) → Login → Dashboard selon rôle
+```
+
+**Fichiers :** `main.py`, `ui/windows/{licence,premier_lancement,login}.py`
+
+### Routage Dashboard (main.py)
+```python
+if role == 'patron' or user.get('super_admin') == 1:
+    → PrincipaleWindow
+elif role == 'gestionnaire':
+    → PrincipaleGestionnaireWindow
+elif role == 'caissier':
+    → PrincipaleCaissierWindow
+```
+
+---
+
+## Commandes de Développement
+
+### Exécution
+```bash
+python main.py                          # Lancer l'app PySide6
+python main_tkinter_backup.py          # Ancienne version Tkinter (backup)
+```
+
+### Python Windows depuis WSL
+```bash
+/mnt/c/Users/hp/AppData/Local/Programs/Python/Python311/python.exe main.py
+```
+
+### Tests
+```bash
+python -m pytest tests/                 # Tous les tests
+python -m pytest tests/test_ventes.py   # Fichier de test unique
+python -m pytest -v -k "test_name"      # Test spécifique
+```
+
+**Config tests :** `tests/conftest.py` configure la DB en mémoire (`:memory:`) pour isoler les tests
+
+### Compilation
+```bash
+pyinstaller GestionBoutique.spec        # Créer l'exécutable
+```
+
+---
 
 ## Conventions
-- Langue de l'interface : francais
-- Noms de classes/fichiers Tkinter : `FenetreXxx` / `fenetre_xxx.py`
-- Noms de classes/fichiers Qt : `XxxWindow` / `xxx.py` (dans ui/windows/)
-- Signaux/slots Qt (pas de callbacks bruts dans le nouveau code)
-- Les modules metier ne doivent JAMAIS importer tkinter ou PySide6
 
-## Commandes utiles
-```bash
-python main.py                    # Lancer application (PySide6)
-python main_tkinter_backup.py    # Lancer backup Tkinter (si necessaire)
-python -m pytest tests/           # Tests
-pyinstaller GestionBoutique.spec  # Build executable
+### Naming
+- **Qt windows:** `XxxWindow` (class), `xxx.py` (file) in `ui/windows/`
+- **Tkinter (legacy):** `FenetreXxx` (class), `fenetre_xxx.py` in `interface/`
+- **UI language:** French (end-user facing)
+- **Code/comments:** French or English
+
+### Qt Patterns
+- Use **signals/slots**, not raw callbacks
+- Dialogs: inherit `QDialog`, use `exec()` for modal
+- Styling: QSS in `ui/theme.py`, not inline Python
+- Shortcuts: `QShortcut` or `QKeySequence.StandardKey` (cross-platform)
+
+### Business Logic Rules
+- Modules in `modules/` **MUST NOT** import `tkinter` or `PySide6`
+- All UI-agnostic code goes in `modules/`
+- DB access only via `database.py` singleton
+
+---
+
+## Multiplatform Support
+
+### Paths (handled by `config.py`)
+| OS      | Data Dir                                              |
+|---------|-------------------------------------------------------|
+| Windows | `%APPDATA%/GestionBoutique/`                          |
+| Linux   | `~/.local/share/GestionBoutique/`                     |
+| macOS   | `~/Library/Application Support/GestionBoutique/`      |
+
+### Serial Ports (thermal printer)
+| OS      | Ports                                  |
+|---------|----------------------------------------|
+| Windows | `COM3`, `COM4`, ...                    |
+| Linux   | `/dev/ttyUSB0`, `/dev/ttyACM0`, ...    |
+| macOS   | `/dev/tty.usbserial-*`                 |
+
+Detection: `ui/platform.py::get_serial_ports()`
+
+### Packaging
+- **Windows:** PyInstaller + Inno Setup
+- **Linux:** PyInstaller → AppImage or `.deb`
+- **macOS:** PyInstaller → `.app` + `.dmg`
+
+---
+
+## Common Patterns
+
+### Database Transaction
+```python
+from database import db
+
+# Single query
+result = db.execute_query("INSERT INTO produits (nom, prix_vente) VALUES (?, ?)", ("Test", 100))
+
+# Fetch
+products = db.fetch_all("SELECT * FROM produits WHERE stock_actuel < ?", (10,))
+product = db.fetch_one("SELECT * FROM produits WHERE id = ?", (1,))
+
+# Transaction (auto-commit/rollback)
+with db.conn:
+    db.execute_query("UPDATE stock ...")
+    db.execute_query("INSERT INTO historique ...")
 ```
 
-## Dependances
-Voir `requirements.txt`. Migration ajoute : `PySide6>=6.6.0`, `platformdirs>=4.0.0`
+### Qt Signal/Slot
+```python
+from PySide6.QtCore import Signal
 
-## Environnement de dev
-- Python Windows : `/mnt/c/Users/hp/AppData/Local/Programs/Python/Python311/python.exe`
-- Depuis WSL, lancer avec ce chemin pour les tests GUI
-- Tests : ce meme Python + pytest
+class MyWindow(QDialog):
+    data_changed = Signal(dict)  # Define signal
 
-## Multiplateforme
-L'application doit fonctionner sur Windows, Linux et macOS.
-- Chemins : `ui/platform.py` gere la detection OS (get_base_dir, get_serial_ports, etc.)
-- Config : `config.py` utilise `_get_base_dir()` multiplateforme (Windows/Linux/macOS)
-- Ports serie imprimante : detecter selon OS
-- Packaging : PyInstaller sur chaque OS cible
+    def some_action(self):
+        self.data_changed.emit({'key': 'value'})  # Emit
+
+# Connect
+window.data_changed.connect(self.on_data_changed)
+```
+
+### Permissions Check
+```python
+from modules.permissions import Permissions
+
+if not Permissions.peut(user, 'gerer_produits'):
+    erreur(self, "Accès refusé")
+    return
+```
+
+---
+
+## Important Files to Read First
+
+When working on:
+- **Sales:** Read `modules/ventes.py`, `ui/windows/ventes.py`, `ui/windows/paiement.py`
+- **Users/Roles:** Read `modules/utilisateurs.py`, `modules/permissions.py`, `PLAN_HIERARCHIE_ROLES.md`
+- **Database:** Read `database.py` (lines 1-200 for schema)
+- **Theming:** Read `ui/theme.py`
+- **Platform:** Read `ui/platform.py`, `config.py`
+
+---
+
+## Migration Notes
+
+**Tkinter → PySide6 migration completed.**
+- Backup Tkinter code: `main_tkinter_backup.py`, `interface/` (deprecated)
+- **Do not modify** files in `interface/` - use `ui/` equivalents
+- See `MIGRATION_PYSIDE6.md` for full migration plan (historical reference)
+
+---
+
+## Development Environment
+
+- **Python:** 3.11+
+- **WSL users:** Use Windows Python path for GUI testing
+- **Dependencies:** See `requirements.txt`
+  - Core: `PySide6>=6.6.0`, `platformdirs>=4.0.0`
+  - Business: `reportlab`, `python-escpos`, `opencv-python`, `pyzbar`, `bcrypt`
+  - Dev: `pytest>=7.0.0`, `pyinstaller==6.3.0`

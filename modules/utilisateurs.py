@@ -51,8 +51,8 @@ class Utilisateur:
     @staticmethod
     def compte_existe():
         """Verifier s'il existe au moins un utilisateur dans la base"""
-        result = db.fetch_one("SELECT COUNT(*) FROM utilisateurs")
-        return result and result[0] > 0
+        result = db.fetch_one("SELECT COUNT(*) as count FROM utilisateurs")
+        return result and result['count'] > 0
 
     @staticmethod
     def est_super_admin(user_id):
@@ -61,7 +61,7 @@ class Utilisateur:
             "SELECT super_admin FROM utilisateurs WHERE id = ?",
             (user_id,)
         )
-        return result and result[0] == 1
+        return result and result['super_admin'] == 1
 
     @staticmethod
     def valider_mot_de_passe(mot_de_passe):
@@ -73,7 +73,7 @@ class Utilisateur:
         return True, "Mot de passe valide"
 
     @staticmethod
-    def creer_utilisateur(nom, prenom, email, mot_de_passe, role='caissier'):
+    def creer_utilisateur(nom, prenom, email, mot_de_passe, role='caissier', admin_user_id=None):
         """Creer un nouvel utilisateur"""
         # Valider le mot de passe
         valide, message = Utilisateur.valider_mot_de_passe(mot_de_passe)
@@ -87,8 +87,8 @@ class Utilisateur:
             super_admin_flag = 0
             if role == 'patron':
                 # Vérifier qu'il n'existe pas déjà un super-admin
-                count_super_admin = db.fetch_one("SELECT COUNT(*) FROM utilisateurs WHERE super_admin = 1")
-                if count_super_admin and count_super_admin[0] > 0:
+                count_super_admin = db.fetch_one("SELECT COUNT(*) as count FROM utilisateurs WHERE super_admin = 1")
+                if count_super_admin and count_super_admin['count'] > 0:
                     return False, "Un super-admin existe déjà. Le rôle 'patron' ne peut être attribué qu'une seule fois."
                 super_admin_flag = 1
 
@@ -99,6 +99,9 @@ class Utilisateur:
             result = db.execute_query(query, (nom, prenom, email, hashed.decode(), role, super_admin_flag))
             if result:
                 logger.info(f"Utilisateur cree : {email} ({role})")
+                if admin_user_id:
+                    Utilisateur.logger_action(admin_user_id, 'creation_utilisateur',
+                                              f"Utilisateur {email} créé (role: {role})")
                 return True, "Utilisateur cree avec succes"
             return False, "Erreur lors de la creation"
         except sqlite3.IntegrityError:
@@ -114,10 +117,10 @@ class Utilisateur:
         query = "SELECT * FROM utilisateurs WHERE email = ? AND actif = 1"
         user = db.fetch_one(query, (email,))
 
-        if user and bcrypt.checkpw(mot_de_passe.encode(), user[4].encode()):
+        if user and bcrypt.checkpw(mot_de_passe.encode(), user['mot_de_passe'].encode()):
             db.execute_query(
                 "UPDATE utilisateurs SET dernier_login = CURRENT_TIMESTAMP WHERE id = ?",
-                (user[0],)
+                (user['id'],)
             )
             logger.info(f"Connexion reussie : {email}")
             return user
@@ -131,7 +134,7 @@ class Utilisateur:
         return db.fetch_all("SELECT * FROM utilisateurs ORDER BY nom")
 
     @staticmethod
-    def modifier_role(user_id, nouveau_role):
+    def modifier_role(user_id, nouveau_role, admin_user_id=None):
         """Changer le role d'un utilisateur"""
         # Vérifier si l'utilisateur est super-admin
         if Utilisateur.est_super_admin(user_id):
@@ -139,8 +142,8 @@ class Utilisateur:
 
         # Empêcher la promotion vers 'patron' si un super-admin existe déjà
         if nouveau_role == 'patron':
-            count_super_admin = db.fetch_one("SELECT COUNT(*) FROM utilisateurs WHERE super_admin = 1")
-            if count_super_admin and count_super_admin[0] > 0:
+            count_super_admin = db.fetch_one("SELECT COUNT(*) as count FROM utilisateurs WHERE super_admin = 1")
+            if count_super_admin and count_super_admin['count'] > 0:
                 return False, "Un super-admin existe déjà. Le rôle 'patron' ne peut être attribué qu'une seule fois."
 
         # Mettre à jour le rôle et potentiellement le flag super_admin
@@ -151,6 +154,9 @@ class Utilisateur:
         )
         if result:
             logger.info(f"Role modifie pour utilisateur {user_id} : {nouveau_role}")
+            if admin_user_id:
+                Utilisateur.logger_action(admin_user_id, 'modification_role',
+                                          f"User {user_id}: rôle changé vers {nouveau_role}")
             return True, "Rôle modifié avec succès."
         return False, "Erreur lors de la modification du rôle."
 

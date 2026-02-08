@@ -25,23 +25,40 @@ class VentesWindow(QDialog):
 
     def __init__(self, parent=None, utilisateur=None):
         super().__init__(parent)
-        self.setWindowTitle("Nouvelle Vente")
-        self.setMinimumSize(1200, 700)
-        self.setModal(True)
+        print("DEBUG: Initialisation de VentesWindow commence.")
+        try:
+            self.setWindowTitle("Nouvelle Vente")
+            self.setMinimumSize(1200, 700)
+            self.setModal(True)
 
-        # Panier en memoire
-        self.panier: list[dict] = []
-        self.client_id = None
-        self.client_selectionne = None
-        self.utilisateur = utilisateur  # Dict utilisateur connecté
+            # Panier en memoire
+            self.panier: list[dict] = []
+            self.client_id = None
+            self.client_selectionne = None
+            self.utilisateur = utilisateur  # Dict utilisateur connecté
+            print("DEBUG: Variables initialisées.")
 
-        self._setup_ui()
-        self._setup_raccourcis()
-        self._actualiser_panier()
-        self._check_camera_auto()
+            self._setup_ui()
+            print("DEBUG: _setup_ui() terminé.")
 
-        # Focus scanner au demarrage
-        QTimer.singleShot(0, self._entry_scan.setFocus)
+            self._setup_raccourcis()
+            print("DEBUG: _setup_raccourcis() terminé.")
+
+            self._actualiser_panier()
+            print("DEBUG: _actualiser_panier() terminé.")
+
+            self._check_camera_auto()
+            print("DEBUG: _check_camera_auto() terminé.")
+
+            # Focus scanner au demarrage
+            QTimer.singleShot(0, self._entry_scan.setFocus)
+            print("DEBUG: Initialisation de VentesWindow terminée avec succès.")
+        except Exception as e:
+            print(f"FATAL: Erreur dans VentesWindow.__init__: {e}")
+            import traceback
+            traceback.print_exc()
+            QMessageBox.critical(self, "Erreur Critique", f"Impossible d'ouvrir la fenêtre de vente:\n\n{e}")
+
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
@@ -389,7 +406,7 @@ class VentesWindow(QDialog):
             return
 
         # Verifier le stock disponible
-        stock_disponible = produit[5]
+        stock_disponible = produit['stock_actuel']
         if stock_disponible <= 0:
             QMessageBox.critical(self, "Stock", "Produit en rupture de stock!")
             self._entry_scan.clear()
@@ -407,14 +424,14 @@ class VentesWindow(QDialog):
                 return
             # Ajout direct quantité 1
             self._ajouter_au_panier(produit, 1)
-            self._flash_ligne_ajoutee(produit[0])  # Feedback visuel
+            self._flash_ligne_ajoutee(produit['id'])  # Feedback visuel
         else:
             # Mode MANUEL : demander la quantité
             qte, ok = DialogueQuantite.saisir(
                 self,
-                f"Quantite - {produit[1]}",
-                f"Stock disponible: {produit[5]}",
-                valeur=1, minimum=1, maximum=produit[5]
+                f"Quantite - {produit['nom']}",
+                f"Stock disponible: {produit['stock_actuel']}",
+                valeur=1, minimum=1, maximum=produit['stock_actuel']
             )
 
             if ok and qte > 0:
@@ -439,7 +456,7 @@ class VentesWindow(QDialog):
             return
 
         # Vérifier le stock disponible
-        stock_disponible = produit[5]
+        stock_disponible = produit['stock_actuel']
         if stock_disponible <= 0:
             QMessageBox.critical(self, "Stock", "Produit en rupture de stock!")
             return
@@ -455,14 +472,14 @@ class VentesWindow(QDialog):
                 return
             # Ajout direct quantité 1
             self._ajouter_au_panier(produit, 1)
-            self._flash_ligne_ajoutee(produit[0])
+            self._flash_ligne_ajoutee(produit['id'])
         else:
             # Mode MANUEL : demander la quantité
             qte, ok = DialogueQuantite.saisir(
                 self,
-                f"Quantite - {produit[1]}",
-                f"Stock disponible: {produit[5]}",
-                valeur=1, minimum=1, maximum=produit[5]
+                f"Quantite - {produit['nom']}",
+                f"Stock disponible: {produit['stock_actuel']}",
+                valeur=1, minimum=1, maximum=produit['stock_actuel']
             )
 
             if ok and qte > 0:
@@ -532,9 +549,9 @@ class VentesWindow(QDialog):
 
     def _ajouter_au_panier(self, produit_tuple, quantite: int):
         """Ajouter un produit au panier memoire."""
-        produit_id = produit_tuple[0]
-        nom = produit_tuple[1]
-        prix_vente = produit_tuple[4]
+        produit_id = produit_tuple['id']
+        nom = produit_tuple['nom']
+        prix_vente = produit_tuple['prix_vente']
 
         # Fusionner si deja present
         for item in self.panier:
@@ -650,9 +667,9 @@ class VentesWindow(QDialog):
         self._list_clients.clear()
         if resultats:
             for c in resultats:
-                tel = f" - {c[2]}" if c[2] else ""
-                item = QListWidgetItem(f"{c[0]}: {c[1]}{tel}")
-                item.setData(Qt.UserRole, c[0])  # stocker l'ID
+                tel = f" - {c['telephone']}" if c['telephone'] else ""
+                item = QListWidgetItem(f"{c['id']}: {c['nom']}{tel}")
+                item.setData(Qt.UserRole, c['id'])  # stocker l'ID
                 self._list_clients.addItem(item)
             self._list_clients.setVisible(True)
         else:
@@ -670,10 +687,10 @@ class VentesWindow(QDialog):
             self.client_id = client_id
             self.client_selectionne = client
             self._entry_client.blockSignals(True)
-            self._entry_client.setText(client[1])
+            self._entry_client.setText(client['nom'])
             self._entry_client.blockSignals(False)
             self._list_clients.setVisible(False)
-            self._label_fidelite.setText(f"Points fidelite: {client[4]}")
+            self._label_fidelite.setText(f"Points fidelite: {client['points_fidelite']}")
 
     def _effacer_client(self):
         """Effacer la selection client."""
@@ -737,13 +754,13 @@ class VentesWindow(QDialog):
                     (item['produit_id'],)
                 )
 
-                if not stock_actuel or stock_actuel[0] < item['quantite']:
+                if not stock_actuel or stock_actuel['stock_actuel'] < item['quantite']:
                     # ROLLBACK + alerte utilisateur
                     db.conn.rollback()
                     QMessageBox.critical(
                         self, "Stock insuffisant",
                         f"Le produit '{item['nom']}' n'a plus assez de stock!\n"
-                        f"Stock actuel: {stock_actuel[0] if stock_actuel else 0}\n"
+                        f"Stock actuel: {stock_actuel['stock_actuel'] if stock_actuel else 0}\n"
                         f"Quantité demandée: {item['quantite']}\n\n"
                         f"La vente a été annulée."
                     )

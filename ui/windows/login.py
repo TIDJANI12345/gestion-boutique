@@ -122,14 +122,14 @@ class LoginWindow(QDialog):
         if user:
             self._tentatives = 0
             infos_user = {
-                'id': user[0],
-                'nom': user[1],
-                'prenom': user[2],
-                'email': user[3],
-                'role': user[5],
-                'super_admin': user[9] if len(user) > 9 else 0
+                'id': user['id'],
+                'nom': user['nom'],
+                'prenom': user['prenom'],
+                'email': user['email'],
+                'role': user['role'],
+                'super_admin': user['super_admin'] if 'super_admin' in user.keys() else 0
             }
-            Utilisateur.logger_action(user[0], 'connexion', "Connexion reussie")
+            Utilisateur.logger_action(user['id'], 'connexion', "Connexion reussie")
             self.login_success.emit(infos_user)
             self.accept()
         else:

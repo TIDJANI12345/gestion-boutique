@@ -1,0 +1,10 @@
+{
+  "version": "2.1.0",
+  "date": "2026-02-08",
+  "url_download": "https://github.com/TIDJANI12345/gestion-boutique/releases/download/v1.1.0/GestionBoutique.exe",
+  "url_changelog": "https://github.com/TIDJANI12345/gestion-boutique/releases/download/v1.1.0/CHANGELOG.md",
+  "sha256": "abc123def456...optionnel",
+  "taille_mb": 105,
+  "critique": false,
+  "message": "Nouvelle version disponible avec système d'audit trail complet et corrections de bugs"
+}

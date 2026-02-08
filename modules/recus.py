@@ -104,10 +104,10 @@ def generer_recu_pdf(vente_id):
             return None
 
         # Informations vente
-        numero_vente = vente[1]
-        date_vente = vente[2]
-        total = vente[3]
-        client = vente[4] if len(vente) > 4 and vente[4] else ""
+        numero_vente = vente['numero_vente']
+        date_vente = vente['date_vente']
+        total = vente['total']
+        client = vente['client'] if vente['client'] else ""
 
         # Informations boutique
         nom_boutique = db.get_parametre('boutique_nom', BOUTIQUE_NOM)
@@ -272,9 +272,9 @@ def generer_recu_pdf(vente_id):
             "SELECT c.nom, c.telephone, c.points_fidelite FROM clients c "
             "JOIN ventes v ON v.client_id = c.id WHERE v.id = ?", (vente_id,))
         if client_info:
-            if client_info[1]:
-                info_data.append(['Tel. client:', client_info[1]])
-            info_data.append(['Points fidelite:', str(client_info[2])])
+            if client_info['telephone']:
+                info_data.append(['Tel. client:', client_info['telephone']])
+            info_data.append(['Points fidelite:', str(client_info['points_fidelite'])])
 
         info_table = Table(info_data, colWidths=[5*cm, 11*cm])
         info_table.setStyle(TableStyle([
@@ -312,10 +312,10 @@ def generer_recu_pdf(vente_id):
         data = [['Article', 'Qté', 'Prix unit.', 'Total']]
 
         for detail in details:
-            nom = detail[1]
-            quantite = detail[2]
-            prix_unit = detail[3]
-            sous_total = detail[4]
+            nom = detail['nom']
+            quantite = detail['quantite']
+            prix_unit = detail['prix_unitaire']
+            sous_total = detail['sous_total']
 
             data.append([
                 nom,
@@ -422,14 +422,14 @@ def generer_recu_pdf(vente_id):
 
             paiement_data = []
             for p in paiements:
-                mode = mode_labels.get(p[0], p[0])
-                montant = p[1]
-                montant_recu = p[2]
-                monnaie_rendue = p[3]
-                reference = p[4]
+                mode = mode_labels.get(p['mode_paiement'], p['mode_paiement'])
+                montant = p['montant']
+                montant_recu = p['montant_recu']
+                monnaie_rendue = p['monnaie_rendue']
+                reference = p['reference']
 
                 paiement_data.append([f"Paiement {mode}:", f"{montant:,.0f} FCFA"])
-                if p[0] == 'especes' and montant_recu and monnaie_rendue:
+                if p['mode_paiement'] == 'especes' and montant_recu and monnaie_rendue:
                     paiement_data.append(["Montant reçu:", f"{montant_recu:,.0f} FCFA"])
                     paiement_data.append(["Monnaie rendue:", f"{monnaie_rendue:,.0f} FCFA"])
                 if reference:
