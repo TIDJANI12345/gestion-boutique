@@ -3,12 +3,12 @@ Fenêtre Paramètres Caisse - Configuration point de vente
 """
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QFrame, QLabel,
-    QPushButton, QRadioButton, QButtonGroup, QCheckBox, QScrollArea
+    QPushButton, QRadioButton, QButtonGroup, QCheckBox, QScrollArea, QLineEdit
 )
 from PySide6.QtCore import Qt
 
 from ui.theme import Theme
-from ui.components.dialogs import information
+from ui.components.dialogs import information, erreur
 from database import db
 
 
@@ -179,6 +179,52 @@ class PreferencesCaisseWindow(QDialog):
         camera_info.setStyleSheet(f"color: {Theme.c('gray')}; font-size: 9pt; margin-left: 25px;")
         camera_layout.addWidget(camera_info)
 
+        camera_layout.addSpacing(15)
+
+        # Source caméra
+        source_label = QLabel("📹 Source caméra")
+        source_label.setStyleSheet("font-size: 10pt; font-weight: bold;")
+        camera_layout.addWidget(source_label)
+
+        source_layout = QHBoxLayout()
+        self.input_camera_source = QLineEdit()
+        self.input_camera_source.setPlaceholderText("0 (webcam PC) ou http://IP:PORT/video (téléphone)")
+        self.input_camera_source.setStyleSheet(f"""
+            QLineEdit {{
+                padding: 8px;
+                border: 1px solid {Theme.c('gray')};
+                border-radius: 4px;
+                font-size: 10pt;
+            }}
+        """)
+        source_layout.addWidget(self.input_camera_source)
+
+        test_btn = QPushButton("Tester")
+        test_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {Theme.c('info')};
+                color: white;
+                padding: 8px 15px;
+                border-radius: 4px;
+                font-weight: bold;
+            }}
+            QPushButton:hover {{
+                background-color: #0284C7;
+            }}
+        """)
+        test_btn.clicked.connect(self._tester_camera)
+        source_layout.addWidget(test_btn)
+
+        camera_layout.addLayout(source_layout)
+
+        source_info = QLabel(
+            "Entrez 0 pour la webcam par défaut, 1 pour une 2ème webcam USB.\n"
+            "Pour utiliser votre téléphone : installez DroidCam/IP Webcam et entrez l'URL affichée.\n"
+            "Exemple : http://192.168.1.100:8080/video"
+        )
+        source_info.setStyleSheet(f"color: {Theme.c('gray')}; font-size: 9pt; margin-left: 0px;")
+        camera_layout.addWidget(source_info)
+
         content_layout.addWidget(camera_frame)
 
         content_layout.addStretch()
@@ -231,6 +277,10 @@ class PreferencesCaisseWindow(QDialog):
         camera_auto = db.get_parametre('camera_auto_start', '0') == '1'
         self.checkbox_camera_auto.setChecked(camera_auto)
 
+        # Source caméra
+        camera_source = db.get_parametre('camera_source', '0')
+        self.input_camera_source.setText(camera_source)
+
     def _enregistrer(self):
         """Sauvegarder les paramètres"""
         # Mode de scan
@@ -246,6 +296,10 @@ class PreferencesCaisseWindow(QDialog):
         camera_auto = '1' if self.checkbox_camera_auto.isChecked() else '0'
         db.set_parametre('camera_auto_start', camera_auto)
 
+        # Source caméra
+        camera_source = self.input_camera_source.text().strip() or '0'
+        db.set_parametre('camera_source', camera_source)
+
         mode_txt = "AUTOMATIQUE" if mode_auto == '1' else "MANUEL"
         son_txt = "activé" if son_actif == '1' else "désactivé"
         camera_txt = "activée" if camera_auto == '1' else "désactivée"
@@ -253,6 +307,42 @@ class PreferencesCaisseWindow(QDialog):
             self, "Paramètres sauvegardés",
             f"Mode de scan : {mode_txt}\n"
             f"Son de scan : {son_txt}\n"
-            f"Caméra auto : {camera_txt}"
+            f"Caméra auto : {camera_txt}\n"
+            f"Source caméra : {camera_source}"
         )
         self.accept()
+
+    def _tester_camera(self):
+        """Tester la connexion à la caméra"""
+        try:
+            import cv2
+        except ImportError:
+            erreur(self, "Erreur", "opencv-python n'est pas installé.\nInstallez-le avec : pip install opencv-python")
+            return
+
+        source = self.input_camera_source.text().strip() or '0'
+
+        # Convertir en int si possible
+        try:
+            source = int(source)
+        except ValueError:
+            pass  # C'est une URL
+
+        cap = cv2.VideoCapture(source)
+        if cap.isOpened():
+            ret, frame = cap.read()
+            cap.release()
+            if ret:
+                information(self, "Test réussi", f"✓ Caméra connectée avec succès !\nSource : {source}")
+            else:
+                erreur(self, "Erreur", f"Caméra trouvée mais impossible de lire les images.\nVérifiez que la caméra n'est pas utilisée par une autre application.")
+        else:
+            erreur(self, "Erreur de connexion",
+                f"Impossible de se connecter à la caméra.\n\n"
+                f"Source testée : {source}\n\n"
+                f"Vérifications :\n"
+                f"• Pour webcam PC : essayez 0, 1 ou 2\n"
+                f"• Pour téléphone : vérifiez l'URL (http://IP:PORT/video)\n"
+                f"• Assurez-vous que l'app mobile est lancée\n"
+                f"• Vérifiez que PC et téléphone sont sur le même WiFi"
+            )

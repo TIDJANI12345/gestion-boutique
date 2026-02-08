@@ -10,7 +10,7 @@ try:
     import cv2
     from pyzbar.pyzbar import decode as pyzbar_decode
     SCANNER_DISPONIBLE = True
-except ImportError:
+except Exception:
     pass
 
 
@@ -87,7 +87,9 @@ class CameraWidget(QFrame):
         if not SCANNER_DISPONIBLE:
             return
 
-        self.cap = cv2.VideoCapture(0)
+        # Récupérer la source caméra configurée
+        source = self._get_camera_source()
+        self.cap = cv2.VideoCapture(source)
         if not self.cap.isOpened():
             self.label_statut.setText("Erreur: caméra inaccessible")
             self.label_statut.setStyleSheet("font-size: 9pt; color: #EF4444;")
@@ -101,6 +103,20 @@ class CameraWidget(QFrame):
         self.timer = QTimer()
         self.timer.timeout.connect(self._lire_frame)
         self.timer.start(33)  # ~30 FPS
+
+    def _get_camera_source(self):
+        """Récupérer la source caméra depuis la config"""
+        try:
+            from database import db
+            source = db.get_parametre('camera_source', '0')
+            # Convertir en int si possible (webcam locale)
+            try:
+                return int(source)
+            except ValueError:
+                # C'est une URL (téléphone via DroidCam/IP Webcam)
+                return source
+        except Exception:
+            return 0  # Fallback sur webcam par défaut
 
     def _arreter_camera(self):
         """Arrêter la caméra"""

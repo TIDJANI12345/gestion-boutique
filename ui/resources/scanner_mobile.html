@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Scanner Mobile - GestionBoutique</title>
+    <script src="https://unpkg.com/@zxing/library@0.20.0/umd/index.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .container {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 20px;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .status {
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 20px;
+            text-align: center;
+            color: white;
+            font-weight: 500;
+        }
+
+        .status.connected {
+            background: rgba(16, 185, 129, 0.3);
+        }
+
+        .status.error {
+            background: rgba(239, 68, 68, 0.3);
+        }
+
+        .status.scanning {
+            background: rgba(59, 130, 246, 0.3);
+        }
+
+        .video-container {
+            flex: 1;
+            background: black;
+            border-radius: 12px;
+            overflow: hidden;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .scan-line {
+            position: absolute;
+            width: 100%;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #10b981, transparent);
+            animation: scan 2s ease-in-out infinite;
+            display: none;
+        }
+
+        .scan-line.active {
+            display: block;
+        }
+
+        @keyframes scan {
+            0%, 100% {
+                top: 20%;
+                opacity: 0;
+            }
+            50% {
+                top: 50%;
+                opacity: 1;
+            }
+        }
+
+        .last-scan {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 12px;
+            padding: 15px;
+            margin-top: 20px;
+            text-align: center;
+        }
+
+        .last-scan-label {
+            font-size: 12px;
+            color: #6b7280;
+            margin-bottom: 5px;
+        }
+
+        .last-scan-code {
+            font-size: 20px;
+            font-weight: bold;
+            color: #1f2937;
+            font-family: 'Courier New', monospace;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        button {
+            flex: 1;
+            padding: 15px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+
+        button:active {
+            transform: scale(0.95);
+        }
+
+        .btn-start {
+            background: #10b981;
+            color: white;
+        }
+
+        .btn-stop {
+            background: #ef4444;
+            color: white;
+        }
+
+        .btn-reconnect {
+            background: #3b82f6;
+            color: white;
+        }
+
+        .loading {
+            color: white;
+            font-size: 16px;
+        }
+
+        .stats {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 10px;
+            margin-top: 10px;
+            display: flex;
+            justify-content: space-around;
+            color: white;
+            font-size: 12px;
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 18px;
+            font-weight: bold;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📷 Scanner Mobile</h1>
+            <p>GestionBoutique</p>
+        </div>
+
+        <div class="status" id="status">Connexion en cours...</div>
+
+        <div class="video-container">
+            <video id="video" playsinline></video>
+            <div class="scan-line" id="scanLine"></div>
+            <div class="loading" id="loading">Initialisation...</div>
+        </div>
+
+        <div class="last-scan" id="lastScan" style="display: none;">
+            <div class="last-scan-label">Dernier scan</div>
+            <div class="last-scan-code" id="lastScanCode">-</div>
+        </div>
+
+        <div class="stats">
+            <div class="stat-item">
+                <span class="stat-value" id="scanCount">0</span>
+                <span>Scans</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-value" id="wsStatus">❌</span>
+                <span>WebSocket</span>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button class="btn-start" id="btnStart" onclick="startScanning()">Démarrer</button>
+            <button class="btn-reconnect" id="btnReconnect" onclick="reconnectWS()" style="display: none;">Reconnecter</button>
+        </div>
+    </div>
+
+    <script>
+        let codeReader = null;
+        let ws = null;
+        let scanning = false;
+        let scanCount = 0;
+        let wsHost = window.location.hostname;
+        let wsPort = 8765;
+
+        // Éléments DOM
+        const video = document.getElementById('video');
+        const loading = document.getElementById('loading');
+        const status = document.getElementById('status');
+        const scanLine = document.getElementById('scanLine');
+        const lastScan = document.getElementById('lastScan');
+        const lastScanCode = document.getElementById('lastScanCode');
+        const btnStart = document.getElementById('btnStart');
+        const btnReconnect = document.getElementById('btnReconnect');
+        const scanCountEl = document.getElementById('scanCount');
+        const wsStatusEl = document.getElementById('wsStatus');
+
+        // Connexion WebSocket
+        function connectWS() {
+            const wsUrl = `ws://${wsHost}:${wsPort}`;
+            updateStatus('Connexion au serveur...', 'status');
+
+            try {
+                ws = new WebSocket(wsUrl);
+
+                ws.onopen = () => {
+                    console.log('WebSocket connecté');
+                    updateStatus('✓ Connecté au PC', 'connected');
+                    wsStatusEl.textContent = '✓';
+                    btnReconnect.style.display = 'none';
+                };
+
+                ws.onclose = () => {
+                    console.log('WebSocket déconnecté');
+                    updateStatus('⚠ Déconnecté du PC', 'error');
+                    wsStatusEl.textContent = '❌';
+                    btnReconnect.style.display = 'block';
+                };
+
+                ws.onerror = (error) => {
+                    console.error('Erreur WebSocket:', error);
+                    updateStatus('Erreur de connexion', 'error');
+                    wsStatusEl.textContent = '❌';
+                };
+
+                ws.onmessage = (event) => {
+                    const data = JSON.parse(event.data);
+                    if (data.type === 'pong') {
+                        console.log('Pong reçu');
+                    }
+                };
+
+            } catch (error) {
+                console.error('Erreur connexion WebSocket:', error);
+                updateStatus('Impossible de se connecter', 'error');
+                btnReconnect.style.display = 'block';
+            }
+        }
+
+        function reconnectWS() {
+            connectWS();
+        }
+
+        function sendCode(code) {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                const message = {
+                    type: 'scan',
+                    code: code,
+                    format: 'auto',
+                    timestamp: Date.now()
+                };
+                ws.send(JSON.stringify(message));
+                console.log('Code envoyé:', code);
+
+                // Mise à jour UI
+                scanCount++;
+                scanCountEl.textContent = scanCount;
+                lastScanCode.textContent = code;
+                lastScan.style.display = 'block';
+
+                // Vibration feedback
+                if (navigator.vibrate) {
+                    navigator.vibrate(100);
+                }
+
+                // Animation flash
+                video.style.opacity = '0.3';
+                setTimeout(() => {
+                    video.style.opacity = '1';
+                }, 100);
+
+                updateStatus(`✓ Code envoyé : ${code}`, 'scanning');
+            } else {
+                console.error('WebSocket non connecté');
+                updateStatus('⚠ Non connecté au PC', 'error');
+            }
+        }
+
+        async function startScanning() {
+            if (scanning) return;
+
+            try {
+                loading.style.display = 'block';
+                updateStatus('Démarrage caméra...', 'status');
+
+                // Initialiser ZXing
+                codeReader = new ZXing.BrowserMultiFormatReader();
+
+                // Lister les caméras disponibles
+                const devices = await codeReader.listVideoInputDevices();
+                console.log('Caméras disponibles:', devices);
+
+                // Utiliser la caméra arrière si disponible
+                let selectedDevice = devices[0];
+                for (const device of devices) {
+                    if (device.label.toLowerCase().includes('back') ||
+                        device.label.toLowerCase().includes('arrière')) {
+                        selectedDevice = device;
+                        break;
+                    }
+                }
+
+                // Démarrer le scan
+                await codeReader.decodeFromVideoDevice(
+                    selectedDevice.deviceId,
+                    'video',
+                    (result, error) => {
+                        if (result) {
+                            console.log('Code détecté:', result.text);
+                            sendCode(result.text);
+                        }
+                        if (error && error.name !== 'NotFoundException') {
+                            console.error('Erreur scan:', error);
+                        }
+                    }
+                );
+
+                scanning = true;
+                loading.style.display = 'none';
+                scanLine.classList.add('active');
+                updateStatus('🔍 Scan en cours...', 'scanning');
+                btnStart.textContent = 'Arrêter';
+                btnStart.className = 'btn-stop';
+                btnStart.onclick = stopScanning;
+
+            } catch (error) {
+                console.error('Erreur démarrage caméra:', error);
+                loading.style.display = 'none';
+                updateStatus('❌ Erreur caméra', 'error');
+                alert('Erreur: ' + error.message + '\n\nAutorisez l\'accès à la caméra dans les paramètres de votre navigateur.');
+            }
+        }
+
+        function stopScanning() {
+            if (codeReader) {
+                codeReader.reset();
+                codeReader = null;
+            }
+            scanning = false;
+            scanLine.classList.remove('active');
+            updateStatus('⏸ Scan arrêté', 'status');
+            btnStart.textContent = 'Démarrer';
+            btnStart.className = 'btn-start';
+            btnStart.onclick = startScanning;
+        }
+
+        function updateStatus(message, className) {
+            status.textContent = message;
+            status.className = 'status ' + className;
+        }
+
+        // Initialisation
+        window.onload = () => {
+            connectWS();
+
+            // Keepalive ping
+            setInterval(() => {
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({ type: 'ping' }));
+                }
+            }, 30000); // Toutes les 30s
+        };
+
+        // Cleanup
+        window.onbeforeunload = () => {
+            stopScanning();
+            if (ws) ws.close();
+        };
+    </script>
+</body>
+</html>

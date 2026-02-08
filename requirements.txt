@@ -19,9 +19,13 @@ bcrypt>=4.0.0
 python-escpos==3.1
 opencv-python==4.8.1.78
 pyzbar==0.1.9
+websockets>=12.0
 
 # === Packaging ===
 pyinstaller==6.3.0
 
 # === Tests ===
 pytest>=7.0.0
+
+# === IA (optionnel) ===
+# google-generativeai>=0.8.0  # Décommenter si mode IA activé

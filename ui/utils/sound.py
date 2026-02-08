@@ -1,15 +1,14 @@
 """
 Module de gestion des sons pour l'application
 """
-from PySide6.QtMultimedia import QSoundEffect
-from PySide6.QtCore import QUrl
 import os
 
 # Sons disponibles
 SOUND_AVAILABLE = False
+QSoundEffect = None
 try:
-    # Vérifier si QtMultimedia est disponible
     from PySide6.QtMultimedia import QSoundEffect
+    from PySide6.QtCore import QUrl
     SOUND_AVAILABLE = True
 except ImportError:
     pass

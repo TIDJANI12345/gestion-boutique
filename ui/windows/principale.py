@@ -184,6 +184,13 @@ class PrincipaleWindow(QMainWindow):
                 action.triggered.connect(slot)
                 menu_admin.addAction(action)
 
+        # Outils
+        menu_outils = menubar.addMenu("Outils")
+
+        action_scanner_mobile = QAction("📱 Scanner Mobile", self)
+        action_scanner_mobile.triggered.connect(self.ouvrir_scanner_mobile_setup)
+        menu_outils.addAction(action_scanner_mobile)
+
         # Aide
         menu_aide = menubar.addMenu("Aide")
 
@@ -286,6 +293,7 @@ class PrincipaleWindow(QMainWindow):
             ("F4  Rapports", c['info'], self.ouvrir_rapports, 1, 0),
             ("F6  Export WhatsApp", c['warning'], self.ouvrir_whatsapp, 1, 1),
             ("F7  Clients", c['info'], self.ouvrir_clients, 1, 2),
+            # ("F8  Import WhatsApp", c['primary'], self.ouvrir_import_whatsapp, 2, 0),  # TODO: Activer plus tard
         ]
 
         self._boutons_actions = {}
@@ -420,6 +428,7 @@ class PrincipaleWindow(QMainWindow):
             ("F5", self.actualiser_stats),
             ("F6", self.ouvrir_whatsapp),
             ("F7", self.ouvrir_clients),
+            # ("F8", self.ouvrir_import_whatsapp),  # TODO: Activer plus tard
         ]
         for key, slot in raccourcis:
             shortcut = QShortcut(QKeySequence(key), self)
@@ -626,6 +635,13 @@ class PrincipaleWindow(QMainWindow):
         dlg = WhatsAppWindow(parent=self)
         dlg.exec()
 
+    # TODO: Activer plus tard
+    # def ouvrir_import_whatsapp(self):
+    #     from ui.windows.import_whatsapp import ImportWhatsAppWindow
+    #     dlg = ImportWhatsAppWindow(parent=self)
+    #     if dlg.exec():
+    #         self.actualiser_stats()
+
     def ouvrir_a_propos(self):
         from ui.windows.a_propos import AProposWindow
         dlg = AProposWindow(parent=self)
@@ -686,6 +702,12 @@ class PrincipaleWindow(QMainWindow):
     def ouvrir_preferences_caisse(self):
         from ui.windows.preferences_caisse import PreferencesCaisseWindow
         dlg = PreferencesCaisseWindow(parent=self)
+        dlg.exec()
+
+    def ouvrir_scanner_mobile_setup(self):
+        """Ouvrir la configuration du scanner mobile"""
+        from ui.windows.scanner_mobile_setup import ScannerMobileSetupDialog
+        dlg = ScannerMobileSetupDialog(parent=self)
         dlg.exec()
 
     def ouvrir_parametres_fiscaux(self):

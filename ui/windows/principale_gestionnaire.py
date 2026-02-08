@@ -292,6 +292,10 @@ class PrincipaleGestionnaireWindow(QMainWindow):
         if Permissions.peut(self.utilisateur, 'voir_mes_ventes'):
             gestion_menu.addAction("Mes Ventes", self.voir_mes_ventes)
 
+        # Menu Outils
+        outils_menu = menubar.addMenu("Outils")
+        outils_menu.addAction("📱 Scanner Mobile", self.ouvrir_scanner_mobile_setup)
+
         # Menu Aide
         help_menu = menubar.addMenu("Aide")
         help_menu.addAction("À Propos", self.ouvrir_a_propos)
@@ -371,6 +375,12 @@ class PrincipaleGestionnaireWindow(QMainWindow):
             dlg.exec()
         else:
             QMessageBox.warning(self, "Accès refusé", "Vous n'avez pas la permission de voir vos ventes.")
+
+    def ouvrir_scanner_mobile_setup(self):
+        """Ouvrir la configuration du scanner mobile"""
+        from ui.windows.scanner_mobile_setup import ScannerMobileSetupDialog
+        dlg = ScannerMobileSetupDialog(parent=self)
+        dlg.exec()
 
     def ouvrir_a_propos(self):
         from ui.windows.a_propos import AProposWindow

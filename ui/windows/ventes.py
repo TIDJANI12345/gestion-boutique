@@ -36,6 +36,8 @@ class VentesWindow(QDialog):
             self.client_id = None
             self.client_selectionne = None
             self.utilisateur = utilisateur  # Dict utilisateur connecté
+            self.scanner_mobile_server = None  # Serveur scanner mobile
+            self.scanner_mobile_http = None  # Serveur HTTP pour page mobile
             print("DEBUG: Variables initialisées.")
 
             self._setup_ui()
@@ -49,6 +51,9 @@ class VentesWindow(QDialog):
 
             self._check_camera_auto()
             print("DEBUG: _check_camera_auto() terminé.")
+
+            self._check_scanner_mobile_auto()
+            print("DEBUG: _check_scanner_mobile_auto() terminé.")
 
             # Focus scanner au demarrage
             QTimer.singleShot(0, self._entry_scan.setFocus)
@@ -521,6 +526,35 @@ class VentesWindow(QDialog):
             self.btn_toggle_camera.setChecked(True)
             self.btn_toggle_camera.setText("📷 Masquer caméra")
 
+    def _check_scanner_mobile_auto(self):
+        """Démarrer le serveur scanner mobile si configuré"""
+        try:
+            from database import db
+            from modules.scanner_mobile_server import ScannerMobileServer, est_disponible
+            from modules.scanner_mobile_http import ScannerMobileHTTP
+
+            scanner_mobile_auto = db.get_parametre('scanner_mobile_auto', '0') == '1'
+
+            if scanner_mobile_auto and est_disponible():
+                try:
+                    # Démarrer serveur WebSocket
+                    self.scanner_mobile_server = ScannerMobileServer(host='0.0.0.0', port=8765)
+                    self.scanner_mobile_server.code_recu.connect(self._traiter_code_camera)
+                    self.scanner_mobile_server.start()
+
+                    # Démarrer serveur HTTP
+                    self.scanner_mobile_http = ScannerMobileHTTP(port=8080)
+                    self.scanner_mobile_http.start()
+
+                    print("DEBUG: Serveur scanner mobile démarré")
+                except Exception as e:
+                    print(f"ERREUR: Impossible de démarrer le scanner mobile : {e}")
+        except ImportError:
+            # Module scanner mobile non disponible (websockets manquant)
+            print("DEBUG: Scanner mobile non disponible (websockets manquant)")
+        except Exception as e:
+            print(f"ERREUR: _check_scanner_mobile_auto : {e}")
+
     def _toggle_camera_widget(self):
         """Afficher/masquer le widget camera"""
         if self.btn_toggle_camera.isChecked():
@@ -869,4 +903,17 @@ class VentesWindow(QDialog):
             ):
                 event.ignore()
                 return
+
+        # Arrêter les serveurs scanner mobile
+        try:
+            if self.scanner_mobile_server:
+                self.scanner_mobile_server.arreter()
+                self.scanner_mobile_server = None
+
+            if self.scanner_mobile_http:
+                self.scanner_mobile_http.arreter()
+                self.scanner_mobile_http = None
+        except Exception as e:
+            print(f"ERREUR arrêt scanner mobile : {e}")
+
         super().closeEvent(event)
