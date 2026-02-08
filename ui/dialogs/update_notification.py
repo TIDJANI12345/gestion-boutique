@@ -53,7 +53,7 @@ class UpdateNotificationDialog(QDialog):
             infos_layout.addWidget(date_label)
 
         # Taille
-        if 'taille_mb' in self.infos:
+        if self.infos.get('taille_mb'):
             taille = formater_taille(self.infos['taille_mb'])
             taille_label = QLabel(f"<b>Taille du téléchargement :</b> ~{taille}")
             infos_layout.addWidget(taille_label)
