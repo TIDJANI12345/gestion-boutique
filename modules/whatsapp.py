@@ -145,10 +145,8 @@ class WhatsAppExport:
             with open(filepath, 'w', encoding='utf-8') as f:
                 f.write(message)
             
-            print(f"✅ Export WhatsApp sauvegardé: {filepath}")
             return filepath
-        except Exception as e:
-            print(f"❌ Erreur lors de la sauvegarde: {e}")
+        except Exception:
             return None
     
     @staticmethod

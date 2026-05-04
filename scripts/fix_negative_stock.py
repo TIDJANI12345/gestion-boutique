@@ -68,7 +68,7 @@ def corriger_stocks_negatifs():
         try:
             # Mettre à jour le stock à 0
             db.execute_query(
-                "UPDATE produits SET stock_actuel = 0, updated_at = datetime('now') WHERE id = ?",
+                "UPDATE produits SET stock_actuel = 0, updated_at = strftime('%Y-%m-%d %H:%M:%S', 'now', 'localtime') WHERE id = ?",
                 (id_produit,)
             )
 

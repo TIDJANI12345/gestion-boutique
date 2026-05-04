@@ -11,7 +11,7 @@ from reportlab.pdfgen import canvas
 from datetime import datetime
 import os
 import io
-from config import RECUS_DIR, BOUTIQUE_NOM, BOUTIQUE_ADRESSE, BOUTIQUE_TELEPHONE
+from config import RECUS_DIR, BOUTIQUE_NOM, BOUTIQUE_ADRESSE, BOUTIQUE_TELEPHONE, BOUTIQUE_EMAIL
 from database import db
 from modules.ventes import Vente
 from modules.logger import get_logger
@@ -113,6 +113,9 @@ def generer_recu_pdf(vente_id):
         nom_boutique = db.get_parametre('boutique_nom', BOUTIQUE_NOM)
         adresse = db.get_parametre('boutique_adresse', BOUTIQUE_ADRESSE)
         telephone = db.get_parametre('boutique_telephone', BOUTIQUE_TELEPHONE)
+        email_boutique = db.get_parametre('boutique_email', BOUTIQUE_EMAIL)
+        from modules.fiscalite import get_devise
+        devise = get_devise()
 
         # Créer le PDF
         filename = f"recu_{numero_vente}.pdf"
@@ -181,8 +184,10 @@ def generer_recu_pdf(vente_id):
             info_boutique = [
                 [Paragraph(nom_boutique.upper(), style_boutique)],
                 [Paragraph(adresse, style_info)],
-                [Paragraph(f"Tél: {telephone}", style_info)]
+                [Paragraph(f"Tél: {telephone}", style_info)],
             ]
+            if email_boutique:
+                info_boutique.append([Paragraph(email_boutique, style_info)])
 
             info_table = Table(info_boutique, colWidths=[13*cm])
             info_table.setStyle(TableStyle([
@@ -205,6 +210,8 @@ def generer_recu_pdf(vente_id):
             elements.append(Paragraph(nom_boutique.upper(), style_boutique))
             elements.append(Paragraph(adresse, style_info))
             elements.append(Paragraph(f"Tél: {telephone}", style_info))
+            if email_boutique:
+                elements.append(Paragraph(email_boutique, style_info))
 
         elements.append(Spacer(1, 0.7*cm))
 
@@ -320,8 +327,8 @@ def generer_recu_pdf(vente_id):
             data.append([
                 nom,
                 str(quantite),
-                f"{prix_unit:,.0f} FCFA",
-                f"{sous_total:,.0f} FCFA"
+                f"{prix_unit:,.0f} {devise}",
+                f"{sous_total:,.0f} {devise}"
             ])
 
         table = Table(data, colWidths=[8*cm, 2*cm, 3*cm, 3*cm])
@@ -353,8 +360,8 @@ def generer_recu_pdf(vente_id):
         if Fiscalite.tva_active():
             decomp = Fiscalite.calculer_tva(total)
             tva_data = [
-                ['Sous-total HT', f"{decomp['ht']:,.0f} FCFA"],
-                [f"TVA ({decomp['taux']:.0f}%)", f"{decomp['tva']:,.0f} FCFA"],
+                ['Sous-total HT', f"{decomp['ht']:,.0f} {devise}"],
+                [f"TVA ({decomp['taux']:.0f}%)", f"{decomp['tva']:,.0f} {devise}"],
             ]
 
             tva_table = Table(tva_data, colWidths=[13*cm, 3*cm])
@@ -378,7 +385,7 @@ def generer_recu_pdf(vente_id):
         # ==========================================
 
         total_label = "TOTAL TTC" if Fiscalite.tva_active() else "TOTAL A PAYER"
-        total_data = [[total_label, f"{total:,.0f} FCFA"]]
+        total_data = [[total_label, f"{total:,.0f} {devise}"]]
 
         total_table = Table(total_data, colWidths=[13*cm, 3*cm])
         total_table.setStyle(TableStyle([
@@ -415,25 +422,40 @@ def generer_recu_pdf(vente_id):
 
             mode_labels = {
                 'especes': 'Espèces',
+                'mobile_money': 'Mobile Money',
+                'virement': 'Virement bancaire',
+                'cheque': 'Chèque',
+                'mixte': 'Paiement mixte',
                 'orange_money': 'Orange Money',
                 'mtn_momo': 'MTN MoMo',
                 'moov_money': 'Moov Money',
+                'wave': 'Wave',
             }
 
             paiement_data = []
             for p in paiements:
-                mode = mode_labels.get(p['mode_paiement'], p['mode_paiement'])
+                mode_key = p['mode']
+                mode = mode_labels.get(mode_key, mode_key)
+                # For mobile_money, extract operator from reference if present
+                if mode_key == 'mobile_money' and p.get('reference') and p['reference'].startswith('['):
+                    end = p['reference'].find(']')
+                    if end > 0:
+                        mode = p['reference'][1:end]
                 montant = p['montant']
                 montant_recu = p['montant_recu']
                 monnaie_rendue = p['monnaie_rendue']
                 reference = p['reference']
 
-                paiement_data.append([f"Paiement {mode}:", f"{montant:,.0f} FCFA"])
-                if p['mode_paiement'] == 'especes' and montant_recu and monnaie_rendue:
-                    paiement_data.append(["Montant reçu:", f"{montant_recu:,.0f} FCFA"])
-                    paiement_data.append(["Monnaie rendue:", f"{monnaie_rendue:,.0f} FCFA"])
-                if reference:
-                    paiement_data.append(["Référence:", reference])
+                paiement_data.append([f"Paiement {mode}:", f"{montant:,.0f} {devise}"])
+                if mode_key == 'especes' and montant_recu and monnaie_rendue:
+                    paiement_data.append(["Montant reçu:", f"{montant_recu:,.0f} {devise}"])
+                    paiement_data.append(["Monnaie rendue:", f"{monnaie_rendue:,.0f} {devise}"])
+                ref_display = reference
+                if mode_key == 'mobile_money' and reference and reference.startswith('['):
+                    end = reference.find(']')
+                    ref_display = reference[end + 1:].strip() if end > 0 else reference
+                if ref_display:
+                    paiement_data.append(["Référence:", ref_display])
 
             if paiement_data:
                 p_table = Table(paiement_data, colWidths=[5*cm, 11*cm])

@@ -8,11 +8,20 @@ logger = get_logger('paiements')
 
 # Labels d'affichage pour les modes de paiement
 MODE_LABELS = {
-    'especes': 'Especes',
+    'especes':      'Espèces',
+    'mobile_money': 'Mobile Money',
+    'virement':     'Virement bancaire',
+    'cheque':       'Chèque',
+    'mixte':        'Paiement mixte',
+    # Anciens modes (rétrocompatibilité DB existante)
     'orange_money': 'Orange Money',
-    'mtn_momo': 'MTN MoMo',
-    'moov_money': 'Moov Money',
+    'mtn_momo':     'MTN MoMo',
+    'moov_money':   'Moov Money',
+    'wave':         'Wave',
 }
+
+# Modes considérés comme "Mobile Money" pour le regroupement
+MODES_MOBILE = {'mobile_money', 'orange_money', 'mtn_momo', 'moov_money'}
 
 
 class Paiement:
@@ -86,9 +95,10 @@ class Paiement:
         rapport = {
             'date': date,
             'total_especes': 0,
-            'total_orange_money': 0,
-            'total_mtn_momo': 0,
-            'total_moov_money': 0,
+            'total_mobile_money': 0,
+            'total_virement': 0,
+            'total_cheque': 0,
+            'total_mixte': 0,
             'total_general': 0,
             'nb_transactions': 0,
             'details_par_mode': [],
@@ -107,11 +117,13 @@ class Paiement:
 
             if mode == 'especes':
                 rapport['total_especes'] = total
-            elif mode == 'orange_money':
-                rapport['total_orange_money'] = total
-            elif mode == 'mtn_momo':
-                rapport['total_mtn_momo'] = total
-            elif mode == 'moov_money':
-                rapport['total_moov_money'] = total
+            elif mode in MODES_MOBILE:
+                rapport['total_mobile_money'] += total
+            elif mode == 'virement':
+                rapport['total_virement'] = total
+            elif mode == 'cheque':
+                rapport['total_cheque'] = total
+            elif mode == 'mixte':
+                rapport['total_mixte'] = total
 
         return rapport

@@ -49,7 +49,7 @@ class Database:
                 stock_alerte INTEGER DEFAULT 5,
                 code_barre TEXT UNIQUE NOT NULL,
                 type_code_barre TEXT DEFAULT 'code128',
-                date_ajout TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                date_ajout TIMESTAMP DEFAULT (strftime('%Y-%m-%d %H:%M:%S', 'now', 'localtime')),
                 description TEXT
             )
         ''')
@@ -59,7 +59,7 @@ class Database:
             CREATE TABLE IF NOT EXISTS ventes (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 numero_vente TEXT UNIQUE NOT NULL,
-                date_vente TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                date_vente TIMESTAMP DEFAULT (strftime('%Y-%m-%d %H:%M:%S', 'now', 'localtime')),
                 total REAL NOT NULL,
                 client TEXT,
                 utilisateur_id INTEGER,
@@ -107,7 +107,7 @@ class Database:
                 quantite_avant INTEGER,
                 quantite_apres INTEGER,
                 operation TEXT,
-                date_operation TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                date_operation TIMESTAMP DEFAULT (strftime('%Y-%m-%d %H:%M:%S', 'now', 'localtime')),
                 FOREIGN KEY (produit_id) REFERENCES produits(id)
             )
         ''')
@@ -132,7 +132,7 @@ class Database:
                 mot_de_passe TEXT NOT NULL,
                 role TEXT DEFAULT 'caissier',
                 actif BOOLEAN DEFAULT 1,
-                date_creation TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                date_creation TIMESTAMP DEFAULT (strftime('%Y-%m-%d %H:%M:%S', 'now', 'localtime')),
                 dernier_login TIMESTAMP,
                 super_admin BOOLEAN DEFAULT 0
             )
@@ -164,7 +164,7 @@ class Database:
                 utilisateur_id INTEGER,
                 action TEXT NOT NULL,
                 details TEXT,
-                date_action TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                date_action TIMESTAMP DEFAULT (strftime('%Y-%m-%d %H:%M:%S', 'now', 'localtime')),
                 FOREIGN KEY (utilisateur_id) REFERENCES utilisateurs(id)
             )
         ''')
@@ -176,7 +176,7 @@ class Database:
                 action TEXT NOT NULL,
                 table_name TEXT NOT NULL,
                 data_json TEXT NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                created_at TIMESTAMP DEFAULT (strftime('%Y-%m-%d %H:%M:%S', 'now', 'localtime'))
             )
         ''')
 
@@ -190,7 +190,7 @@ class Database:
                 points_fidelite INTEGER DEFAULT 0,
                 total_achats REAL DEFAULT 0,
                 nombre_achats INTEGER DEFAULT 0,
-                date_creation TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                date_creation TIMESTAMP DEFAULT (strftime('%Y-%m-%d %H:%M:%S', 'now', 'localtime')),
                 notes TEXT
             )
         ''')
@@ -205,7 +205,7 @@ class Database:
                 reference TEXT,
                 montant_recu REAL,
                 monnaie_rendue REAL,
-                date_paiement TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                date_paiement TIMESTAMP DEFAULT (strftime('%Y-%m-%d %H:%M:%S', 'now', 'localtime')),
                 FOREIGN KEY (vente_id) REFERENCES ventes(id)
             )
         ''')
@@ -261,7 +261,7 @@ class Database:
                 colonnes = [row[1] for row in self.cursor.execute(f"PRAGMA table_info({table})").fetchall()]
                 if 'updated_at' not in colonnes:
                     self.cursor.execute(f"ALTER TABLE {table} ADD COLUMN updated_at TIMESTAMP")
-                    self.cursor.execute(f"UPDATE {table} SET updated_at = datetime('now') WHERE updated_at IS NULL")
+                    self.cursor.execute(f"UPDATE {table} SET updated_at = strftime('%Y-%m-%d %H:%M:%S', 'now', 'localtime') WHERE updated_at IS NULL")
                     logger.info(f"Colonne updated_at ajoutee a {table}")
             except Exception as e:
                 logger.warning(f"Migration updated_at pour {table}: {e}")

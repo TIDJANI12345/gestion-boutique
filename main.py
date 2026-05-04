@@ -79,6 +79,41 @@ def verifier_mises_a_jour_auto(fenetre_parent):
             dialog.exec()
 
 
+def verifier_config_initiale(fenetre):
+    """Rappelle le patron de configurer la boutique si les paramètres essentiels manquent."""
+    from database import db
+    from PySide6.QtWidgets import QMessageBox
+    from config import BOUTIQUE_NOM, BOUTIQUE_TELEPHONE
+
+    nom = db.get_parametre('boutique_nom', '').strip()
+    tel = db.get_parametre('boutique_telephone', '').strip()
+
+    manquants = []
+    # Valeur non modifiée = encore le placeholder de config.py
+    if not nom or nom == BOUTIQUE_NOM:
+        manquants.append("Nom de la boutique")
+    if not tel or tel == BOUTIQUE_TELEPHONE:
+        manquants.append("Téléphone de la boutique")
+
+    if not manquants:
+        return
+
+    msg = QMessageBox(fenetre)
+    msg.setWindowTitle("Configuration initiale requise")
+    msg.setIcon(QMessageBox.Warning)
+    msg.setText(
+        "Certains paramètres essentiels ne sont pas encore configurés :\n\n"
+        + "\n".join(f"  • {m}" for m in manquants)
+        + "\n\nConfigurez-les maintenant pour que les reçus et calculs soient corrects."
+    )
+    btn_now = msg.addButton("Configurer maintenant", QMessageBox.AcceptRole)
+    msg.addButton("Plus tard", QMessageBox.RejectRole)
+    msg.exec()
+
+    if msg.clickedButton() == btn_now and hasattr(fenetre, 'ouvrir_preferences_caisse'):
+        fenetre.ouvrir_preferences_caisse()
+
+
 def lancer_dashboard(app: QApplication, utilisateur: dict):
     """Lance le dashboard selon le role et gere la session."""
 
@@ -100,9 +135,14 @@ def lancer_dashboard(app: QApplication, utilisateur: dict):
         app.quit()
         return
 
-    def on_session_expiree():
+    def _fermer_tout():
+        for w in app.topLevelWidgets():
+            if w is not fenetre:
+                w.close()
         fenetre.close()
-        # Re-login apres expiration
+
+    def on_session_expiree():
+        _fermer_tout()
         nouveau_user = demander_login()
         if nouveau_user:
             lancer_dashboard(app, nouveau_user)
@@ -110,7 +150,7 @@ def lancer_dashboard(app: QApplication, utilisateur: dict):
             app.quit()
 
     def on_deconnexion():
-        fenetre.close()
+        _fermer_tout()
         nouveau_user = demander_login()
         if nouveau_user:
             lancer_dashboard(app, nouveau_user)
@@ -121,7 +161,11 @@ def lancer_dashboard(app: QApplication, utilisateur: dict):
     if hasattr(fenetre, 'deconnexion_demandee'):
         fenetre.deconnexion_demandee.connect(on_deconnexion)
 
-    fenetre.show()
+    fenetre.showMaximized()
+
+    # Rappel config initiale après 1 seconde (patron seulement)
+    if utilisateur.get('super_admin') == 1:
+        QTimer.singleShot(1000, lambda: verifier_config_initiale(fenetre))
 
     # Vérifier les mises à jour après 3 secondes (ne pas bloquer le démarrage)
     QTimer.singleShot(3000, lambda: verifier_mises_a_jour_auto(fenetre))

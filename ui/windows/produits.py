@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
     QPushButton, QFrame, QMessageBox, QWidget, QComboBox,
     QTextEdit, QRadioButton, QButtonGroup, QScrollArea,
-    QSpinBox
+    QSpinBox, QInputDialog
 )
 from PySide6.QtCore import Qt, QUrl
 from PySide6.QtGui import QFont, QDesktopServices, QDoubleValidator, QIntValidator
@@ -129,10 +129,24 @@ class ProduitsWindow(QDialog):
         il.addWidget(self._entry_nom)
 
         il.addWidget(QLabel("Categorie"))
+        cat_row = QHBoxLayout()
+        cat_row.setSpacing(6)
         self._entry_categorie = QComboBox()
-        self._entry_categorie.setEditable(True)
-        self._entry_categorie.setPlaceholderText("Categorie")
-        il.addWidget(self._entry_categorie)
+        self._entry_categorie.addItem("-- Aucune --")
+        cat_row.addWidget(self._entry_categorie, 1)
+        btn_new_cat = QPushButton("＋")
+        btn_new_cat.setFixedSize(32, 32)
+        btn_new_cat.setToolTip("Ajouter une nouvelle categorie")
+        btn_new_cat.setAutoDefault(False)
+        btn_new_cat.setFont(QFont("Segoe UI", 14, QFont.Bold))
+        btn_new_cat.setStyleSheet(
+            f"QPushButton {{ background-color: {Theme.c('success')}; color: #FFFFFF; "
+            f"border: none; border-radius: 4px; padding: 0px; }}"
+            f"QPushButton:hover {{ background-color: {Theme.c('success_hover')}; color: #FFFFFF; }}"
+        )
+        btn_new_cat.clicked.connect(self._ajouter_nouvelle_categorie)
+        cat_row.addWidget(btn_new_cat)
+        il.addLayout(cat_row)
 
         il.addWidget(QLabel("Description"))
         self._entry_description = QTextEdit()
@@ -195,13 +209,13 @@ class ProduitsWindow(QDialog):
         # -- Boutons formulaire --
         btn_row = QHBoxLayout()
 
-        btn_enregistrer = QPushButton("Enregistrer")
-        btn_enregistrer.setFont(QFont("Segoe UI", 11, QFont.Bold))
-        btn_enregistrer.setMinimumHeight(42)
-        btn_enregistrer.setCursor(Qt.PointingHandCursor)
-        btn_enregistrer.setProperty("class", "success")
-        btn_enregistrer.clicked.connect(self._enregistrer_produit)
-        btn_row.addWidget(btn_enregistrer)
+        self._btn_enregistrer = QPushButton("Ajouter le produit")
+        self._btn_enregistrer.setFont(QFont("Segoe UI", 11, QFont.Bold))
+        self._btn_enregistrer.setMinimumHeight(42)
+        self._btn_enregistrer.setCursor(Qt.PointingHandCursor)
+        self._btn_enregistrer.setProperty("class", "success")
+        self._btn_enregistrer.clicked.connect(self._enregistrer_ou_modifier)
+        btn_row.addWidget(self._btn_enregistrer)
 
         btn_reset = QPushButton("Reinitialiser")
         btn_reset.setMinimumHeight(42)
@@ -292,11 +306,13 @@ class ProduitsWindow(QDialog):
 
         btn_voir_cb = QPushButton("Voir code-barres")
         btn_voir_cb.setCursor(Qt.PointingHandCursor)
+        btn_voir_cb.setProperty("class", "secondary")
         btn_voir_cb.clicked.connect(self._voir_code_barre)
         actions_row.addWidget(btn_voir_cb)
 
         btn_actualiser = QPushButton("Actualiser")
         btn_actualiser.setCursor(Qt.PointingHandCursor)
+        btn_actualiser.setProperty("class", "secondary")
         btn_actualiser.clicked.connect(self._actualiser)
         actions_row.addWidget(btn_actualiser)
 
@@ -314,6 +330,7 @@ class ProduitsWindow(QDialog):
         pag_row = QHBoxLayout()
         self._btn_prev = QPushButton("< Precedent")
         self._btn_prev.setCursor(Qt.PointingHandCursor)
+        self._btn_prev.setProperty("class", "secondary")
         self._btn_prev.clicked.connect(self._page_precedente)
         pag_row.addWidget(self._btn_prev)
 
@@ -330,6 +347,7 @@ class ProduitsWindow(QDialog):
 
         self._btn_next = QPushButton("Suivant >")
         self._btn_next.setCursor(Qt.PointingHandCursor)
+        self._btn_next.setProperty("class", "secondary")
         self._btn_next.clicked.connect(self._page_suivante)
         pag_row.addWidget(self._btn_next)
 
@@ -372,17 +390,40 @@ class ProduitsWindow(QDialog):
 
     def _charger_categories(self):
         from modules.produits import Produit
-        categories = Produit.obtenir_categories()
+        from ui.windows.gestion_categories import charger_categories
+        predefinies = charger_categories()
+        depuis_produits = Produit.obtenir_categories()
+        categories = sorted(set(predefinies + depuis_produits))
+
         self._combo_filtre_cat.blockSignals(True)
         self._combo_filtre_cat.clear()
         self._combo_filtre_cat.addItem("Toutes")
         self._combo_filtre_cat.addItems(categories)
         self._combo_filtre_cat.blockSignals(False)
 
-        # Aussi mettre a jour le combo du formulaire
+        current_text = self._entry_categorie.currentText()
+        self._entry_categorie.blockSignals(True)
         self._entry_categorie.clear()
-        for cat in categories:
-            self._entry_categorie.addItem(cat)
+        self._entry_categorie.addItem("-- Aucune --")
+        self._entry_categorie.addItems(categories)
+        idx = self._entry_categorie.findText(current_text, Qt.MatchFixedString)
+        self._entry_categorie.setCurrentIndex(idx if idx >= 0 else 0)
+        self._entry_categorie.blockSignals(False)
+
+    def _ajouter_nouvelle_categorie(self):
+        nom, ok = QInputDialog.getText(self, "Nouvelle categorie", "Nom de la categorie:")
+        if not ok or not nom.strip():
+            return
+        nom = nom.strip()
+        from ui.windows.gestion_categories import charger_categories, sauvegarder_categories
+        cats = charger_categories()
+        if nom.lower() not in [c.lower() for c in cats]:
+            cats.append(nom)
+            sauvegarder_categories(cats)
+        self._charger_categories()
+        idx = self._entry_categorie.findText(nom, Qt.MatchFixedString)
+        if idx >= 0:
+            self._entry_categorie.setCurrentIndex(idx)
 
     def _get_filtres(self):
         terme = self._entry_recherche.text().strip()
@@ -485,11 +526,8 @@ class ProduitsWindow(QDialog):
         self._entry_nom.setText(p[1] or "")
 
         # Categorie
-        idx = self._entry_categorie.findText(p[2] or "")
-        if idx >= 0:
-            self._entry_categorie.setCurrentIndex(idx)
-        else:
-            self._entry_categorie.setEditText(p[2] or "")
+        idx = self._entry_categorie.findText(p[2] or "", Qt.MatchFixedString)
+        self._entry_categorie.setCurrentIndex(idx if idx >= 0 else 0)
 
         self._entry_description.setPlainText(p[10] or "" if len(p) > 10 else "")
         self._entry_prix_achat.setText(str(int(p[3])) if p[3] is not None else "0")
@@ -504,7 +542,19 @@ class ProduitsWindow(QDialog):
         if idx_type >= 0:
             self._combo_type_code.setCurrentIndex(idx_type)
 
+        self._btn_enregistrer.setText("Enregistrer les modifications")
+        self._btn_enregistrer.setStyleSheet(
+            f"background-color: {Theme.c('primary')}; color: white; "
+            f"border: none; border-radius: 6px;"
+        )
+
     # === CRUD ===
+
+    def _enregistrer_ou_modifier(self):
+        if self._produit_selectionne_id:
+            self._modifier_produit()
+        else:
+            self._enregistrer_produit()
 
     def _enregistrer_produit(self):
         """Ajouter un nouveau produit."""
@@ -513,7 +563,8 @@ class ProduitsWindow(QDialog):
             erreur(self, "Erreur", "Le nom du produit est obligatoire.")
             return
 
-        categorie = self._entry_categorie.currentText().strip()
+        _cat = self._entry_categorie.currentText().strip()
+        categorie = "" if _cat == "-- Aucune --" else _cat
         description = self._entry_description.toPlainText().strip()
 
         try:
@@ -571,7 +622,8 @@ class ProduitsWindow(QDialog):
             erreur(self, "Erreur", "Le nom du produit est obligatoire.")
             return
 
-        categorie = self._entry_categorie.currentText().strip()
+        _cat = self._entry_categorie.currentText().strip()
+        categorie = "" if _cat == "-- Aucune --" else _cat
         description = self._entry_description.toPlainText().strip()
 
         try:
@@ -594,9 +646,16 @@ class ProduitsWindow(QDialog):
         )
 
         if succes:
-            information(self, "Succes", f"Produit '{nom}' modifie.")
             self._charger_categories()
             self._charger_page()
+            if stock <= alerte:
+                QMessageBox.warning(
+                    self, "Stock bas",
+                    f"Produit '{nom}' modifié.\n\n"
+                    f"⚠️ Stock actuel ({stock}) ≤ seuil d'alerte ({alerte}) !"
+                )
+            else:
+                information(self, "Succes", f"Produit '{nom}' modifie.")
         else:
             erreur(self, "Erreur", "Impossible de modifier le produit.")
 
@@ -647,8 +706,7 @@ class ProduitsWindow(QDialog):
     def _reinitialiser_formulaire(self):
         self._produit_selectionne_id = None
         self._entry_nom.clear()
-        self._entry_categorie.setCurrentIndex(-1)
-        self._entry_categorie.setEditText("")
+        self._entry_categorie.setCurrentIndex(0)
         self._entry_description.clear()
         self._entry_prix_achat.clear()
         self._entry_prix_vente.clear()
@@ -656,3 +714,5 @@ class ProduitsWindow(QDialog):
         self._spin_alerte.setValue(5)
         self._entry_code.clear()
         self._radio_auto.setChecked(True)
+        self._btn_enregistrer.setText("Ajouter le produit")
+        self._btn_enregistrer.setStyleSheet("")

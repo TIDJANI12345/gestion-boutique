@@ -3,422 +3,348 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Scanner Mobile - GestionBoutique</title>
+    <title>Scanner - GestionBoutique</title>
     <script src="https://unpkg.com/@zxing/library@0.20.0/umd/index.min.js"></script>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            height: 100vh;
-            overflow: hidden;
+            min-height: 100vh;
         }
 
         .container {
-            height: 100%;
+            min-height: 100vh;
             display: flex;
             flex-direction: column;
-            padding: 20px;
+            padding: 12px;
+            max-width: 500px;
+            margin: 0 auto;
         }
 
-        .header {
-            text-align: center;
-            color: white;
-            margin-bottom: 20px;
-        }
-
-        .header h1 {
-            font-size: 24px;
-            font-weight: bold;
-            margin-bottom: 5px;
-        }
-
-        .header p {
-            font-size: 14px;
-            opacity: 0.9;
-        }
+        .header { text-align: center; color: white; margin-bottom: 10px; }
+        .header h1 { font-size: 20px; font-weight: bold; }
+        .header p { font-size: 12px; opacity: 0.8; }
 
         .status {
-            background: rgba(255, 255, 255, 0.2);
             backdrop-filter: blur(10px);
-            border-radius: 12px;
-            padding: 15px;
-            margin-bottom: 20px;
+            border-radius: 10px;
+            padding: 10px;
+            margin-bottom: 10px;
             text-align: center;
             color: white;
             font-weight: 500;
+            font-size: 14px;
+            background: rgba(255,255,255,0.2);
         }
-
-        .status.connected {
-            background: rgba(16, 185, 129, 0.3);
-        }
-
-        .status.error {
-            background: rgba(239, 68, 68, 0.3);
-        }
-
-        .status.scanning {
-            background: rgba(59, 130, 246, 0.3);
-        }
+        .status.connected { background: rgba(16,185,129,0.4); }
+        .status.error { background: rgba(239,68,68,0.4); }
+        .status.scanning { background: rgba(59,130,246,0.4); }
+        .status.success { background: rgba(16,185,129,0.6); }
 
         .video-container {
             flex: 1;
-            background: black;
+            background: #000;
             border-radius: 12px;
             overflow: hidden;
             position: relative;
+            min-height: 280px;
             display: flex;
             align-items: center;
             justify-content: center;
         }
 
-        #video {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
+        #video { width: 100%; height: 100%; object-fit: cover; }
+
+        .scan-overlay {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 220px; height: 220px;
+            border: 3px solid rgba(16,185,129,0.8);
+            border-radius: 16px;
+            pointer-events: none;
         }
 
-        .scan-line {
+        .scan-overlay::before {
+            content: '';
             position: absolute;
             width: 100%;
             height: 2px;
             background: linear-gradient(90deg, transparent, #10b981, transparent);
-            animation: scan 2s ease-in-out infinite;
-            display: none;
+            animation: scanline 2s ease-in-out infinite;
         }
 
-        .scan-line.active {
-            display: block;
+        @keyframes scanline {
+            0%, 100% { top: 10%; opacity: 0.3; }
+            50% { top: 90%; opacity: 1; }
         }
 
-        @keyframes scan {
-            0%, 100% {
-                top: 20%;
-                opacity: 0;
-            }
-            50% {
-                top: 50%;
-                opacity: 1;
-            }
-        }
-
-        .last-scan {
-            background: rgba(255, 255, 255, 0.95);
-            border-radius: 12px;
-            padding: 15px;
-            margin-top: 20px;
+        .video-msg {
+            color: white;
+            font-size: 14px;
             text-align: center;
+            position: absolute;
         }
 
-        .last-scan-label {
-            font-size: 12px;
-            color: #6b7280;
-            margin-bottom: 5px;
+        .controls { display: flex; gap: 8px; margin-top: 10px; }
+
+        .btn {
+            flex: 1;
+            padding: 16px;
+            border: none;
+            border-radius: 12px;
+            font-size: 15px;
+            font-weight: bold;
+            cursor: pointer;
+            color: white;
+        }
+        .btn:active { transform: scale(0.96); }
+        .btn-start { background: linear-gradient(135deg, #10b981, #059669); }
+        .btn-stop { background: linear-gradient(135deg, #ef4444, #dc2626); }
+
+        .result-card {
+            background: rgba(255,255,255,0.95);
+            border-radius: 10px;
+            padding: 12px;
+            margin-top: 10px;
+            display: none;
+            animation: fadeIn 0.3s;
         }
 
-        .last-scan-code {
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; } }
+
+        .result-label { font-size: 10px; color: #6b7280; }
+        .result-code {
             font-size: 20px;
             font-weight: bold;
             color: #1f2937;
             font-family: 'Courier New', monospace;
+            word-break: break-all;
         }
+        .result-status { font-size: 11px; margin-top: 2px; font-weight: 500; }
 
-        .controls {
-            display: flex;
-            gap: 10px;
-            margin-top: 15px;
-        }
-
-        button {
-            flex: 1;
-            padding: 15px;
-            border: none;
-            border-radius: 12px;
-            font-size: 16px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: transform 0.1s;
-        }
-
-        button:active {
-            transform: scale(0.95);
-        }
-
-        .btn-start {
-            background: #10b981;
-            color: white;
-        }
-
-        .btn-stop {
-            background: #ef4444;
-            color: white;
-        }
-
-        .btn-reconnect {
-            background: #3b82f6;
-            color: white;
-        }
-
-        .loading {
-            color: white;
-            font-size: 16px;
-        }
-
-        .stats {
-            background: rgba(255, 255, 255, 0.1);
+        .history {
+            background: rgba(255,255,255,0.1);
             border-radius: 8px;
             padding: 10px;
-            margin-top: 10px;
+            margin-top: 8px;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+        .history-title { color: rgba(255,255,255,0.6); font-size: 10px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+        .history-item {
+            background: rgba(255,255,255,0.1);
+            border-radius: 6px;
+            padding: 6px 10px;
+            margin-bottom: 4px;
             display: flex;
-            justify-content: space-around;
+            justify-content: space-between;
             color: white;
             font-size: 12px;
         }
+        .history-code { font-family: 'Courier New', monospace; }
+        .history-time { opacity: 0.5; font-size: 10px; }
 
-        .stat-item {
-            text-align: center;
+        .stats {
+            background: rgba(255,255,255,0.1);
+            border-radius: 8px;
+            padding: 8px;
+            margin-top: 8px;
+            display: flex;
+            justify-content: space-around;
+            color: white;
+            font-size: 11px;
         }
-
-        .stat-value {
-            font-size: 18px;
-            font-weight: bold;
-            display: block;
-        }
+        .stat-value { font-size: 16px; font-weight: bold; display: block; }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>📷 Scanner Mobile</h1>
+            <h1>Scanner Mobile</h1>
             <p>GestionBoutique</p>
         </div>
 
-        <div class="status" id="status">Connexion en cours...</div>
+        <div class="status" id="status">Pret</div>
 
         <div class="video-container">
-            <video id="video" playsinline></video>
-            <div class="scan-line" id="scanLine"></div>
-            <div class="loading" id="loading">Initialisation...</div>
-        </div>
-
-        <div class="last-scan" id="lastScan" style="display: none;">
-            <div class="last-scan-label">Dernier scan</div>
-            <div class="last-scan-code" id="lastScanCode">-</div>
-        </div>
-
-        <div class="stats">
-            <div class="stat-item">
-                <span class="stat-value" id="scanCount">0</span>
-                <span>Scans</span>
-            </div>
-            <div class="stat-item">
-                <span class="stat-value" id="wsStatus">❌</span>
-                <span>WebSocket</span>
-            </div>
+            <video id="video" playsinline autoplay muted></video>
+            <div class="scan-overlay" id="scanOverlay" style="display:none;"></div>
+            <div class="video-msg" id="videoMsg">Appuyez sur Demarrer</div>
         </div>
 
         <div class="controls">
-            <button class="btn-start" id="btnStart" onclick="startScanning()">Démarrer</button>
-            <button class="btn-reconnect" id="btnReconnect" onclick="reconnectWS()" style="display: none;">Reconnecter</button>
+            <button class="btn btn-start" id="btnToggle" onclick="toggleScanning()">Demarrer le scan</button>
+        </div>
+
+        <div class="result-card" id="resultCard">
+            <div class="result-label">Dernier code</div>
+            <div class="result-code" id="resultCode">-</div>
+            <div class="result-status" id="resultStatus"></div>
+        </div>
+
+        <div class="history">
+            <div class="history-title">Historique</div>
+            <div id="historyList"></div>
+        </div>
+
+        <div class="stats">
+            <div><span class="stat-value" id="scanCount">0</span><span>Scans</span></div>
+            <div><span class="stat-value" id="serverStatus">OK</span><span>Serveur</span></div>
         </div>
     </div>
 
     <script>
-        let codeReader = null;
-        let ws = null;
-        let scanning = false;
-        let scanCount = 0;
-        let wsHost = window.location.hostname;
-        let wsPort = 8765;
+        var codeReader = null;
+        var scanning = false;
+        var scanCount = 0;
+        var lastCode = '';
+        var lastCodeTime = 0;
 
-        // Éléments DOM
-        const video = document.getElementById('video');
-        const loading = document.getElementById('loading');
-        const status = document.getElementById('status');
-        const scanLine = document.getElementById('scanLine');
-        const lastScan = document.getElementById('lastScan');
-        const lastScanCode = document.getElementById('lastScanCode');
-        const btnStart = document.getElementById('btnStart');
-        const btnReconnect = document.getElementById('btnReconnect');
-        const scanCountEl = document.getElementById('scanCount');
-        const wsStatusEl = document.getElementById('wsStatus');
+        // URL de base = meme serveur que la page
+        var baseUrl = window.location.origin;
 
-        // Connexion WebSocket
-        function connectWS() {
-            const wsUrl = `ws://${wsHost}:${wsPort}`;
-            updateStatus('Connexion au serveur...', 'status');
+        var video = document.getElementById('video');
+        var videoMsg = document.getElementById('videoMsg');
+        var scanOverlay = document.getElementById('scanOverlay');
+        var statusEl = document.getElementById('status');
+        var btnToggle = document.getElementById('btnToggle');
+        var resultCard = document.getElementById('resultCard');
+        var resultCode = document.getElementById('resultCode');
+        var resultStatus = document.getElementById('resultStatus');
+        var scanCountEl = document.getElementById('scanCount');
+        var serverStatusEl = document.getElementById('serverStatus');
+        var historyList = document.getElementById('historyList');
 
-            try {
-                ws = new WebSocket(wsUrl);
-
-                ws.onopen = () => {
-                    console.log('WebSocket connecté');
-                    updateStatus('✓ Connecté au PC', 'connected');
-                    wsStatusEl.textContent = '✓';
-                    btnReconnect.style.display = 'none';
-                };
-
-                ws.onclose = () => {
-                    console.log('WebSocket déconnecté');
-                    updateStatus('⚠ Déconnecté du PC', 'error');
-                    wsStatusEl.textContent = '❌';
-                    btnReconnect.style.display = 'block';
-                };
-
-                ws.onerror = (error) => {
-                    console.error('Erreur WebSocket:', error);
-                    updateStatus('Erreur de connexion', 'error');
-                    wsStatusEl.textContent = '❌';
-                };
-
-                ws.onmessage = (event) => {
-                    const data = JSON.parse(event.data);
-                    if (data.type === 'pong') {
-                        console.log('Pong reçu');
-                    }
-                };
-
-            } catch (error) {
-                console.error('Erreur connexion WebSocket:', error);
-                updateStatus('Impossible de se connecter', 'error');
-                btnReconnect.style.display = 'block';
-            }
-        }
-
-        function reconnectWS() {
-            connectWS();
-        }
-
+        // === ENVOYER CODE PAR HTTP POST ===
         function sendCode(code) {
-            if (ws && ws.readyState === WebSocket.OPEN) {
-                const message = {
-                    type: 'scan',
-                    code: code,
-                    format: 'auto',
-                    timestamp: Date.now()
-                };
-                ws.send(JSON.stringify(message));
-                console.log('Code envoyé:', code);
+            var now = Date.now();
+            if (code === lastCode && (now - lastCodeTime) < 3000) return;
+            lastCodeTime = now;
+            lastCode = code;
 
-                // Mise à jour UI
-                scanCount++;
-                scanCountEl.textContent = scanCount;
-                lastScanCode.textContent = code;
-                lastScan.style.display = 'block';
+            fetch(baseUrl + '/api/scan', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ code: code, timestamp: now })
+            })
+            .then(function(response) {
+                if (response.ok) {
+                    scanCount++;
+                    scanCountEl.textContent = scanCount;
+                    resultCode.textContent = code;
+                    resultStatus.textContent = 'Envoye au PC';
+                    resultStatus.style.color = '#10b981';
+                    resultCard.style.display = 'block';
+                    serverStatusEl.textContent = 'OK';
 
-                // Vibration feedback
-                if (navigator.vibrate) {
-                    navigator.vibrate(100);
+                    addToHistory(code);
+                    if (navigator.vibrate) navigator.vibrate([80, 40, 80]);
+                    updateStatus('Envoye : ' + code, 'success');
+
+                    setTimeout(function() {
+                        if (statusEl.className.indexOf('success') !== -1)
+                            updateStatus('Scan en cours...', 'scanning');
+                    }, 1500);
+                } else {
+                    resultStatus.textContent = 'Erreur serveur';
+                    resultStatus.style.color = '#ef4444';
                 }
+            })
+            .catch(function(err) {
+                resultStatus.textContent = 'Erreur connexion';
+                resultStatus.style.color = '#ef4444';
+                serverStatusEl.textContent = '--';
+                updateStatus('Erreur envoi', 'error');
+            });
+        }
 
-                // Animation flash
-                video.style.opacity = '0.3';
-                setTimeout(() => {
-                    video.style.opacity = '1';
-                }, 100);
+        function addToHistory(code) {
+            var t = new Date().toLocaleTimeString('fr-FR', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+            var el = document.createElement('div');
+            el.className = 'history-item';
+            el.innerHTML = '<span class="history-code">' + code + '</span><span class="history-time">' + t + '</span>';
+            historyList.insertBefore(el, historyList.firstChild);
+            while (historyList.children.length > 30) historyList.removeChild(historyList.lastChild);
+        }
 
-                updateStatus(`✓ Code envoyé : ${code}`, 'scanning');
+        // === SCAN VIDEO LIVE ===
+        async function toggleScanning() {
+            if (scanning) {
+                stopScanning();
             } else {
-                console.error('WebSocket non connecté');
-                updateStatus('⚠ Non connecté au PC', 'error');
+                await startScanning();
             }
         }
 
         async function startScanning() {
-            if (scanning) return;
-
             try {
-                loading.style.display = 'block';
-                updateStatus('Démarrage caméra...', 'status');
+                videoMsg.textContent = 'Demarrage camera...';
 
-                // Initialiser ZXing
-                codeReader = new ZXing.BrowserMultiFormatReader();
+                var stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }
+                });
 
-                // Lister les caméras disponibles
-                const devices = await codeReader.listVideoInputDevices();
-                console.log('Caméras disponibles:', devices);
+                video.srcObject = stream;
+                video.style.display = 'block';
+                videoMsg.style.display = 'none';
+                scanOverlay.style.display = 'block';
 
-                // Utiliser la caméra arrière si disponible
-                let selectedDevice = devices[0];
-                for (const device of devices) {
-                    if (device.label.toLowerCase().includes('back') ||
-                        device.label.toLowerCase().includes('arrière')) {
-                        selectedDevice = device;
-                        break;
-                    }
-                }
+                // Hints pour accélérer la détection
+                var hints = new Map();
+                hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
+                    ZXing.BarcodeFormat.EAN_13,
+                    ZXing.BarcodeFormat.EAN_8,
+                    ZXing.BarcodeFormat.CODE_128,
+                    ZXing.BarcodeFormat.CODE_39,
+                    ZXing.BarcodeFormat.UPC_A,
+                    ZXing.BarcodeFormat.UPC_E
+                ]);
+                hints.set(ZXing.DecodeHintType.TRY_HARDER, false);
 
-                // Démarrer le scan
-                await codeReader.decodeFromVideoDevice(
-                    selectedDevice.deviceId,
-                    'video',
-                    (result, error) => {
-                        if (result) {
-                            console.log('Code détecté:', result.text);
-                            sendCode(result.text);
-                        }
-                        if (error && error.name !== 'NotFoundException') {
-                            console.error('Erreur scan:', error);
-                        }
-                    }
-                );
+                codeReader = new ZXing.BrowserMultiFormatReader(hints);
+
+                // Réduire résolution pour analyse plus rapide (scan toutes les 250ms)
+                codeReader.timeBetweenDecodingAttempts = 250;
+
+                codeReader.decodeFromStream(stream, 'video', function(result, err) {
+                    if (result) sendCode(result.text);
+                });
 
                 scanning = true;
-                loading.style.display = 'none';
-                scanLine.classList.add('active');
-                updateStatus('🔍 Scan en cours...', 'scanning');
-                btnStart.textContent = 'Arrêter';
-                btnStart.className = 'btn-stop';
-                btnStart.onclick = stopScanning;
+                btnToggle.textContent = 'Arreter le scan';
+                btnToggle.className = 'btn btn-stop';
+                updateStatus('Scan en cours...', 'scanning');
 
-            } catch (error) {
-                console.error('Erreur démarrage caméra:', error);
-                loading.style.display = 'none';
-                updateStatus('❌ Erreur caméra', 'error');
-                alert('Erreur: ' + error.message + '\n\nAutorisez l\'accès à la caméra dans les paramètres de votre navigateur.');
+            } catch (err) {
+                videoMsg.textContent = 'Camera non disponible';
+                videoMsg.style.display = 'block';
+                updateStatus('Erreur camera : ' + err.message, 'error');
             }
         }
 
         function stopScanning() {
-            if (codeReader) {
-                codeReader.reset();
-                codeReader = null;
+            if (codeReader) { codeReader.reset(); codeReader = null; }
+            if (video.srcObject) {
+                video.srcObject.getTracks().forEach(function(t) { t.stop(); });
+                video.srcObject = null;
             }
             scanning = false;
-            scanLine.classList.remove('active');
-            updateStatus('⏸ Scan arrêté', 'status');
-            btnStart.textContent = 'Démarrer';
-            btnStart.className = 'btn-start';
-            btnStart.onclick = startScanning;
+            video.style.display = 'none';
+            scanOverlay.style.display = 'none';
+            videoMsg.textContent = 'Appuyez sur Demarrer';
+            videoMsg.style.display = 'block';
+            btnToggle.textContent = 'Demarrer le scan';
+            btnToggle.className = 'btn btn-start';
+            updateStatus('Pret', 'connected');
         }
 
-        function updateStatus(message, className) {
-            status.textContent = message;
-            status.className = 'status ' + className;
+        function updateStatus(msg, cls) {
+            statusEl.textContent = msg;
+            statusEl.className = 'status ' + cls;
         }
-
-        // Initialisation
-        window.onload = () => {
-            connectWS();
-
-            // Keepalive ping
-            setInterval(() => {
-                if (ws && ws.readyState === WebSocket.OPEN) {
-                    ws.send(JSON.stringify({ type: 'ping' }));
-                }
-            }, 30000); // Toutes les 30s
-        };
-
-        // Cleanup
-        window.onbeforeunload = () => {
-            stopScanning();
-            if (ws) ws.close();
-        };
     </script>
 </body>
 </html>

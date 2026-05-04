@@ -7,6 +7,11 @@ from modules.logger import get_logger
 logger = get_logger('fiscalite')
 
 
+def get_devise() -> str:
+    """Retourne le symbole de devise configuré (ex: FCFA, GNF, NGN)."""
+    return db.get_parametre('devise_symbole', 'FCFA')
+
+
 class Fiscalite:
 
     @staticmethod

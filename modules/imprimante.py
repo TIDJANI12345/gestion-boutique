@@ -252,6 +252,7 @@ class ImprimanteThermique:
             return False, "Impossible de se connecter a l'imprimante"
 
         try:
+            mode = db.get_parametre('imprimante_mode', 'usb')
             nom_boutique = db.get_parametre('boutique_nom', 'Ma Boutique')
             format_papier = db.get_parametre('imprimante_format', '80mm')
             largeur = LARGEURS.get(format_papier, 48)

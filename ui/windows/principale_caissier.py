@@ -11,6 +11,7 @@ from PySide6.QtGui import QFont, QShortcut, QKeySequence
 
 from config import APP_NAME
 from ui.theme import Theme
+from modules.fiscalite import get_devise
 from modules.logger import get_logger
 
 logger = get_logger('fenetre_caissier')
@@ -84,6 +85,19 @@ class PrincipaleCaissierWindow(QMainWindow):
         """)
         btn_deconnexion.setCursor(Qt.PointingHandCursor)
         btn_deconnexion.clicked.connect(self._deconnexion)
+
+        self._btn_theme = QPushButton("☾ Sombre" if not Theme.est_sombre() else "☀ Clair")
+        self._btn_theme.setStyleSheet("""
+            QPushButton {
+                background: rgba(255,255,255,0.2); color: white;
+                border: 1px solid rgba(255,255,255,0.3); border-radius: 4px;
+                padding: 8px 14px; font-size: 11px;
+            }
+            QPushButton:hover { background: rgba(255,255,255,0.3); }
+        """)
+        self._btn_theme.setCursor(Qt.PointingHandCursor)
+        self._btn_theme.clicked.connect(self._basculer_theme)
+        header_layout.addWidget(self._btn_theme)
         header_layout.addWidget(btn_deconnexion)
 
         main_layout.addWidget(header)
@@ -169,7 +183,7 @@ class PrincipaleCaissierWindow(QMainWindow):
         cc_label.setAlignment(Qt.AlignCenter)
         cc_layout.addWidget(cc_label)
 
-        self._label_ca = QLabel("0 FCFA")
+        self._label_ca = QLabel("0 {get_devise()}")
         self._label_ca.setFont(QFont("Segoe UI", 32, QFont.Bold))
         self._label_ca.setStyleSheet(f"color: {Theme.c('success')};")
         self._label_ca.setAlignment(Qt.AlignCenter)
@@ -225,7 +239,7 @@ class PrincipaleCaissierWindow(QMainWindow):
             from modules.rapports import Rapport
             stats = Rapport.statistiques_utilisateur(self.utilisateur['id'])
             self._label_ventes.setText(str(stats['nb_ventes']))
-            self._label_ca.setText(f"{stats['ca_jour']:,.0f} FCFA")
+            self._label_ca.setText(f"{stats['ca_jour']:,.0f} {get_devise()}")
         except Exception as e:
             logger.error(f"Erreur actualisation: {e}")
 
@@ -240,6 +254,12 @@ class PrincipaleCaissierWindow(QMainWindow):
         from ui.windows.liste_ventes import ListeVentesWindow
         dlg = ListeVentesWindow(parent=self, utilisateur=self.utilisateur)
         dlg.exec()
+
+    def _basculer_theme(self):
+        from ui.theme import Theme
+        Theme.basculer()
+        self._btn_theme.setText("☾ Sombre" if not Theme.est_sombre() else "☀ Clair")
+        self.update()
 
     def _deconnexion(self):
         from modules.utilisateurs import Utilisateur

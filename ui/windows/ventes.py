@@ -7,13 +7,12 @@ from datetime import datetime
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
     QPushButton, QFrame, QMessageBox, QWidget, QListWidget,
-    QListWidgetItem
+    QListWidgetItem, QScrollArea, QSizePolicy
 )
 from PySide6.QtCore import Qt, Signal, QTimer
 from PySide6.QtGui import QFont, QShortcut, QKeySequence
 
 from ui.theme import Theme
-from ui.components.table import BoutiqueTableView, BoutiqueTableModel
 from ui.components.dialogs import DialogueQuantite, confirmer
 from ui.components.camera_widget import CameraWidget
 
@@ -25,41 +24,28 @@ class VentesWindow(QDialog):
 
     def __init__(self, parent=None, utilisateur=None):
         super().__init__(parent)
-        print("DEBUG: Initialisation de VentesWindow commence.")
         try:
             self.setWindowTitle("Nouvelle Vente")
             self.setMinimumSize(1200, 700)
             self.setModal(True)
 
-            # Panier en memoire
             self.panier: list[dict] = []
             self.client_id = None
             self.client_selectionne = None
-            self.utilisateur = utilisateur  # Dict utilisateur connecté
-            self.scanner_mobile_server = None  # Serveur scanner mobile
-            self.scanner_mobile_http = None  # Serveur HTTP pour page mobile
-            print("DEBUG: Variables initialisées.")
+            self.utilisateur = utilisateur
 
             self._setup_ui()
-            print("DEBUG: _setup_ui() terminé.")
+
+            for btn in self.findChildren(QPushButton):
+                btn.setAutoDefault(False)
+                btn.setDefault(False)
 
             self._setup_raccourcis()
-            print("DEBUG: _setup_raccourcis() terminé.")
-
             self._actualiser_panier()
-            print("DEBUG: _actualiser_panier() terminé.")
-
             self._check_camera_auto()
-            print("DEBUG: _check_camera_auto() terminé.")
 
-            self._check_scanner_mobile_auto()
-            print("DEBUG: _check_scanner_mobile_auto() terminé.")
-
-            # Focus scanner au demarrage
             QTimer.singleShot(0, self._entry_scan.setFocus)
-            print("DEBUG: Initialisation de VentesWindow terminée avec succès.")
         except Exception as e:
-            print(f"FATAL: Erreur dans VentesWindow.__init__: {e}")
             import traceback
             traceback.print_exc()
             QMessageBox.critical(self, "Erreur Critique", f"Impossible d'ouvrir la fenêtre de vente:\n\n{e}")
@@ -119,18 +105,21 @@ class VentesWindow(QDialog):
         scan_row = QHBoxLayout()
         self._entry_scan = QLineEdit()
         self._entry_scan.setFont(QFont("Segoe UI", 14))
-        self._entry_scan.setPlaceholderText("Code-barres...")
+        self._entry_scan.setPlaceholderText("Saisir ou scanner un code-barres...")
         self._entry_scan.returnPressed.connect(self._scanner_produit)
+        self._entry_scan.textChanged.connect(self._on_scan_text_changed)
         scan_row.addWidget(self._entry_scan)
 
-        btn_camera = QPushButton("Camera")
-        btn_camera.setStyleSheet(
+        self._btn_camera = QPushButton("📷 Caméra")
+        self._btn_camera.setStyleSheet(
             f"background-color: {Theme.c('info')}; color: white; "
             f"border: none; border-radius: 6px; padding: 10px 16px;"
         )
-        btn_camera.setCursor(Qt.PointingHandCursor)
-        btn_camera.clicked.connect(self._ouvrir_scanner_camera)
-        scan_row.addWidget(btn_camera)
+        self._btn_camera.setCursor(Qt.PointingHandCursor)
+        self._btn_camera.setAutoDefault(False)
+        self._btn_camera.setDefault(False)
+        self._btn_camera.clicked.connect(self._ouvrir_scanner_camera)
+        scan_row.addWidget(self._btn_camera)
 
         scanner_layout.addLayout(scan_row)
 
@@ -164,28 +153,30 @@ class VentesWindow(QDialog):
 
         panier_layout.addLayout(panier_header)
 
-        # Separateur
-        sep = QFrame()
-        sep.setFrameShape(QFrame.HLine)
-        sep.setStyleSheet(f"color: {Theme.c('separator')};")
-        panier_layout.addWidget(sep)
-
-        # Tableau
-        colonnes = ['Produit', 'Prix Unit.', 'Qte', 'Sous-total']
-        self._table_model = BoutiqueTableModel(colonnes)
-        self._table_view = BoutiqueTableView()
-        self._table_view.setModel(self._table_model)
-        self._table_view.ligne_double_clic.connect(self._retirer_ligne)
-        panier_layout.addWidget(self._table_view)
-
         # Label panier vide
-        self._label_vide = QLabel(
-            "Le panier est vide\n\nScannez un produit pour commencer"
-        )
+        self._label_vide = QLabel("Le panier est vide\n\nScannez un produit pour commencer")
         self._label_vide.setFont(QFont("Segoe UI", 11))
         self._label_vide.setStyleSheet(f"color: {Theme.c('gray')};")
         self._label_vide.setAlignment(Qt.AlignCenter)
+        self._label_vide.setMinimumHeight(80)
         panier_layout.addWidget(self._label_vide)
+
+        # Zone scrollable des articles
+        self._scroll_panier = QScrollArea()
+        self._scroll_panier.setWidgetResizable(True)
+        self._scroll_panier.setStyleSheet("QScrollArea { border: none; background: transparent; }")
+        self._scroll_panier.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+
+        self._panier_container = QWidget()
+        self._panier_container.setStyleSheet("background: transparent;")
+        self._panier_items_layout = QVBoxLayout(self._panier_container)
+        self._panier_items_layout.setContentsMargins(0, 0, 0, 0)
+        self._panier_items_layout.setSpacing(4)
+        self._panier_items_layout.addStretch()
+
+        self._scroll_panier.setWidget(self._panier_container)
+        self._scroll_panier.setVisible(False)
+        panier_layout.addWidget(self._scroll_panier)
 
         left_layout.addWidget(panier_frame, 1)
         main_layout.addWidget(left, 1)
@@ -236,7 +227,7 @@ class VentesWindow(QDialog):
         row_total.addWidget(lbl_total_label)
         row_total.addStretch()
 
-        self._label_total = QLabel("0 FCFA")
+        self._label_total = QLabel("0")
         self._label_total.setFont(QFont("Segoe UI", 20, QFont.Bold))
         self._label_total.setStyleSheet(f"color: {Theme.c('success')};")
         row_total.addWidget(self._label_total)
@@ -393,6 +384,24 @@ class VentesWindow(QDialog):
 
     # === SCANNER ===
 
+    def _on_scan_text_changed(self, texte: str):
+        if texte.strip():
+            self._btn_camera.setText("↵ Valider")
+            self._btn_camera.setStyleSheet(
+                f"background-color: {Theme.c('success')}; color: white; "
+                f"border: none; border-radius: 6px; padding: 10px 16px;"
+            )
+            self._btn_camera.clicked.disconnect()
+            self._btn_camera.clicked.connect(self._scanner_produit)
+        else:
+            self._btn_camera.setText("📷 Caméra")
+            self._btn_camera.setStyleSheet(
+                f"background-color: {Theme.c('info')}; color: white; "
+                f"border: none; border-radius: 6px; padding: 10px 16px;"
+            )
+            self._btn_camera.clicked.disconnect()
+            self._btn_camera.clicked.connect(self._ouvrir_scanner_camera)
+
     def _scanner_produit(self):
         """Scanner un code-barre et ajouter au panier."""
         code_barre = self._entry_scan.text().strip()
@@ -526,35 +535,6 @@ class VentesWindow(QDialog):
             self.btn_toggle_camera.setChecked(True)
             self.btn_toggle_camera.setText("📷 Masquer caméra")
 
-    def _check_scanner_mobile_auto(self):
-        """Démarrer le serveur scanner mobile si configuré"""
-        try:
-            from database import db
-            from modules.scanner_mobile_server import ScannerMobileServer, est_disponible
-            from modules.scanner_mobile_http import ScannerMobileHTTP
-
-            scanner_mobile_auto = db.get_parametre('scanner_mobile_auto', '0') == '1'
-
-            if scanner_mobile_auto and est_disponible():
-                try:
-                    # Démarrer serveur WebSocket
-                    self.scanner_mobile_server = ScannerMobileServer(host='0.0.0.0', port=8765)
-                    self.scanner_mobile_server.code_recu.connect(self._traiter_code_camera)
-                    self.scanner_mobile_server.start()
-
-                    # Démarrer serveur HTTP
-                    self.scanner_mobile_http = ScannerMobileHTTP(port=8080)
-                    self.scanner_mobile_http.start()
-
-                    print("DEBUG: Serveur scanner mobile démarré")
-                except Exception as e:
-                    print(f"ERREUR: Impossible de démarrer le scanner mobile : {e}")
-        except ImportError:
-            # Module scanner mobile non disponible (websockets manquant)
-            print("DEBUG: Scanner mobile non disponible (websockets manquant)")
-        except Exception as e:
-            print(f"ERREUR: _check_scanner_mobile_auto : {e}")
-
     def _toggle_camera_widget(self):
         """Afficher/masquer le widget camera"""
         if self.btn_toggle_camera.isChecked():
@@ -609,46 +589,144 @@ class VentesWindow(QDialog):
         self._play_scan_sound()
 
     def _actualiser_panier(self):
-        """Rafraichir le tableau et les labels."""
+        """Reconstruire les widgets du panier."""
+        # Vider les anciens widgets (sauf le stretch)
+        while self._panier_items_layout.count() > 1:
+            item = self._panier_items_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+
         if not self.panier:
-            self._table_view.setVisible(False)
+            self._scroll_panier.setVisible(False)
             self._label_vide.setVisible(True)
             self._label_nb_articles.setText("0")
-            self._label_total.setText("0 FCFA")
+            self._label_total.setText("0")
             return
 
-        self._table_view.setVisible(True)
+        self._scroll_panier.setVisible(True)
         self._label_vide.setVisible(False)
 
         total_articles = 0
         total_prix = 0
-        lignes = []
 
-        for item in self.panier:
+        for idx, item in enumerate(self.panier):
             total_articles += item['quantite']
             total_prix += item['sous_total']
-            lignes.append([
-                item['nom'],
-                f"{item['prix_vente']:,.0f} F",
-                item['quantite'],
-                f"{item['sous_total']:,.0f} F",
-            ])
+            widget = self._creer_widget_article(idx, item)
+            self._panier_items_layout.insertWidget(idx, widget)
 
-        self._table_model.charger_donnees(lignes)
-        self._table_view.ajuster_colonnes()
         self._label_nb_articles.setText(str(total_articles))
-        self._label_total.setText(f"{total_prix:,.0f} FCFA")
+        from modules.fiscalite import get_devise
+        self._label_total.setText(f"{total_prix:,.0f} {get_devise()}")
+
+    def _creer_widget_article(self, idx: int, item: dict) -> QWidget:
+        """Créer un widget de ligne de panier avec contrôles +/−/×."""
+        row = QFrame()
+        row.setStyleSheet(
+            f"QFrame {{ background-color: {Theme.c('light')}; "
+            f"border-radius: 6px; border: 1px solid {Theme.c('card_border')}; }}"
+        )
+        layout = QHBoxLayout(row)
+        layout.setContentsMargins(10, 6, 8, 6)
+        layout.setSpacing(8)
+
+        # Nom + prix unitaire
+        info = QVBoxLayout()
+        lbl_nom = QLabel(item['nom'])
+        lbl_nom.setFont(QFont("Segoe UI", 10, QFont.Bold))
+        lbl_nom.setStyleSheet("border: none; background: transparent;")
+        info.addWidget(lbl_nom)
+        lbl_prix = QLabel(f"{item['prix_vente']:,.0f} F / unité")
+        lbl_prix.setFont(QFont("Segoe UI", 8))
+        lbl_prix.setStyleSheet(f"color: {Theme.c('gray')}; border: none; background: transparent;")
+        info.addWidget(lbl_prix)
+        layout.addLayout(info, 1)
+
+        # Bouton −
+        btn_moins = QPushButton("−  Moins")
+        btn_moins.setFixedSize(72, 30)
+        btn_moins.setToolTip("Diminuer la quantité")
+        btn_moins.setStyleSheet(
+            f"background-color: {Theme.c('warning')}; color: white; "
+            f"border: none; border-radius: 4px; font-size: 11px; font-weight: bold;"
+        )
+        btn_moins.setCursor(Qt.PointingHandCursor)
+        btn_moins.setAutoDefault(False)
+        btn_moins.clicked.connect(lambda _, i=idx: self._diminuer_quantite(i))
+        layout.addWidget(btn_moins)
+
+        # Quantité
+        lbl_qte = QLabel(str(item['quantite']))
+        lbl_qte.setFont(QFont("Segoe UI", 13, QFont.Bold))
+        lbl_qte.setFixedWidth(32)
+        lbl_qte.setAlignment(Qt.AlignCenter)
+        lbl_qte.setStyleSheet("border: none; background: transparent;")
+        layout.addWidget(lbl_qte)
+
+        # Bouton +
+        btn_plus = QPushButton("+ Plus")
+        btn_plus.setFixedSize(62, 30)
+        btn_plus.setToolTip("Augmenter la quantité")
+        btn_plus.setStyleSheet(
+            f"background-color: {Theme.c('success')}; color: white; "
+            f"border: none; border-radius: 4px; font-size: 11px; font-weight: bold;"
+        )
+        btn_plus.setCursor(Qt.PointingHandCursor)
+        btn_plus.setAutoDefault(False)
+        btn_plus.clicked.connect(lambda _, i=idx: self._augmenter_quantite(i))
+        layout.addWidget(btn_plus)
+
+        # Sous-total
+        lbl_total = QLabel(f"{item['sous_total']:,.0f} F")
+        lbl_total.setFont(QFont("Segoe UI", 10, QFont.Bold))
+        lbl_total.setFixedWidth(80)
+        lbl_total.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        lbl_total.setStyleSheet(f"color: {Theme.c('success')}; border: none; background: transparent;")
+        layout.addWidget(lbl_total)
+
+        # Bouton supprimer
+        btn_retirer = QPushButton("Retirer")
+        btn_retirer.setFixedSize(60, 28)
+        btn_retirer.setToolTip("Retirer cet article du panier")
+        btn_retirer.setStyleSheet(
+            f"background-color: {Theme.c('danger')}; color: white; "
+            f"border: none; border-radius: 4px; font-size: 10px; font-weight: bold;"
+        )
+        btn_retirer.setCursor(Qt.PointingHandCursor)
+        btn_retirer.setAutoDefault(False)
+        btn_retirer.clicked.connect(lambda _, i=idx: self._retirer_ligne(i))
+        layout.addWidget(btn_retirer)
+
+        return row
+
+    def _augmenter_quantite(self, idx: int):
+        if idx >= len(self.panier):
+            return
+        item = self.panier[idx]
+        from modules.produits import Produit
+        p = Produit.obtenir_par_id(item['produit_id'])
+        stock_max = p['stock_actuel'] if p else 9999
+        if item['quantite'] >= stock_max:
+            QMessageBox.warning(self, "Stock", f"Stock max atteint ({stock_max})")
+            return
+        item['quantite'] += 1
+        item['sous_total'] = item['prix_vente'] * item['quantite']
+        self._actualiser_panier()
+
+    def _diminuer_quantite(self, idx: int):
+        if idx >= len(self.panier):
+            return
+        item = self.panier[idx]
+        if item['quantite'] <= 1:
+            self._retirer_ligne(idx)
+        else:
+            item['quantite'] -= 1
+            item['sous_total'] = item['prix_vente'] * item['quantite']
+            self._actualiser_panier()
 
     def _flash_ligne_ajoutee(self, produit_id):
-        """Flash vert sur la ligne ajoutée (feedback visuel mode AUTO)"""
-        # Trouver la ligne du produit dans le panier
-        for i, item in enumerate(self.panier):
-            if item['produit_id'] == produit_id:
-                # Sélectionner la ligne
-                self._table_view.selectRow(i)
-                # Retirer la sélection après 500ms
-                QTimer.singleShot(500, self._table_view.clearSelection)
-                break
+        """Scroll vers l'article ajouté (feedback visuel mode AUTO)"""
+        pass
 
     def _toggle_mode_scan(self):
         """Basculer entre mode AUTO et MANUEL (raccourci F9)"""
@@ -664,14 +742,11 @@ class VentesWindow(QDialog):
         )
 
     def _retirer_ligne(self, row: int):
-        """Retirer un article du panier (double-clic)."""
+        """Retirer un article du panier."""
         if row < 0 or row >= len(self.panier):
             return
-
-        nom = self.panier[row]['nom']
-        if confirmer(self, "Confirmation", f"Retirer '{nom}' du panier?"):
-            self.panier.pop(row)
-            self._actualiser_panier()
+        self.panier.pop(row)
+        self._actualiser_panier()
 
     def _vider_panier(self):
         """Vider tout le panier."""
@@ -842,8 +917,17 @@ class VentesWindow(QDialog):
                 ClientModule.ajouter_points(client_id, total)
 
             # Generer le recu PDF
-            from modules.recus import generer_recu_pdf
-            chemin_recu = generer_recu_pdf(vente_id)
+            chemin_recu = ""
+            try:
+                from modules.recus import generer_recu_pdf
+                chemin_recu = generer_recu_pdf(vente_id) or ""
+            except Exception as e_pdf:
+                import traceback
+                traceback.print_exc()
+                QMessageBox.warning(
+                    self, "PDF",
+                    f"La vente est enregistrée mais le reçu PDF n'a pas pu être généré :\n{e_pdf}"
+                )
 
             # Preparer les infos pour la confirmation
             vente_info = {
@@ -903,17 +987,5 @@ class VentesWindow(QDialog):
             ):
                 event.ignore()
                 return
-
-        # Arrêter les serveurs scanner mobile
-        try:
-            if self.scanner_mobile_server:
-                self.scanner_mobile_server.arreter()
-                self.scanner_mobile_server = None
-
-            if self.scanner_mobile_http:
-                self.scanner_mobile_http.arreter()
-                self.scanner_mobile_http = None
-        except Exception as e:
-            print(f"ERREUR arrêt scanner mobile : {e}")
 
         super().closeEvent(event)

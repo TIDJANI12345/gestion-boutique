@@ -5,7 +5,7 @@ Dialogue modal : especes, mobile money (Orange/MTN/Moov), mixte.
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
     QPushButton, QRadioButton, QButtonGroup, QFrame,
-    QMessageBox, QWidget
+    QMessageBox, QWidget, QComboBox
 )
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QFont
@@ -22,6 +22,8 @@ class PaiementWindow(QDialog):
         super().__init__(parent)
         self.total = total
         self._result = None
+        from modules.fiscalite import get_devise
+        self._devise = get_devise()
 
         self.setWindowTitle("Paiement")
         self.setFixedSize(550, 620)
@@ -52,7 +54,7 @@ class PaiementWindow(QDialog):
 
         h_layout.addStretch()
 
-        montant = QLabel(f"{self.total:,.0f} FCFA")
+        montant = QLabel(f"{self.total:,.0f} {self._devise}")
         montant.setFont(QFont("Segoe UI", 22, QFont.Bold))
         montant.setStyleSheet("color: white; background: transparent;")
         h_layout.addWidget(montant)
@@ -71,13 +73,10 @@ class PaiementWindow(QDialog):
         c_layout.addWidget(lbl_mode)
 
         self._mode_group = QButtonGroup(self)
-        modes = [
-            ('especes', 'Especes'),
-            ('orange_money', 'Orange Money'),
-            ('mtn_momo', 'MTN MoMo'),
-            ('moov_money', 'Moov Money'),
-            ('mixte', 'Paiement mixte'),
-        ]
+        from ui.windows.parametres_paiement import modes_actifs
+        modes = [(m['key'], m['label']) for m in modes_actifs()]
+        if not modes:
+            modes = [('especes', 'Espèces')]
         for value, label in modes:
             rb = QRadioButton(label)
             rb.setProperty("mode", value)
@@ -138,10 +137,13 @@ class PaiementWindow(QDialog):
 
         if mode == 'especes':
             self._champs_especes()
-        elif mode in ('orange_money', 'mtn_momo', 'moov_money'):
-            self._champs_mobile()
         elif mode == 'mixte':
             self._champs_mixte()
+        elif mode == 'mobile_money':
+            self._champs_mobile()
+        else:
+            # virement, cheque, modes custom → référence simple
+            self._champs_reference()
 
     def _champs_especes(self):
         lbl = QLabel("Montant recu du client:")
@@ -156,7 +158,7 @@ class PaiementWindow(QDialog):
         self._entry_montant_recu.textChanged.connect(self._calculer_monnaie)
         self._zone_saisie.addWidget(self._entry_montant_recu)
 
-        self._label_monnaie = QLabel(f"Monnaie a rendre: 0 FCFA")
+        self._label_monnaie = QLabel(f"Monnaie a rendre: 0 {self._devise}")
         self._label_monnaie.setFont(QFont("Segoe UI", 14, QFont.Bold))
         self._label_monnaie.setStyleSheet(f"color: {Theme.c('success')};")
         self._label_monnaie.setAlignment(Qt.AlignCenter)
@@ -169,26 +171,57 @@ class PaiementWindow(QDialog):
             recu = float(self._entry_montant_recu.text().replace(",", "").replace(" ", ""))
             monnaie = recu - self.total
             if monnaie >= 0:
-                self._label_monnaie.setText(f"Monnaie a rendre: {monnaie:,.0f} FCFA")
+                self._label_monnaie.setText(f"Monnaie a rendre: {monnaie:,.0f} {self._devise}")
                 self._label_monnaie.setStyleSheet(f"color: {Theme.c('success')};")
             else:
-                self._label_monnaie.setText(f"Insuffisant: {monnaie:,.0f} FCFA")
+                self._label_monnaie.setText(f"Insuffisant: {monnaie:,.0f} {self._devise}")
                 self._label_monnaie.setStyleSheet(f"color: {Theme.c('danger')};")
         except ValueError:
             self._label_monnaie.setText("Montant invalide")
             self._label_monnaie.setStyleSheet(f"color: {Theme.c('danger')};")
 
     def _champs_mobile(self):
-        lbl = QLabel("Reference de la transaction:")
+        lbl_op = QLabel("Opérateur Mobile Money:")
+        lbl_op.setFont(QFont("Segoe UI", 11, QFont.Bold))
+        self._zone_saisie.addWidget(lbl_op)
+
+        self._combo_operateur = QComboBox()
+        self._combo_operateur.setFont(QFont("Segoe UI", 12))
+        for op in ["Orange Money", "MTN MoMo", "Moov Money", "Wave", "Autre"]:
+            self._combo_operateur.addItem(op)
+        self._zone_saisie.addWidget(self._combo_operateur)
+
+        lbl = QLabel("Référence de la transaction (optionnel):")
         lbl.setFont(QFont("Segoe UI", 11, QFont.Bold))
         self._zone_saisie.addWidget(lbl)
 
         self._entry_reference = QLineEdit()
         self._entry_reference.setFont(QFont("Segoe UI", 14))
         self._entry_reference.setAlignment(Qt.AlignCenter)
+        self._entry_reference.setPlaceholderText("Ex: TXN123456 (facultatif)")
         self._zone_saisie.addWidget(self._entry_reference)
 
-        info = QLabel(f"Montant: {self.total:,.0f} FCFA")
+        info = QLabel(f"Montant: {self.total:,.0f} {self._devise}")
+        info.setFont(QFont("Segoe UI", 14, QFont.Bold))
+        info.setStyleSheet(f"color: {Theme.c('primary')};")
+        info.setAlignment(Qt.AlignCenter)
+        self._zone_saisie.addWidget(info)
+
+        self._entry_reference.setFocus()
+
+    def _champs_reference(self):
+        """Virement bancaire, Chèque, modes personnalisés : référence optionnelle."""
+        lbl = QLabel("Référence / Numéro (optionnel):")
+        lbl.setFont(QFont("Segoe UI", 11, QFont.Bold))
+        self._zone_saisie.addWidget(lbl)
+
+        self._entry_reference = QLineEdit()
+        self._entry_reference.setFont(QFont("Segoe UI", 14))
+        self._entry_reference.setAlignment(Qt.AlignCenter)
+        self._entry_reference.setPlaceholderText("Ex: N°chèque, REF-VIR… (facultatif)")
+        self._zone_saisie.addWidget(self._entry_reference)
+
+        info = QLabel(f"Montant: {self.total:,.0f} {self._devise}")
         info.setFont(QFont("Segoe UI", 14, QFont.Bold))
         info.setStyleSheet(f"color: {Theme.c('primary')};")
         info.setAlignment(Qt.AlignCenter)
@@ -208,23 +241,16 @@ class PaiementWindow(QDialog):
         self._entry_mixte_especes.textChanged.connect(self._maj_mixte)
         self._zone_saisie.addWidget(self._entry_mixte_especes)
 
-        # Mode mobile
-        lbl2 = QLabel("Mode Mobile Money:")
+        # Opérateur mobile
+        lbl2 = QLabel("Opérateur Mobile Money:")
         lbl2.setFont(QFont("Segoe UI", 11, QFont.Bold))
         self._zone_saisie.addWidget(lbl2)
 
-        self._mixte_mobile_group = QButtonGroup(self)
-        mobile_frame = QWidget()
-        mobile_layout = QHBoxLayout(mobile_frame)
-        mobile_layout.setContentsMargins(0, 0, 0, 0)
-        for val, lbl in [('orange_money', 'Orange'), ('mtn_momo', 'MTN'), ('moov_money', 'Moov')]:
-            rb = QRadioButton(lbl)
-            rb.setProperty("mode", val)
-            self._mixte_mobile_group.addButton(rb)
-            mobile_layout.addWidget(rb)
-            if val == 'orange_money':
-                rb.setChecked(True)
-        self._zone_saisie.addWidget(mobile_frame)
+        self._combo_mixte_operateur = QComboBox()
+        self._combo_mixte_operateur.setFont(QFont("Segoe UI", 12))
+        for op in ["Orange Money", "MTN MoMo", "Moov Money", "Wave", "Autre"]:
+            self._combo_mixte_operateur.addItem(op)
+        self._zone_saisie.addWidget(self._combo_mixte_operateur)
 
         # Montant mobile
         lbl3 = QLabel("Montant Mobile Money:")
@@ -238,12 +264,13 @@ class PaiementWindow(QDialog):
         self._zone_saisie.addWidget(self._entry_mixte_mobile)
 
         # Reference
-        lbl4 = QLabel("Reference transaction:")
+        lbl4 = QLabel("Reference transaction (optionnel):")
         lbl4.setFont(QFont("Segoe UI", 10, QFont.Bold))
         self._zone_saisie.addWidget(lbl4)
 
         self._entry_mixte_ref = QLineEdit()
         self._entry_mixte_ref.setFont(QFont("Segoe UI", 12))
+        self._entry_mixte_ref.setPlaceholderText("Facultatif")
         self._zone_saisie.addWidget(self._entry_mixte_ref)
 
         # Info
@@ -263,13 +290,13 @@ class PaiementWindow(QDialog):
             diff = somme - self.total
 
             if abs(diff) < 0.01:
-                self._label_mixte_info.setText(f"Total: {somme:,.0f} FCFA - OK")
+                self._label_mixte_info.setText(f"Total: {somme:,.0f} {self._devise} - OK")
                 self._label_mixte_info.setStyleSheet(f"color: {Theme.c('success')};")
             elif diff > 0:
-                self._label_mixte_info.setText(f"Total: {somme:,.0f} FCFA (excedent: {diff:,.0f})")
-                self._label_mixte_info.setStyleSheet(f"color: {Theme.c('warning')};")
+                self._label_mixte_info.setText(f"Total: {somme:,.0f} {self._devise} (excedent: {diff:,.0f})")
+                self._label_mixte_info.setStyleSheet(f"color: {Theme.c('warning_text')};")
             else:
-                self._label_mixte_info.setText(f"Total: {somme:,.0f} FCFA (manque: {-diff:,.0f})")
+                self._label_mixte_info.setText(f"Total: {somme:,.0f} {self._devise} (manque: {-diff:,.0f})")
                 self._label_mixte_info.setStyleSheet(f"color: {Theme.c('danger')};")
         except ValueError:
             self._label_mixte_info.setText("Montants invalides")
@@ -293,12 +320,18 @@ class PaiementWindow(QDialog):
                     'monnaie_rendue': monnaie,
                 }]
 
-            elif mode in ('orange_money', 'mtn_momo', 'moov_money'):
-                reference = self._entry_reference.text().strip()
-                if not reference:
-                    QMessageBox.critical(self, "Erreur",
-                                         "Veuillez saisir la reference de la transaction!")
-                    return
+            elif mode == 'mobile_money':
+                operateur = self._combo_operateur.currentText()
+                ref_saisie = self._entry_reference.text().strip()
+                reference = f"[{operateur}] {ref_saisie}".strip() if ref_saisie else f"[{operateur}]"
+                self._result = [{
+                    'mode': 'mobile_money', 'montant': self.total,
+                    'reference': reference, 'montant_recu': None,
+                    'monnaie_rendue': None,
+                }]
+
+            elif mode not in ('especes', 'mixte', 'mobile_money'):
+                reference = self._entry_reference.text().strip() if hasattr(self, '_entry_reference') else None
                 self._result = [{
                     'mode': mode, 'montant': self.total,
                     'reference': reference, 'montant_recu': None,
@@ -317,13 +350,9 @@ class PaiementWindow(QDialog):
                         f"La somme ({especes + mobile:,.0f}) est inferieure au total ({self.total:,.0f})!")
                     return
 
-                mobile_btn = self._mixte_mobile_group.checkedButton()
-                mode_mobile = mobile_btn.property("mode") if mobile_btn else "orange_money"
-                reference = self._entry_mixte_ref.text().strip()
-                if mobile > 0 and not reference:
-                    QMessageBox.critical(self, "Erreur",
-                                         "Veuillez saisir la reference Mobile Money!")
-                    return
+                operateur = self._combo_mixte_operateur.currentText()
+                ref_saisie = self._entry_mixte_ref.text().strip()
+                reference = f"[{operateur}] {ref_saisie}".strip() if ref_saisie else f"[{operateur}]"
 
                 self._result = []
                 if especes > 0:
@@ -334,7 +363,7 @@ class PaiementWindow(QDialog):
                     })
                 if mobile > 0:
                     self._result.append({
-                        'mode': mode_mobile, 'montant': mobile,
+                        'mode': 'mobile_money', 'montant': mobile,
                         'reference': reference, 'montant_recu': None,
                         'monnaie_rendue': None,
                     })

@@ -10,6 +10,7 @@ from PySide6.QtCore import Qt, QDate
 from PySide6.QtGui import QFont, QDesktopServices, QAction
 
 from ui.theme import Theme
+from modules.fiscalite import get_devise
 from ui.components.table import BoutiqueTableView, BoutiqueTableModel
 from ui.components.dialogs import confirmer, information, erreur
 
@@ -115,10 +116,10 @@ class ListeVentesWindow(QDialog):
 
         # Table (colonnes selon rôle)
         if self.utilisateur and self.utilisateur.get('role') == 'caissier':
-            colonnes = ["ID", "Numero", "Date", "Heure", "Client", "Total (FCFA)", "Paiement", "Nb Articles"]
+            colonnes = ["ID", "Numero", "Date", "Heure", "Client", "Total ({get_devise()})", "Paiement", "Nb Articles"]
         else:
             # Admin/Gérant : ajouter colonne Vendeur
-            colonnes = ["ID", "Numero", "Date", "Heure", "Vendeur", "Client", "Total (FCFA)", "Paiement", "Nb Articles"]
+            colonnes = ["ID", "Numero", "Date", "Heure", "Vendeur", "Client", "Total ({get_devise()})", "Paiement", "Nb Articles"]
         self.model = BoutiqueTableModel(colonnes)
         self.table = BoutiqueTableView()
         self.table.setModel(self.model)
@@ -207,7 +208,7 @@ class ListeVentesWindow(QDialog):
         self.model.charger_donnees(lignes)
         self.table.ajuster_colonnes()
         self.lbl_stats.setText(
-            f"{len(lignes)} vente(s)  |  CA total : {total_ca:,.0f} FCFA"
+            f"{len(lignes)} vente(s)  |  CA total : {total_ca:,.0f} {get_devise()}"
         )
 
         # Stats par vendeur (Admin seulement)
@@ -310,7 +311,7 @@ class ListeVentesWindow(QDialog):
         client_str = vente[4] or "Client anonyme"
         info_l.addWidget(QLabel(f"Date : {date_str}"))
         info_l.addWidget(QLabel(f"Client : {client_str}"))
-        info_l.addWidget(QLabel(f"Total : {vente[3]:,.0f} FCFA"))
+        info_l.addWidget(QLabel(f"Total : {vente[3]:,.0f} {get_devise()}"))
         layout.addWidget(info_frame)
 
         # Produits

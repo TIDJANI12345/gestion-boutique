@@ -53,7 +53,7 @@ class Rapport:
                 stats['valeur_stock'] = result[0] or 0
                 
         except Exception as e:
-            print(f"❌ Erreur statistiques: {e}")
+            pass
         
         return stats
 
@@ -79,7 +79,7 @@ class Rapport:
                 stats['ca_jour'] = result[1] or 0
 
         except Exception as e:
-            print(f"❌ Erreur statistiques utilisateur: {e}")
+            pass
 
         return stats
 
@@ -197,7 +197,7 @@ class Rapport:
             rapport['top_produits'] = db.fetch_all(query_top, (date,))
             
         except Exception as e:
-            print(f"❌ Erreur rapport journalier: {e}")
+            pass
 
         return rapport
 

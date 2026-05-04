@@ -11,6 +11,7 @@ from PySide6.QtGui import QFont, QShortcut, QKeySequence
 
 from config import APP_NAME
 from ui.theme import Theme
+from modules.fiscalite import get_devise
 from modules.logger import get_logger
 from modules.permissions import Permissions
 from database import db
@@ -87,6 +88,19 @@ class PrincipaleGestionnaireWindow(QMainWindow):
         """)
         btn_deconnexion.setCursor(Qt.PointingHandCursor)
         btn_deconnexion.clicked.connect(self._deconnexion)
+
+        self._btn_theme = QPushButton("☾ Sombre" if not Theme.est_sombre() else "☀ Clair")
+        self._btn_theme.setStyleSheet("""
+            QPushButton {
+                background: rgba(255,255,255,0.2); color: white;
+                border: 1px solid rgba(255,255,255,0.3); border-radius: 4px;
+                padding: 8px 14px; font-size: 11px;
+            }
+            QPushButton:hover { background: rgba(255,255,255,0.3); }
+        """)
+        self._btn_theme.setCursor(Qt.PointingHandCursor)
+        self._btn_theme.clicked.connect(self._basculer_theme)
+        header_layout.addWidget(self._btn_theme)
         header_layout.addWidget(btn_deconnexion)
 
         main_layout.addWidget(header)
@@ -209,7 +223,7 @@ class PrincipaleGestionnaireWindow(QMainWindow):
         svc_label.setAlignment(Qt.AlignCenter)
         svc_layout.addWidget(svc_label)
 
-        self._label_valeur_stock = QLabel("0 FCFA")
+        self._label_valeur_stock = QLabel(f"0 {get_devise()}")
         self._label_valeur_stock.setFont(QFont("Segoe UI", 32, QFont.Bold))
         self._label_valeur_stock.setStyleSheet(f"color: {Theme.c('success')};")
         self._label_valeur_stock.setAlignment(Qt.AlignCenter)
@@ -232,7 +246,7 @@ class PrincipaleGestionnaireWindow(QMainWindow):
 
         self._label_produits_alerte = QLabel("0")
         self._label_produits_alerte.setFont(QFont("Segoe UI", 32, QFont.Bold))
-        self._label_produits_alerte.setStyleSheet(f"color: {Theme.c('warning')};")
+        self._label_produits_alerte.setStyleSheet(f"color: {Theme.c('warning_text')};")
         self._label_produits_alerte.setAlignment(Qt.AlignCenter)
         ac_layout.addWidget(self._label_produits_alerte)
         cards_layout.addWidget(alerte_card)
@@ -285,16 +299,13 @@ class PrincipaleGestionnaireWindow(QMainWindow):
         gestion_menu = menubar.addMenu("Gestion")
         if Permissions.peut(self.utilisateur, 'gerer_produits'):
             gestion_menu.addAction("Produits", self.ouvrir_produits)
+            gestion_menu.addAction("Catégories", self.ouvrir_categories)
         if Permissions.peut(self.utilisateur, 'gerer_clients'):
             gestion_menu.addAction("Clients", self.ouvrir_clients)
         if Permissions.peut(self.utilisateur, 'effectuer_ventes'):
             gestion_menu.addAction("Nouvelle Vente", self.ouvrir_ventes)
         if Permissions.peut(self.utilisateur, 'voir_mes_ventes'):
             gestion_menu.addAction("Mes Ventes", self.voir_mes_ventes)
-
-        # Menu Outils
-        outils_menu = menubar.addMenu("Outils")
-        outils_menu.addAction("📱 Scanner Mobile", self.ouvrir_scanner_mobile_setup)
 
         # Menu Aide
         help_menu = menubar.addMenu("Aide")
@@ -331,7 +342,7 @@ class PrincipaleGestionnaireWindow(QMainWindow):
 
             self._label_total_produits.setText(str(total_produits))
             self._label_produits_alerte.setText(str(produits_alerte))
-            self._label_valeur_stock.setText(f"{valeur_stock:,.0f} FCFA")
+            self._label_valeur_stock.setText(f"{valeur_stock:,.0f} {get_devise()}")
 
             # Stats Ventes (si le gestionnaire peut vendre)
             if Permissions.peut(self.utilisateur, 'voir_mes_ventes'):
@@ -350,6 +361,14 @@ class PrincipaleGestionnaireWindow(QMainWindow):
         else:
             QMessageBox.warning(self, "Accès refusé", "Vous n'avez pas la permission de gérer les produits.")
 
+    def ouvrir_categories(self):
+        from ui.windows.gestion_categories import GestionCategoriesWindow
+        if Permissions.peut(self.utilisateur, 'gerer_produits'):
+            dlg = GestionCategoriesWindow(parent=self)
+            dlg.exec()
+        else:
+            QMessageBox.warning(self, "Accès refusé", "Vous n'avez pas la permission de gérer les catégories.")
+
     def ouvrir_clients(self):
         from ui.windows.clients import ClientsWindow
         if Permissions.peut(self.utilisateur, 'gerer_clients'):
@@ -362,7 +381,7 @@ class PrincipaleGestionnaireWindow(QMainWindow):
         from ui.windows.ventes import VentesWindow
         if Permissions.peut(self.utilisateur, 'effectuer_ventes'):
             dlg = VentesWindow(parent=self, utilisateur=self.utilisateur)
-            dlg.vente_terminee.connect(self.actualiser_stats) # Connecter a l'actualisation des stats manager
+            dlg.vente_terminee.connect(self.actualiser_stats)
             dlg.exec()
         else:
             QMessageBox.warning(self, "Accès refusé", "Vous n'avez pas la permission d'effectuer des ventes.")
@@ -376,16 +395,16 @@ class PrincipaleGestionnaireWindow(QMainWindow):
         else:
             QMessageBox.warning(self, "Accès refusé", "Vous n'avez pas la permission de voir vos ventes.")
 
-    def ouvrir_scanner_mobile_setup(self):
-        """Ouvrir la configuration du scanner mobile"""
-        from ui.windows.scanner_mobile_setup import ScannerMobileSetupDialog
-        dlg = ScannerMobileSetupDialog(parent=self)
-        dlg.exec()
-
     def ouvrir_a_propos(self):
         from ui.windows.a_propos import AProposWindow
         dlg = AProposWindow(parent=self)
         dlg.exec()
+
+    def _basculer_theme(self):
+        from ui.theme import Theme
+        Theme.basculer()
+        self._btn_theme.setText("☾ Sombre" if not Theme.est_sombre() else "☀ Clair")
+        self.update()
 
     def _deconnexion(self):
         from modules.utilisateurs import Utilisateur

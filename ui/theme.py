@@ -17,6 +17,7 @@ THEME_CLAIR = {
     'danger': '#EF4444',
     'danger_hover': '#DC2626',
     'warning': '#F59E0B',
+    'warning_text': '#B45309',
     'info': '#06B6D4',
     'purple': '#8B5CF6',
     'gray': '#6B7280',
@@ -49,6 +50,7 @@ THEME_SOMBRE = {
     'danger': '#EF4444',
     'danger_hover': '#F87171',
     'warning': '#F59E0B',
+    'warning_text': '#FCD34D',
     'info': '#06B6D4',
     'purple': '#8B5CF6',
     'gray': '#9CA3AF',
@@ -94,13 +96,38 @@ class Theme:
         return cls._is_dark
 
     @classmethod
+    def sauvegarder(cls):
+        """Persiste le thème actuel en base de données."""
+        try:
+            from database import db
+            db.set_parametre('theme', 'sombre' if cls._is_dark else 'clair')
+        except Exception:
+            pass
+
+    @classmethod
+    def charger(cls):
+        """Charge le thème sauvegardé depuis la base de données."""
+        try:
+            from database import db
+            valeur = db.get_parametre('theme', 'clair')
+            if valeur == 'sombre':
+                cls._current = dict(THEME_SOMBRE)
+                cls._is_dark = True
+            else:
+                cls._current = dict(THEME_CLAIR)
+                cls._is_dark = False
+        except Exception:
+            pass
+
+    @classmethod
     def basculer(cls):
-        """Bascule entre theme clair et sombre."""
+        """Bascule entre theme clair et sombre, et sauvegarde le choix."""
         if cls._is_dark:
             cls._current = dict(THEME_CLAIR)
         else:
             cls._current = dict(THEME_SOMBRE)
         cls._is_dark = not cls._is_dark
+        cls.sauvegarder()
         app = QApplication.instance()
         if app:
             app.setStyleSheet(cls.stylesheet())
@@ -117,7 +144,8 @@ class Theme:
 
     @classmethod
     def appliquer(cls, app: QApplication):
-        """Applique le theme a l'application Qt."""
+        """Charge le thème sauvegardé puis applique à l'application Qt."""
+        cls.charger()
         font = QFont("Segoe UI", 10)
         font.setStyleStrategy(QFont.PreferAntialias)
         app.setFont(font)
@@ -193,7 +221,8 @@ class Theme:
         }}
 
         /* === CHAMPS DE SAISIE === */
-        QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox {{
+        QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox,
+        QDateEdit, QDateTimeEdit, QTimeEdit {{
             background-color: {c['input_bg']};
             color: {c['input_fg']};
             border: 1px solid {c['input_border']};
@@ -203,9 +232,42 @@ class Theme:
             min-height: 20px;
         }}
 
-        QLineEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus, QComboBox:focus {{
+        QLineEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus, QComboBox:focus,
+        QDateEdit:focus, QDateTimeEdit:focus, QTimeEdit:focus {{
             border: 2px solid {c['input_focus']};
             padding: 7px 11px;
+        }}
+
+        QDateEdit::drop-down, QDateTimeEdit::drop-down, QTimeEdit::drop-down {{
+            border: none;
+            padding-right: 8px;
+        }}
+
+        QDateEdit::down-arrow, QDateTimeEdit::down-arrow {{
+            width: 12px;
+            height: 12px;
+        }}
+
+        QCalendarWidget {{
+            background-color: {c['card_bg']};
+            color: {c['text']};
+        }}
+
+        QCalendarWidget QAbstractItemView {{
+            background-color: {c['card_bg']};
+            color: {c['text']};
+            selection-background-color: {c['table_selection']};
+            selection-color: {c['text']};
+        }}
+
+        QCalendarWidget QWidget#qt_calendar_navigationbar {{
+            background-color: {c['primary']};
+            color: white;
+        }}
+
+        QCalendarWidget QToolButton {{
+            background-color: transparent;
+            color: white;
         }}
 
         QComboBox::drop-down {{
@@ -348,6 +410,40 @@ class Theme:
             color: {c['separator']};
         }}
 
+        /* === SPLITTER === */
+        QSplitter::handle {{
+            background-color: {c['separator']};
+        }}
+
+        QSplitter::handle:horizontal {{
+            width: 2px;
+        }}
+
+        QSplitter::handle:vertical {{
+            height: 2px;
+        }}
+
+        /* === DIALOGS SYSTEME === */
+        QMessageBox {{
+            background-color: {c['card_bg']};
+            color: {c['text']};
+        }}
+
+        QMessageBox QLabel {{
+            color: {c['text']};
+            background: transparent;
+        }}
+
+        QInputDialog {{
+            background-color: {c['card_bg']};
+            color: {c['text']};
+        }}
+
+        QFileDialog {{
+            background-color: {c['bg']};
+            color: {c['text']};
+        }}
+
         /* === TOOLTIPS === */
         QToolTip {{
             background-color: {c['dark']};
@@ -407,6 +503,57 @@ class Theme:
         QProgressBar::chunk {{
             background-color: {c['primary']};
             border-radius: 4px;
+        }}
+
+        /* === CARTES / PANELS DASHBOARD === */
+        QFrame[role="card"] {{
+            background-color: {c['card_bg']};
+            border: 1px solid {c['card_border']};
+            border-radius: 8px;
+        }}
+
+        QFrame[role="footer-bar"] {{
+            background-color: {c['light']};
+        }}
+
+        QTextEdit[role="panel-text"] {{
+            background-color: {c['card_bg']};
+            color: {c['text']};
+            border: none;
+            font-size: 12px;
+        }}
+
+        /* === SCROLL AREA === */
+        QScrollArea {{
+            background-color: {c['bg']};
+            border: none;
+        }}
+
+        QScrollArea > QWidget > QWidget {{
+            background-color: {c['bg']};
+        }}
+
+        /* === LISTE === */
+        QListWidget {{
+            background-color: {c['card_bg']};
+            color: {c['text']};
+            border: 1px solid {c['card_border']};
+            border-radius: 6px;
+            font-size: 13px;
+        }}
+
+        QListWidget::item {{
+            padding: 6px 10px;
+            border-radius: 4px;
+        }}
+
+        QListWidget::item:selected {{
+            background-color: {c['table_selection']};
+            color: {c['text']};
+        }}
+
+        QListWidget::item:hover {{
+            background-color: {c['light']};
         }}
 
         /* === CHECKBOX & RADIO === */

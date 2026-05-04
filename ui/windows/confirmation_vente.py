@@ -87,7 +87,8 @@ class ConfirmationVenteWindow(QDialog):
         lbl_date.setAlignment(Qt.AlignCenter)
         info_layout.addWidget(lbl_date)
 
-        lbl_total = QLabel(f"{self.vente_info['total']:,.0f} FCFA")
+        from modules.fiscalite import get_devise
+        lbl_total = QLabel(f"{self.vente_info['total']:,.0f} {get_devise()}")
         lbl_total.setFont(QFont("Segoe UI", 32, QFont.Bold))
         lbl_total.setStyleSheet(f"color: {Theme.c('success')};")
         lbl_total.setAlignment(Qt.AlignCenter)

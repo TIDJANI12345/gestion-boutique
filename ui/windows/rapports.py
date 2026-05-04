@@ -12,6 +12,7 @@ from PySide6.QtGui import QFont
 from ui.theme import Theme
 from ui.components.table import BoutiqueTableView, BoutiqueTableModel
 from ui.components.dialogs import information, erreur
+from modules.fiscalite import get_devise
 
 
 class RapportsWindow(QDialog):
@@ -100,7 +101,7 @@ class RapportsWindow(QDialog):
             ("stock_alertes", "Alertes stock", Theme.c('danger')),
             ("nb_ventes_total", "Total ventes", Theme.c('info')),
             ("ca_total", "CA total", Theme.c('purple')),
-            ("valeur_stock", "Valeur stock", Theme.c('warning')),
+            ("valeur_stock", "Valeur stock", Theme.c('warning_text')),
         ]
         for i, (key, label, color) in enumerate(cards_def):
             card = self._creer_stat_card(label, "0", color)
@@ -171,7 +172,7 @@ class RapportsWindow(QDialog):
 
         # Chart area (bar chart)
         self.top_chart_frame = QFrame()
-        self.top_chart_frame.setMinimumHeight(280)
+        self.top_chart_frame.setFixedHeight(220)
         self.top_chart_frame.setStyleSheet(
             f"QFrame {{ background: {Theme.c('card_bg')}; "
             f"border: 1px solid {Theme.c('card_border')}; border-radius: 8px; }}"
@@ -186,7 +187,7 @@ class RapportsWindow(QDialog):
         layout.addWidget(self.top_chart_frame)
 
         # Table
-        colonnes = ["Rang", "Produit", "Categorie", "Qte Vendue", "CA Genere (FCFA)"]
+        colonnes = ["Rang", "Produit", "Categorie", "Qte Vendue", f"CA Genere ({get_devise()})"]
         self.top_model = BoutiqueTableModel(colonnes)
         self.top_table = BoutiqueTableView()
         self.top_table.setModel(self.top_model)
@@ -227,27 +228,28 @@ class RapportsWindow(QDialog):
         self._caisse_cards = {}
 
         modes = [
-            ("especes", "Especes", Theme.c('success')),
-            ("orange_money", "Orange Money", "#FF6600"),
-            ("mtn_momo", "MTN MoMo", "#FFCC00"),
-            ("moov_money", "Moov Money", Theme.c('primary')),
+            ("especes", "Espèces", Theme.c('success')),
+            ("mobile_money", "Mobile Money", "#FF6600"),
+            ("virement", "Virement bancaire", Theme.c('primary')),
+            ("cheque", "Chèque", Theme.c('info')),
+            ("mixte", "Paiement mixte", Theme.c('purple')),
         ]
         for key, label, color in modes:
-            card = self._creer_stat_card(label, "0 FCFA", color)
+            card = self._creer_stat_card(label, f"0 {get_devise()}", color)
             self._caisse_cards[key] = card
             self.caisse_cards_layout.addWidget(card)
 
         layout.addLayout(self.caisse_cards_layout)
 
         # Table
-        colonnes = ["Mode", "Nb transactions", "Total (FCFA)"]
+        colonnes = ["Mode", "Nb transactions", f"Total ({get_devise()})"]
         self.caisse_model = BoutiqueTableModel(colonnes)
         self.caisse_table = BoutiqueTableView()
         self.caisse_table.setModel(self.caisse_model)
         layout.addWidget(self.caisse_table)
 
         # Total
-        self.lbl_total_caisse = QLabel("Total general : 0 FCFA")
+        self.lbl_total_caisse = QLabel(f"Total general : 0 {get_devise()}")
         self.lbl_total_caisse.setFont(QFont("Segoe UI", 14, QFont.Bold))
         self.lbl_total_caisse.setAlignment(Qt.AlignRight)
         layout.addWidget(self.lbl_total_caisse)
@@ -278,7 +280,7 @@ class RapportsWindow(QDialog):
             ("ca_ht", "CA HT", Theme.c('info')),
             ("tva_collectee", "TVA collectee", Theme.c('success')),
         ]:
-            card = self._creer_stat_card(label, "0 FCFA", color)
+            card = self._creer_stat_card(label, f"0 {get_devise()}", color)
             self._tva_cards[key] = card
             self.tva_cards_layout.addWidget(card)
         layout.addLayout(self.tva_cards_layout)
@@ -307,7 +309,7 @@ class RapportsWindow(QDialog):
         layout.addWidget(self.lbl_stock_alert)
 
         # Table
-        colonnes = ["Produit", "Categorie", "Stock actuel", "Seuil alerte", "Prix vente (FCFA)"]
+        colonnes = ["Produit", "Categorie", "Stock actuel", "Seuil alerte", f"Prix vente ({get_devise()})"]
         self.stock_model = BoutiqueTableModel(colonnes)
         self.stock_table = BoutiqueTableView()
         self.stock_table.setModel(self.stock_model)
@@ -348,11 +350,11 @@ class RapportsWindow(QDialog):
                     break
 
             self._maj_card(self._cards_overview["ventes_jour"], str(ventes_jour or nb_ventes_jour))
-            self._maj_card(self._cards_overview["ca_jour"], f"{ca_jour:,.0f} FCFA")
+            self._maj_card(self._cards_overview["ca_jour"], f"{ca_jour:,.0f} {get_devise()}")
             self._maj_card(self._cards_overview["stock_alertes"], str(len(alertes) if alertes else 0))
             self._maj_card(self._cards_overview["nb_ventes_total"], str(stats.get('nb_ventes', 0)))
-            self._maj_card(self._cards_overview["ca_total"], f"{ca_total:,.0f} FCFA")
-            self._maj_card(self._cards_overview["valeur_stock"], f"{valeur_stock:,.0f} FCFA")
+            self._maj_card(self._cards_overview["ca_total"], f"{ca_total:,.0f} {get_devise()}")
+            self._maj_card(self._cards_overview["valeur_stock"], f"{valeur_stock:,.0f} {get_devise()}")
 
             # Chart
             self._afficher_graphique_evolution(evol)
@@ -387,7 +389,7 @@ class RapportsWindow(QDialog):
                                 textcoords="offset points", xytext=(0, 10),
                                 ha='center', fontsize=8)
 
-            ax.set_ylabel("CA (FCFA)")
+            ax.set_ylabel(f"CA ({get_devise()})")
             ax.grid(True, alpha=0.3)
             fig.tight_layout()
 
@@ -442,7 +444,7 @@ class RapportsWindow(QDialog):
 
             fig.tight_layout()
             canvas = FigureCanvasQTAgg(fig)
-            self.chart_container.addWidget(canvas)
+            self.top_chart_container.addWidget(canvas)
         except ImportError:
             pass
 
@@ -454,9 +456,9 @@ class RapportsWindow(QDialog):
             rapport = Paiement.rapport_caisse_jour(date)
 
             # Update cards
-            for key in ["especes", "orange_money", "mtn_momo", "moov_money"]:
+            for key in ["especes", "mobile_money", "virement", "cheque", "mixte"]:
                 val = rapport.get(f"total_{key}", 0)
-                self._maj_card(self._caisse_cards[key], f"{val:,.0f} FCFA")
+                self._maj_card(self._caisse_cards[key], f"{val:,.0f} {get_devise()}")
 
             # Table
             lignes = []
@@ -466,7 +468,7 @@ class RapportsWindow(QDialog):
             self.caisse_table.ajuster_colonnes()
 
             self.lbl_total_caisse.setText(
-                f"Total general : {rapport.get('total_general', 0):,.0f} FCFA  "
+                f"Total general : {rapport.get('total_general', 0):,.0f} {get_devise()}  "
                 f"({rapport.get('nb_transactions', 0)} transactions)"
             )
         except Exception as e:
@@ -485,9 +487,9 @@ class RapportsWindow(QDialog):
                 )
 
                 rapport = Fiscalite.rapport_tva_mensuel()
-                self._maj_card(self._tva_cards["ca_ttc"], f"{rapport['total_ttc']:,.0f} FCFA")
-                self._maj_card(self._tva_cards["ca_ht"], f"{rapport['total_ht']:,.0f} FCFA")
-                self._maj_card(self._tva_cards["tva_collectee"], f"{rapport['total_tva']:,.0f} FCFA")
+                self._maj_card(self._tva_cards["ca_ttc"], f"{rapport['total_ttc']:,.0f} {get_devise()}")
+                self._maj_card(self._tva_cards["ca_ht"], f"{rapport['total_ht']:,.0f} {get_devise()}")
+                self._maj_card(self._tva_cards["tva_collectee"], f"{rapport['total_tva']:,.0f} {get_devise()}")
             else:
                 self.tva_banner.setText("TVA INACTIVE")
                 self.tva_banner.setStyleSheet(

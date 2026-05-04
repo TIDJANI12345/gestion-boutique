@@ -19,7 +19,6 @@ class WhatsAppWindow(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Export WhatsApp")
         self.resize(1200, 750)
-        self.setStyleSheet(Theme.stylesheet())
 
         self.categories_vars = {}
         self._setup_ui()
@@ -162,7 +161,7 @@ class WhatsAppWindow(QDialog):
 
         self.apercu_text = QTextEdit()
         self.apercu_text.setReadOnly(True)
-        self.apercu_text.setStyleSheet(f"background-color: {Theme.c('light')}; font-family: 'Courier New'; font-size: 9pt;")
+        self.apercu_text.setStyleSheet(f"background-color: {Theme.c('input_bg')}; color: {Theme.c('input_fg')}; font-family: 'Courier New'; font-size: 9pt;")
         preview_inner.addWidget(self.apercu_text)
 
         preview_panel.layout().addLayout(preview_inner)
@@ -209,7 +208,7 @@ class WhatsAppWindow(QDialog):
     def _create_panel(self, title):
         """Create a styled panel with title"""
         panel = QFrame()
-        panel.setStyleSheet(f"background-color: white; border: 1px solid {Theme.c('card_border')}; border-radius: 4px;")
+        panel.setStyleSheet(f"background-color: {Theme.c('card_bg')}; border: 1px solid {Theme.c('card_border')}; border-radius: 4px;")
         panel_layout = QVBoxLayout(panel)
         panel_layout.setContentsMargins(0, 0, 0, 0)
         panel_layout.setSpacing(0)

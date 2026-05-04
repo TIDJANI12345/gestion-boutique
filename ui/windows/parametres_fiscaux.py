@@ -19,7 +19,6 @@ class ParametresFiscauxWindow(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Parametres fiscaux")
         self.setFixedSize(700, 650)
-        self.setStyleSheet(Theme.stylesheet())
 
         self._setup_ui()
         self._charger_devises()

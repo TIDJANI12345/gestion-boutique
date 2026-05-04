@@ -47,11 +47,8 @@ class CodeBarre:
             # Ajouter le nom du produit et le prix sur l'image
             CodeBarre.ajouter_texte_sur_image(filename, nom_produit, prix)
             
-            print(f"✅ Code-barres généré: {filename}")
             return filename
-            
-        except Exception as e:
-            print(f"❌ Erreur lors de la génération du code-barres: {e}")
+        except Exception:
             return None
     
     @staticmethod
@@ -110,8 +107,8 @@ class CodeBarre:
             # Sauvegarder
             nouvelle_img.save(chemin_image)
             
-        except Exception as e:
-            print(f"❌ Erreur lors de l'ajout du texte: {e}")
+        except Exception:
+            pass
     
     @staticmethod
     def imprimer_code_barre(chemin_image):
@@ -121,9 +118,8 @@ class CodeBarre:
         try:
             img = Image.open(chemin_image)
             img.show()
-            print(f"✅ Image ouverte pour impression: {chemin_image}")
-        except Exception as e:
-            print(f"❌ Erreur lors de l'ouverture de l'image: {e}")
+        except Exception:
+            pass
     
     @staticmethod
     def obtenir_chemin_image(code):

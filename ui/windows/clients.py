@@ -10,6 +10,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
 
 from ui.theme import Theme
+from modules.fiscalite import get_devise
 from ui.components.table import BoutiqueTableView, BoutiqueTableModel
 from ui.components.dialogs import confirmer, information, erreur
 
@@ -117,6 +118,7 @@ class ClientsWindow(QDialog):
         btn_reset = QPushButton("Reinitialiser")
         btn_reset.setMinimumHeight(42)
         btn_reset.setCursor(Qt.PointingHandCursor)
+        btn_reset.setProperty("class", "secondary")
         btn_reset.clicked.connect(self._reinitialiser_formulaire)
         btn_row.addWidget(btn_reset)
 
@@ -160,11 +162,13 @@ class ClientsWindow(QDialog):
 
         btn_historique = QPushButton("Historique")
         btn_historique.setCursor(Qt.PointingHandCursor)
+        btn_historique.setProperty("class", "secondary")
         btn_historique.clicked.connect(self._voir_historique)
         actions_row.addWidget(btn_historique)
 
         btn_actualiser = QPushButton("Actualiser")
         btn_actualiser.setCursor(Qt.PointingHandCursor)
+        btn_actualiser.setProperty("class", "secondary")
         btn_actualiser.clicked.connect(self._charger_page)
         actions_row.addWidget(btn_actualiser)
 
@@ -182,6 +186,7 @@ class ClientsWindow(QDialog):
         pag_row = QHBoxLayout()
         self._btn_prev = QPushButton("< Precedent")
         self._btn_prev.setCursor(Qt.PointingHandCursor)
+        self._btn_prev.setProperty("class", "secondary")
         self._btn_prev.clicked.connect(self._page_precedente)
         pag_row.addWidget(self._btn_prev)
 
@@ -198,6 +203,7 @@ class ClientsWindow(QDialog):
 
         self._btn_next = QPushButton("Suivant >")
         self._btn_next.setCursor(Qt.PointingHandCursor)
+        self._btn_next.setProperty("class", "secondary")
         self._btn_next.clicked.connect(self._page_suivante)
         pag_row.addWidget(self._btn_next)
 
@@ -396,7 +402,7 @@ class HistoriqueClientDialog(QDialog):
         points = c[4] if c[4] is not None else 0
         total = c[5] if c[5] is not None else 0
         nb = c[6] if c[6] is not None else 0
-        details.append(f"Points: {points}  |  Total achats: {total:,.0f} FCFA  |  {nb} achats")
+        details.append(f"Points: {points}  |  Total achats: {total:,.0f} {get_devise()}  |  {nb} achats")
 
         for d in details:
             lbl = QLabel(d)
@@ -426,7 +432,7 @@ class HistoriqueClientDialog(QDialog):
                 a[0],                                         # ID vente
                 a[1] or "",                                    # Numero vente
                 a[2] or "",                                    # Date
-                f"{a[3]:,.0f} FCFA" if a[3] is not None else "0", # Total
+                f"{a[3]:,.0f} {get_devise()}" if a[3] is not None else "0", # Total
                 a[4] or "",                                    # Statut
             ])
 
@@ -443,5 +449,6 @@ class HistoriqueClientDialog(QDialog):
         btn_fermer = QPushButton("Fermer")
         btn_fermer.setMinimumHeight(38)
         btn_fermer.setCursor(Qt.PointingHandCursor)
+        btn_fermer.setProperty("class", "secondary")
         btn_fermer.clicked.connect(self.accept)
         layout.addWidget(btn_fermer)

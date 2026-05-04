@@ -128,7 +128,7 @@ class Produit:
             UPDATE produits
             SET nom = ?, categorie = ?, prix_achat = ?, prix_vente = ?,
                 stock_actuel = ?, stock_alerte = ?, description = ?,
-                updated_at = datetime('now')
+                updated_at = strftime('%Y-%m-%d %H:%M:%S', 'now', 'localtime')
             WHERE id = ?
         """
         result = db.execute_query(query, (nom, categorie, prix_achat, prix_vente, stock_actuel,
@@ -188,7 +188,7 @@ class Produit:
         ancien = db.fetch_one("SELECT stock_actuel FROM produits WHERE id = ?", (id_produit,))
         if ancien:
             ancien_stock = ancien['stock_actuel']
-            query = "UPDATE produits SET stock_actuel = ?, updated_at = datetime('now') WHERE id = ?"
+            query = "UPDATE produits SET stock_actuel = ?, updated_at = strftime('%Y-%m-%d %H:%M:%S', 'now', 'localtime') WHERE id = ?"
             if db.execute_query(query, (nouvelle_quantite, id_produit)):
                 query_historique = """
                     INSERT INTO historique_stock (produit_id, quantite_avant, quantite_apres, operation)
@@ -211,6 +211,25 @@ class Produit:
         else:
             query = "SELECT * FROM produits WHERE stock_actuel < ? ORDER BY stock_actuel"
             return db.fetch_all(query, (seuil,))
+
+    @staticmethod
+    def compter_produits() -> int:
+        result = db.fetch_one("SELECT COUNT(*) as n FROM produits")
+        return result['n'] if result else 0
+
+    @staticmethod
+    def compter_produits_alerte() -> int:
+        result = db.fetch_one(
+            "SELECT COUNT(*) as n FROM produits WHERE stock_actuel < stock_alerte"
+        )
+        return result['n'] if result else 0
+
+    @staticmethod
+    def calculer_valeur_stock_globale() -> float:
+        result = db.fetch_one(
+            "SELECT SUM(stock_actuel * prix_achat) as total FROM produits"
+        )
+        return float(result['total']) if result and result['total'] else 0.0
 
     @staticmethod
     def obtenir_categories():

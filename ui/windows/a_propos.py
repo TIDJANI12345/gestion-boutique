@@ -18,7 +18,6 @@ class AProposWindow(QDialog):
         super().__init__(parent)
         self.setWindowTitle("À propos")
         self.setFixedSize(500, 650)
-        self.setStyleSheet(Theme.stylesheet())
 
         self._setup_ui()
 

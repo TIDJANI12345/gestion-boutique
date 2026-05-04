@@ -119,7 +119,7 @@ class Utilisateur:
 
         if user and bcrypt.checkpw(mot_de_passe.encode(), user['mot_de_passe'].encode()):
             db.execute_query(
-                "UPDATE utilisateurs SET dernier_login = CURRENT_TIMESTAMP WHERE id = ?",
+                "UPDATE utilisateurs SET dernier_login = strftime('%Y-%m-%d %H:%M:%S', 'now', 'localtime') WHERE id = ?",
                 (user['id'],)
             )
             logger.info(f"Connexion reussie : {email}")

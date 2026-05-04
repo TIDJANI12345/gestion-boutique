@@ -15,6 +15,7 @@ from PySide6.QtGui import QFont, QShortcut, QKeySequence, QAction
 
 from config import APP_NAME, APP_VERSION, WINDOW_WIDTH, WINDOW_HEIGHT
 from ui.theme import Theme
+from modules.fiscalite import get_devise
 
 # Matplotlib avec backend Qt
 try:
@@ -46,13 +47,8 @@ class CarteStatistique(QFrame):
 
     def __init__(self, titre: str, valeur: str, couleur: str, parent=None):
         super().__init__(parent)
-        self.setStyleSheet(f"""
-            CarteStatistique {{
-                background-color: {Theme.c('card_bg')};
-                border: 1px solid {Theme.c('card_border')};
-                border-radius: 8px;
-            }}
-        """)
+        self._couleur = couleur
+        self.setProperty("role", "card")
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(20, 15, 20, 15)
@@ -68,6 +64,9 @@ class CarteStatistique(QFrame):
 
     def set_valeur(self, text: str):
         self._valeur.setText(text)
+
+    def refresh_theme(self):
+        self._titre.setStyleSheet(f"color: {Theme.c('text_secondary')}; font-size: 12px;")
 
 
 class BoutonAction(QPushButton):
@@ -104,6 +103,7 @@ class PrincipaleWindow(QMainWindow):
     """Fenetre principale - Dashboard admin."""
 
     session_expiree = Signal()
+    deconnexion_demandee = Signal()
 
     def __init__(self, utilisateur: dict, parent=None):
         super().__init__(parent)
@@ -155,6 +155,8 @@ class PrincipaleWindow(QMainWindow):
             for label, slot in [
                 ("Gestion utilisateurs", self.ouvrir_utilisateurs),
                 ("Parametres caisse", self.ouvrir_preferences_caisse),
+                ("Modes de paiement", self.ouvrir_parametres_paiement),
+                ("Categories produits", self.ouvrir_categories),
                 ("Synchronisation", self.ouvrir_sync),
                 ("Parametres fiscaux", self.ouvrir_parametres_fiscaux),
                 ("Gestion clients", self.ouvrir_clients),
@@ -183,13 +185,6 @@ class PrincipaleWindow(QMainWindow):
                 action = QAction(label, self)
                 action.triggered.connect(slot)
                 menu_admin.addAction(action)
-
-        # Outils
-        menu_outils = menubar.addMenu("Outils")
-
-        action_scanner_mobile = QAction("📱 Scanner Mobile", self)
-        action_scanner_mobile.triggered.connect(self.ouvrir_scanner_mobile_setup)
-        menu_outils.addAction(action_scanner_mobile)
 
         # Aide
         menu_aide = menubar.addMenu("Aide")
@@ -236,8 +231,8 @@ class PrincipaleWindow(QMainWindow):
         header_layout.addWidget(session_label)
 
         # Bouton theme
-        btn_theme = QPushButton("Theme")
-        btn_theme.setStyleSheet("""
+        self._btn_theme = QPushButton(self._label_theme())
+        self._btn_theme.setStyleSheet("""
             QPushButton {
                 background: rgba(255,255,255,0.2); color: white;
                 border: 1px solid rgba(255,255,255,0.3); border-radius: 4px;
@@ -245,8 +240,22 @@ class PrincipaleWindow(QMainWindow):
             }
             QPushButton:hover { background: rgba(255,255,255,0.3); }
         """)
-        btn_theme.clicked.connect(self._basculer_theme)
-        header_layout.addWidget(btn_theme)
+        self._btn_theme.clicked.connect(self._basculer_theme)
+        header_layout.addWidget(self._btn_theme)
+
+        # Bouton deconnexion
+        btn_deconnexion = QPushButton("Deconnexion")
+        btn_deconnexion.setStyleSheet("""
+            QPushButton {
+                background: rgba(239,68,68,0.8); color: white;
+                border: none; border-radius: 4px;
+                padding: 6px 12px; font-size: 11px; font-weight: bold;
+            }
+            QPushButton:hover { background: rgba(239,68,68,1.0); }
+        """)
+        btn_deconnexion.setCursor(Qt.PointingHandCursor)
+        btn_deconnexion.clicked.connect(self._deconnexion)
+        header_layout.addWidget(btn_deconnexion)
 
         main_layout.addWidget(header)
 
@@ -263,7 +272,7 @@ class PrincipaleWindow(QMainWindow):
         self.carte_ventes = CarteStatistique(
             "Ventes du jour", "0", Theme.c('primary'))
         self.carte_ca = CarteStatistique(
-            "Chiffre d'affaires", "0 FCFA", Theme.c('success'))
+            "Chiffre d'affaires", f"0 {get_devise()}", Theme.c('success'))
         self.carte_alertes = CarteStatistique(
             "Alertes stock", "0", Theme.c('danger'))
 
@@ -315,13 +324,7 @@ class PrincipaleWindow(QMainWindow):
 
         # Gauche : Graphique
         chart_panel = QFrame()
-        chart_panel.setStyleSheet(f"""
-            QFrame {{
-                background-color: {Theme.c('card_bg')};
-                border: 1px solid {Theme.c('card_border')};
-                border-radius: 8px;
-            }}
-        """)
+        chart_panel.setProperty("role", "card")
         chart_layout = QVBoxLayout(chart_panel)
         chart_layout.setContentsMargins(15, 12, 15, 12)
 
@@ -356,9 +359,7 @@ class PrincipaleWindow(QMainWindow):
         self._text_ventes = QTextEdit()
         self._text_ventes.setReadOnly(True)
         self._text_ventes.setMaximumHeight(140)
-        self._text_ventes.setStyleSheet(
-            f"border: none; background: {Theme.c('card_bg')}; font-size: 12px;"
-        )
+        self._text_ventes.setProperty("role", "panel-text")
         ventes_frame.layout().addWidget(self._text_ventes)
         right_layout.addWidget(ventes_frame)
 
@@ -367,9 +368,7 @@ class PrincipaleWindow(QMainWindow):
         self._text_stock = QTextEdit()
         self._text_stock.setReadOnly(True)
         self._text_stock.setMaximumHeight(140)
-        self._text_stock.setStyleSheet(
-            f"border: none; background: {Theme.c('card_bg')}; font-size: 12px;"
-        )
+        self._text_stock.setProperty("role", "panel-text")
         stock_frame.layout().addWidget(self._text_stock)
         right_layout.addWidget(stock_frame)
 
@@ -383,33 +382,25 @@ class PrincipaleWindow(QMainWindow):
         main_layout.addWidget(content, 1)
 
         # Footer raccourcis
-        footer = QFrame()
-        footer.setFixedHeight(28)
-        footer.setStyleSheet(
-            f"background-color: {Theme.c('light')};"
-        )
-        footer_layout = QHBoxLayout(footer)
+        self._footer = QFrame()
+        self._footer.setFixedHeight(28)
+        self._footer.setProperty("role", "footer-bar")
+        footer_layout = QHBoxLayout(self._footer)
         footer_layout.setContentsMargins(10, 0, 10, 0)
-        footer_label = QLabel(
+        self._footer_label = QLabel(
             "F1=Nouvelle vente | F2=Produits | F3=Ventes | "
             "F4=Rapports | F5=Actualiser | F6=WhatsApp | F7=Clients"
         )
-        footer_label.setStyleSheet(
+        self._footer_label.setStyleSheet(
             f"color: {Theme.c('gray')}; font-size: 9px;"
         )
-        footer_label.setAlignment(Qt.AlignCenter)
-        footer_layout.addWidget(footer_label)
-        main_layout.addWidget(footer)
+        self._footer_label.setAlignment(Qt.AlignCenter)
+        footer_layout.addWidget(self._footer_label)
+        main_layout.addWidget(self._footer)
 
     def _creer_panel(self, titre: str) -> QFrame:
         panel = QFrame()
-        panel.setStyleSheet(f"""
-            QFrame {{
-                background-color: {Theme.c('card_bg')};
-                border: 1px solid {Theme.c('card_border')};
-                border-radius: 8px;
-            }}
-        """)
+        panel.setProperty("role", "card")
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(15, 12, 15, 12)
         lbl = QLabel(titre)
@@ -477,7 +468,7 @@ class PrincipaleWindow(QMainWindow):
         ax = fig.add_subplot(111)
         ax.set_facecolor(bg)
         ax.bar(labels, values, color=bar_c, width=0.6)
-        ax.set_ylabel('CA (FCFA)', color=text_c, fontsize=9)
+        ax.set_ylabel(f'CA ({get_devise()})', color=text_c, fontsize=9)
         ax.tick_params(colors=text_c, labelsize=8)
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
@@ -501,7 +492,7 @@ class PrincipaleWindow(QMainWindow):
             stats = Rapport.statistiques_generales()
 
             self.carte_ventes.set_valeur(str(stats['nb_ventes']))
-            self.carte_ca.set_valeur(f"{stats['ca_jour']:,.0f} FCFA")
+            self.carte_ca.set_valeur(f"{stats['ca_jour']:,.0f} {get_devise()}")
 
             produits_alerte = Produit.obtenir_stock_faible()
             self.carte_alertes.set_valeur(str(len(produits_alerte)))
@@ -515,7 +506,7 @@ class PrincipaleWindow(QMainWindow):
                 fleche = "^" if variation >= 0 else "v"
                 self._label_comparaison.setText(
                     f"{fleche} {signe}{variation:.0f}% vs hier  |  "
-                    f"CA mois: {stats['ca_mois']:,.0f} FCFA"
+                    f"CA mois: {stats['ca_mois']:,.0f} {get_devise()}"
                 )
                 self._label_comparaison.setStyleSheet(
                     f"color: {couleur}; font-size: 11px; font-weight: bold;"
@@ -533,7 +524,7 @@ class PrincipaleWindow(QMainWindow):
                 for v in ventes_jour[:5]:
                     numero = v[1] if len(v) > 1 else "N/A"
                     total = v[3] if len(v) > 3 else 0
-                    lines.append(f"  {numero}: {total:,.0f} FCFA")
+                    lines.append(f"  {numero}: {total:,.0f} {get_devise()}")
                 self._text_ventes.setPlainText("\n".join(lines))
 
             # Stock faible
@@ -549,7 +540,7 @@ class PrincipaleWindow(QMainWindow):
             self._dessiner_graphique()
 
         except Exception as e:
-            print(f"Erreur actualisation: {e}")
+            pass
 
     # === SESSION TIMEOUT ===
 
@@ -579,6 +570,19 @@ class PrincipaleWindow(QMainWindow):
         self._reset_session_timer()
         super().mousePressEvent(event)
 
+    def _deconnexion(self):
+        try:
+            from modules.audit import enregistrer_action
+            enregistrer_action(
+                self.utilisateur['id'], 'deconnexion',
+                'Session terminee par l\'utilisateur'
+            )
+        except Exception:
+            pass
+        self._timer_refresh.stop()
+        self.deconnexion_demandee.emit()
+        self.close()
+
     def _on_session_expired(self):
         self._timer_refresh.stop()
         QMessageBox.information(
@@ -590,12 +594,19 @@ class PrincipaleWindow(QMainWindow):
 
     # === THEME ===
 
+    @staticmethod
+    def _label_theme() -> str:
+        return "☾ Sombre" if not Theme.est_sombre() else "☀ Clair"
+
     def _basculer_theme(self):
         Theme.basculer()
-        QMessageBox.information(
-            self, "Theme",
-            "Theme modifie.\n\nRedemarrez l'application pour appliquer completement."
-        )
+        self._btn_theme.setText(self._label_theme())
+        self._footer_label.setStyleSheet(f"color: {Theme.c('gray')}; font-size: 9px;")
+        self.carte_ventes.refresh_theme()
+        self.carte_ca.refresh_theme()
+        self.carte_alertes.refresh_theme()
+        self._dessiner_graphique()
+        self.update()
 
     # === OUVERTURE FENETRES ===
     # Les fenetres non encore migrees afficheront un message temporaire.
@@ -704,10 +715,14 @@ class PrincipaleWindow(QMainWindow):
         dlg = PreferencesCaisseWindow(parent=self)
         dlg.exec()
 
-    def ouvrir_scanner_mobile_setup(self):
-        """Ouvrir la configuration du scanner mobile"""
-        from ui.windows.scanner_mobile_setup import ScannerMobileSetupDialog
-        dlg = ScannerMobileSetupDialog(parent=self)
+    def ouvrir_parametres_paiement(self):
+        from ui.windows.parametres_paiement import ParametresPaiementWindow
+        dlg = ParametresPaiementWindow(parent=self)
+        dlg.exec()
+
+    def ouvrir_categories(self):
+        from ui.windows.gestion_categories import GestionCategoriesWindow
+        dlg = GestionCategoriesWindow(parent=self)
         dlg.exec()
 
     def ouvrir_parametres_fiscaux(self):

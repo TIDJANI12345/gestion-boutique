@@ -75,10 +75,11 @@ class GestionLicence:
             if data['machine_id'] != self.get_machine_id():
                 return False, "Cette licence est liee a un autre ordinateur"
 
-            # Verification expiration
-            date_exp = datetime.strptime(data['expiration'], "%Y-%m-%d")
-            if datetime.now() > date_exp:
-                return False, f"Licence expiree le {data['expiration']}"
+            # Verification expiration (comparaison par date uniquement, pas heure)
+            from datetime import date as date_type
+            date_exp = datetime.strptime(data['expiration'][:10], "%Y-%m-%d").date()
+            if date_type.today() > date_exp:
+                return False, f"Licence expiree le {data['expiration'][:10]}"
 
             return True, f"Licence valide jusqu'au {data['expiration']}"
 

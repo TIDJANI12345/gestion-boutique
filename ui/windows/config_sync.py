@@ -17,7 +17,6 @@ class ConfigSyncWindow(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Synchronisation Cloud")
         self.setFixedSize(600, 520)
-        self.setStyleSheet(Theme.stylesheet())
 
         self.sync = Synchronisation()
         self._setup_ui()
@@ -142,7 +141,7 @@ class ConfigSyncWindow(QDialog):
     def _synchroniser_maintenant(self):
         """Launch sync"""
         self.mode_label.setText("Synchronisation en cours...")
-        self.mode_label.setStyleSheet(f"font-size: 14pt; font-weight: bold; color: {Theme.c('warning')};")
+        self.mode_label.setStyleSheet(f"font-size: 14pt; font-weight: bold; color: {Theme.c('warning_text')};")
         self.repaint()
 
         try:
@@ -169,7 +168,7 @@ class ConfigSyncWindow(QDialog):
     def _detecter_mode(self):
         """Redetect connection mode"""
         self.mode_label.setText("Detection en cours...")
-        self.mode_label.setStyleSheet(f"font-size: 14pt; font-weight: bold; color: {Theme.c('warning')};")
+        self.mode_label.setStyleSheet(f"font-size: 14pt; font-weight: bold; color: {Theme.c('warning_text')};")
         self.repaint()
 
         mode = self.sync.detecter_mode()

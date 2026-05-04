@@ -3,7 +3,8 @@ Fenêtre Paramètres Caisse - Configuration point de vente
 """
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QFrame, QLabel,
-    QPushButton, QRadioButton, QButtonGroup, QCheckBox, QScrollArea, QLineEdit
+    QPushButton, QRadioButton, QButtonGroup, QCheckBox, QScrollArea, QLineEdit,
+    QComboBox
 )
 from PySide6.QtCore import Qt
 
@@ -17,7 +18,6 @@ class PreferencesCaisseWindow(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Paramètres Caisse")
         self.setMinimumSize(650, 550)
-        self.setStyleSheet(Theme.stylesheet())
 
         self._setup_ui()
         self._charger_parametres()
@@ -227,6 +227,70 @@ class PreferencesCaisseWindow(QDialog):
 
         content_layout.addWidget(camera_frame)
 
+        content_layout.addSpacing(20)
+
+        # === IMPRESSION THERMIQUE ===
+        imp_label = QLabel("Impression thermique")
+        imp_label.setStyleSheet(f"font-size: 14pt; font-weight: bold; color: {Theme.c('dark')};")
+        content_layout.addWidget(imp_label)
+
+        imp_frame = QFrame()
+        imp_frame.setStyleSheet(f"background-color: {Theme.c('light')}; border-radius: 8px; padding: 10px;")
+        imp_layout = QVBoxLayout(imp_frame)
+        imp_layout.setSpacing(8)
+
+        mode_row = QHBoxLayout()
+        mode_row.addWidget(QLabel("Mode :"))
+        self.combo_imp_mode = QComboBox()
+        self.combo_imp_mode.addItems(["USB", "Réseau (IP)", "Série (COM)"])
+        mode_row.addWidget(self.combo_imp_mode, 1)
+        imp_layout.addLayout(mode_row)
+
+        btn_test_imp = QPushButton("Imprimer ticket de test")
+        btn_test_imp.setProperty("class", "secondary")
+        btn_test_imp.setCursor(Qt.PointingHandCursor)
+        btn_test_imp.clicked.connect(self._tester_impression)
+        imp_layout.addWidget(btn_test_imp)
+
+        content_layout.addWidget(imp_frame)
+
+        content_layout.addSpacing(20)
+
+        # === INFORMATIONS BOUTIQUE ===
+        boutique_label = QLabel("Informations boutique")
+        boutique_label.setStyleSheet(f"font-size: 14pt; font-weight: bold; color: {Theme.c('dark')};")
+        content_layout.addWidget(boutique_label)
+
+        boutique_desc = QLabel("Ces informations apparaissent sur les reçus PDF et tickets thermiques.")
+        boutique_desc.setStyleSheet(f"color: {Theme.c('gray')}; font-size: 10pt;")
+        boutique_desc.setWordWrap(True)
+        content_layout.addWidget(boutique_desc)
+
+        boutique_frame = QFrame()
+        boutique_frame.setStyleSheet(f"background-color: {Theme.c('light')}; border-radius: 8px; padding: 20px;")
+        boutique_layout = QVBoxLayout(boutique_frame)
+        boutique_layout.setSpacing(10)
+
+        def _champ(label_txt, placeholder):
+            row = QHBoxLayout()
+            lbl = QLabel(label_txt)
+            lbl.setFixedWidth(100)
+            lbl.setStyleSheet("font-size: 10pt;")
+            row.addWidget(lbl)
+            entry = QLineEdit()
+            entry.setPlaceholderText(placeholder)
+            entry.setStyleSheet(f"padding: 6px; border: 1px solid {Theme.c('gray')}; border-radius: 4px;")
+            row.addWidget(entry)
+            boutique_layout.addLayout(row)
+            return entry
+
+        self.input_nom_boutique     = _champ("Nom :",      "Ma Boutique")
+        self.input_adresse_boutique = _champ("Adresse :",  "Cotonou, Bénin")
+        self.input_tel_boutique     = _champ("Téléphone :", "+229 XX XX XX XX")
+        self.input_email_boutique   = _champ("Email :",    "contact@maboutique.bj")
+
+        content_layout.addWidget(boutique_frame)
+
         content_layout.addStretch()
 
         # Buttons
@@ -281,6 +345,18 @@ class PreferencesCaisseWindow(QDialog):
         camera_source = db.get_parametre('camera_source', '0')
         self.input_camera_source.setText(camera_source)
 
+        # Mode imprimante
+        mode_imp = db.get_parametre('imprimante_mode', 'usb')
+        mode_map = {'usb': 0, 'reseau': 1, 'serie': 2}
+        self.combo_imp_mode.setCurrentIndex(mode_map.get(mode_imp, 0))
+
+        # Infos boutique
+        from config import BOUTIQUE_NOM, BOUTIQUE_ADRESSE, BOUTIQUE_TELEPHONE, BOUTIQUE_EMAIL
+        self.input_nom_boutique.setText(db.get_parametre('boutique_nom', BOUTIQUE_NOM))
+        self.input_adresse_boutique.setText(db.get_parametre('boutique_adresse', BOUTIQUE_ADRESSE))
+        self.input_tel_boutique.setText(db.get_parametre('boutique_telephone', BOUTIQUE_TELEPHONE))
+        self.input_email_boutique.setText(db.get_parametre('boutique_email', BOUTIQUE_EMAIL))
+
     def _enregistrer(self):
         """Sauvegarder les paramètres"""
         # Mode de scan
@@ -300,17 +376,43 @@ class PreferencesCaisseWindow(QDialog):
         camera_source = self.input_camera_source.text().strip() or '0'
         db.set_parametre('camera_source', camera_source)
 
-        mode_txt = "AUTOMATIQUE" if mode_auto == '1' else "MANUEL"
-        son_txt = "activé" if son_actif == '1' else "désactivé"
-        camera_txt = "activée" if camera_auto == '1' else "désactivée"
-        information(
-            self, "Paramètres sauvegardés",
-            f"Mode de scan : {mode_txt}\n"
-            f"Son de scan : {son_txt}\n"
-            f"Caméra auto : {camera_txt}\n"
-            f"Source caméra : {camera_source}"
-        )
+        # Mode imprimante
+        mode_imp_map = ['usb', 'reseau', 'serie']
+        db.set_parametre('imprimante_mode', mode_imp_map[self.combo_imp_mode.currentIndex()])
+
+        # Infos boutique
+        nom = self.input_nom_boutique.text().strip()
+        adresse = self.input_adresse_boutique.text().strip()
+        tel = self.input_tel_boutique.text().strip()
+        email = self.input_email_boutique.text().strip()
+        if nom:
+            db.set_parametre('boutique_nom', nom)
+        if adresse:
+            db.set_parametre('boutique_adresse', adresse)
+        if tel:
+            db.set_parametre('boutique_telephone', tel)
+        if email:
+            db.set_parametre('boutique_email', email)
+
+        information(self, "Paramètres sauvegardés", "Paramètres enregistrés avec succès.")
         self.accept()
+
+    def _tester_impression(self):
+        """Tester l'impression thermique"""
+        from modules.imprimante import ImprimanteThermique
+
+        if not ImprimanteThermique.est_disponible():
+            erreur(self, "Module manquant", "python-escpos n'est pas installé.\nInstallez-le avec : pip install python-escpos")
+            return
+
+        mode_imp_map = ['usb', 'reseau', 'serie']
+        db.set_parametre('imprimante_mode', mode_imp_map[self.combo_imp_mode.currentIndex()])
+
+        ok, msg = ImprimanteThermique.imprimer_test()
+        if ok:
+            information(self, "Test réussi", msg)
+        else:
+            erreur(self, "Échec du test", msg)
 
     def _tester_camera(self):
         """Tester la connexion à la caméra"""
