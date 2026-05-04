@@ -21,7 +21,7 @@ class Rapport:
         try:
             # Ventes du jour
             aujourd_hui = datetime.now().strftime("%Y-%m-%d")
-            query_jour = "SELECT COUNT(*), COALESCE(SUM(total), 0) FROM ventes WHERE DATE(date_vente) = ?"
+            query_jour = "SELECT COUNT(*), COALESCE(SUM(total), 0) FROM ventes WHERE statut != 'annulee' AND DATE(date_vente) = ?"
             result = db.fetch_one(query_jour, (aujourd_hui,))
             if result:
                 stats['nb_ventes'] = result[0] or 0
@@ -29,13 +29,13 @@ class Rapport:
             
             # CA du mois
             debut_mois = datetime.now().replace(day=1).strftime("%Y-%m-%d")
-            query_mois = "SELECT COALESCE(SUM(total), 0) FROM ventes WHERE date_vente >= ?"
+            query_mois = "SELECT COALESCE(SUM(total), 0) FROM ventes WHERE statut != 'annulee' AND date_vente >= ?"
             result = db.fetch_one(query_mois, (debut_mois,))
             if result:
                 stats['ca_mois'] = result[0] or 0
             
             # CA total ✅ AJOUTÉ
-            query_total = "SELECT COALESCE(SUM(total), 0) FROM ventes"
+            query_total = "SELECT COALESCE(SUM(total), 0) FROM ventes WHERE statut != 'annulee'"
             result = db.fetch_one(query_total)
             if result:
                 stats['ca_total'] = result[0] or 0
@@ -71,7 +71,7 @@ class Rapport:
             query_jour = """
                 SELECT COUNT(*), COALESCE(SUM(total), 0)
                 FROM ventes
-                WHERE DATE(date_vente) = ? AND utilisateur_id = ?
+                WHERE statut != 'annulee' AND DATE(date_vente) = ? AND utilisateur_id = ?
             """
             result = db.fetch_one(query_jour, (aujourd_hui, utilisateur_id))
             if result:
@@ -101,10 +101,10 @@ class Rapport:
     def ventes_par_periode(date_debut, date_fin):
         """Obtenir les ventes pour une période"""
         query = """
-            SELECT DATE(date_vente) as jour, COUNT(*) as nb_ventes, 
+            SELECT DATE(date_vente) as jour, COUNT(*) as nb_ventes,
                    SUM(total) as ca
             FROM ventes
-            WHERE date_vente BETWEEN ? AND ?
+            WHERE statut != 'annulee' AND date_vente BETWEEN ? AND ?
             GROUP BY DATE(date_vente)
             ORDER BY jour DESC
         """
@@ -127,10 +127,10 @@ class Rapport:
         """Évolution des ventes sur 7 jours"""
         il_y_a_7_jours = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
         query = """
-            SELECT DATE(date_vente) as jour, COUNT(*) as nb_ventes, 
+            SELECT DATE(date_vente) as jour, COUNT(*) as nb_ventes,
                    COALESCE(SUM(total), 0) as ca
             FROM ventes
-            WHERE date_vente >= ?
+            WHERE statut != 'annulee' AND date_vente >= ?
             GROUP BY DATE(date_vente)
             ORDER BY jour ASC
         """
@@ -156,7 +156,7 @@ class Rapport:
             query_stats = """
                 SELECT COUNT(*), COALESCE(SUM(total), 0)
                 FROM ventes
-                WHERE DATE(date_vente) = ?
+                WHERE statut != 'annulee' AND DATE(date_vente) = ?
             """
             result = db.fetch_one(query_stats, (date,))
             if result:
@@ -168,7 +168,7 @@ class Rapport:
                 SELECT COALESCE(SUM(dv.quantite), 0)
                 FROM details_ventes dv
                 JOIN ventes v ON dv.vente_id = v.id
-                WHERE DATE(v.date_vente) = ?
+                WHERE v.statut != 'annulee' AND DATE(v.date_vente) = ?
             """
             result = db.fetch_one(query_articles, (date,))
             if result:
@@ -178,7 +178,7 @@ class Rapport:
             query_ventes = """
                 SELECT numero_vente, date_vente, total, client
                 FROM ventes
-                WHERE DATE(date_vente) = ?
+                WHERE statut != 'annulee' AND DATE(date_vente) = ?
                 ORDER BY date_vente DESC
             """
             rapport['ventes'] = db.fetch_all(query_ventes, (date,))
@@ -215,7 +215,7 @@ class Rapport:
                 SELECT p.mode, SUM(p.montant) as total, COUNT(*) as nb
                 FROM paiements p
                 JOIN ventes v ON p.vente_id = v.id
-                WHERE v.date_vente BETWEEN ? AND ?
+                WHERE v.statut != 'annulee' AND v.date_vente BETWEEN ? AND ?
                 GROUP BY p.mode
                 ORDER BY total DESC
             """
@@ -244,7 +244,7 @@ class Rapport:
         query = """
             SELECT DATE(date_vente) as jour, COUNT(*) as nb, COALESCE(SUM(total), 0) as ca
             FROM ventes
-            WHERE DATE(date_vente) IN (?, ?)
+            WHERE statut != 'annulee' AND DATE(date_vente) IN (?, ?)
             GROUP BY DATE(date_vente)
         """
         results = db.fetch_all(query, (aujourd_hui, hier))
@@ -270,7 +270,7 @@ class Rapport:
             aujourd_hui = datetime.now().strftime("%Y-%m-%d")
             query = """
                 SELECT strftime('%H', date_vente) as heure, COALESCE(SUM(total), 0)
-                FROM ventes WHERE DATE(date_vente) = ?
+                FROM ventes WHERE statut != 'annulee' AND DATE(date_vente) = ?
                 GROUP BY heure ORDER BY heure
             """
             results = db.fetch_all(query, (aujourd_hui,))
@@ -282,7 +282,7 @@ class Rapport:
             debut_mois = datetime.now().replace(day=1).strftime("%Y-%m-%d")
             query = """
                 SELECT DATE(date_vente), COALESCE(SUM(total), 0)
-                FROM ventes WHERE date_vente >= ?
+                FROM ventes WHERE statut != 'annulee' AND date_vente >= ?
                 GROUP BY DATE(date_vente) ORDER BY DATE(date_vente)
             """
             results = db.fetch_all(query, (debut_mois,))

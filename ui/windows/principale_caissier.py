@@ -251,6 +251,21 @@ class PrincipaleCaissierWindow(QMainWindow):
         btn_mes_ventes.clicked.connect(self.voir_mes_ventes)
         content_layout.addWidget(btn_mes_ventes)
 
+        # Bouton annulation vente
+        btn_annulation = QPushButton("Annuler une vente")
+        btn_annulation.setFont(QFont("Segoe UI", 12, QFont.Bold))
+        btn_annulation.setCursor(Qt.PointingHandCursor)
+        btn_annulation.setMinimumHeight(48)
+        btn_annulation.setStyleSheet("""
+            QPushButton {
+                background-color: #EF4444; color: white;
+                border: none; border-radius: 6px;
+            }
+            QPushButton:hover { background-color: #DC2626; }
+        """)
+        btn_annulation.clicked.connect(self.ouvrir_annulation_vente)
+        content_layout.addWidget(btn_annulation)
+
         content_layout.addStretch()
         main_layout.addWidget(content, 1)
 
@@ -327,6 +342,12 @@ class PrincipaleCaissierWindow(QMainWindow):
         except Exception as e:
             from PySide6.QtWidgets import QMessageBox
             QMessageBox.critical(self, "Erreur", str(e))
+
+    def ouvrir_annulation_vente(self):
+        from ui.windows.annulation_vente import AnnulationVenteWindow
+        dlg = AnnulationVenteWindow(self.utilisateur, self)
+        dlg.vente_annulee.connect(lambda _: self.actualiser_stats())
+        dlg.exec()
 
     def voir_mes_ventes(self):
         """Ouvrir la liste de MES ventes (filtré caissier)"""

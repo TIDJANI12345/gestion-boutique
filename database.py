@@ -347,6 +347,14 @@ class Database:
             self.cursor.execute("ALTER TABLE ventes ADD COLUMN id_session INTEGER NULL")
             self.conn.commit()
 
+        # Migration : motif_annulation dans ventes
+        try:
+            self.cursor.execute("SELECT motif_annulation FROM ventes LIMIT 1")
+        except sqlite3.OperationalError:
+            logger.info("Migration: Ajout colonne motif_annulation à table ventes")
+            self.cursor.execute("ALTER TABLE ventes ADD COLUMN motif_annulation TEXT NULL")
+            self.conn.commit()
+
         self.conn.commit()
         logger.info("Tables creees/verifiees avec succes")
 

@@ -101,22 +101,32 @@ class Vente:
         return db.fetch_one(query, (vente_id,))
 
     @staticmethod
-    def obtenir_toutes_ventes(date_debut=None, date_fin=None, utilisateur_id=None):
-        """Obtenir toutes les ventes (avec filtre optionnel utilisateur)"""
+    def obtenir_ventes_annulees(date_debut=None, date_fin=None, utilisateur_id=None):
+        """Retourne uniquement les ventes annulées (pour UI annulation)."""
+        base = "SELECT v.*, u.nom as caissier_nom FROM ventes v LEFT JOIN utilisateurs u ON v.utilisateur_id = u.id WHERE v.statut = 'annulee'"
+        params = []
         if date_debut and date_fin:
-            if utilisateur_id is not None:
-                query = "SELECT * FROM ventes WHERE date_vente BETWEEN ? AND ? AND utilisateur_id = ? ORDER BY date_vente DESC"
-                return db.fetch_all(query, (date_debut, date_fin, utilisateur_id))
-            else:
-                query = "SELECT * FROM ventes WHERE date_vente BETWEEN ? AND ? ORDER BY date_vente DESC"
-                return db.fetch_all(query, (date_debut, date_fin))
-        else:
-            if utilisateur_id is not None:
-                query = "SELECT * FROM ventes WHERE utilisateur_id = ? ORDER BY date_vente DESC"
-                return db.fetch_all(query, (utilisateur_id,))
-            else:
-                query = "SELECT * FROM ventes ORDER BY date_vente DESC"
-                return db.fetch_all(query)
+            base += " AND DATE(v.date_vente) BETWEEN ? AND ?"
+            params += [date_debut, date_fin]
+        if utilisateur_id:
+            base += " AND v.utilisateur_id = ?"
+            params.append(utilisateur_id)
+        base += " ORDER BY v.deleted_at DESC"
+        return db.fetch_all(base, tuple(params)) if params else db.fetch_all(base)
+
+    @staticmethod
+    def obtenir_toutes_ventes(date_debut=None, date_fin=None, utilisateur_id=None):
+        """Obtenir toutes les ventes actives (hors annulées)."""
+        base = "SELECT * FROM ventes WHERE statut != 'annulee'"
+        params = []
+        if date_debut and date_fin:
+            base += " AND date_vente BETWEEN ? AND ?"
+            params += [date_debut, date_fin]
+        if utilisateur_id is not None:
+            base += " AND utilisateur_id = ?"
+            params.append(utilisateur_id)
+        base += " ORDER BY date_vente DESC"
+        return db.fetch_all(base, tuple(params)) if params else db.fetch_all(base)
 
     @staticmethod
     def supprimer_ligne_vente(detail_id, vente_id):
@@ -142,48 +152,52 @@ class Vente:
         return False
 
     @staticmethod
-    def annuler_vente(vente_id, user_id=None):
-        """Annuler une vente complete"""
-        query = "SELECT produit_id, quantite FROM details_ventes WHERE vente_id = ?"
-        details = db.fetch_all(query, (vente_id,))
+    def annuler_vente(vente_id, user_id=None, motif=None):
+        """Annulation douce d'une vente : restaure le stock, marque statut='annulee'."""
+        vente = db.fetch_one("SELECT * FROM ventes WHERE id = ? AND statut != 'annulee'", (vente_id,))
+        if not vente:
+            return False
 
-        for detail in details:
-            produit_id = detail['produit_id']
-            quantite = detail['quantite']
-            produit = Produit.obtenir_par_id(produit_id)
+        details = db.fetch_all(
+            "SELECT produit_id, quantite FROM details_ventes WHERE vente_id = ?", (vente_id,)
+        )
+        for d in details:
+            produit = Produit.obtenir_par_id(d['produit_id'])
             if produit:
-                nouveau_stock = produit['stock_actuel'] + quantite
-                Produit.mettre_a_jour_stock(produit_id, nouveau_stock, "Annulation vente")
+                Produit.mettre_a_jour_stock(
+                    d['produit_id'], produit['stock_actuel'] + d['quantite'], "Annulation vente"
+                )
 
-        query_details = "DELETE FROM details_ventes WHERE vente_id = ?"
-        db.execute_query(query_details, (vente_id,))
-
-        query_vente = "DELETE FROM ventes WHERE id = ?"
-        result = db.execute_query(query_vente, (vente_id,))
-
+        from datetime import datetime as _dt
+        result = db.execute_query(
+            """UPDATE ventes
+               SET statut = 'annulee', deleted_at = ?, motif_annulation = ?
+               WHERE id = ?""",
+            (_dt.now().strftime("%Y-%m-%d %H:%M:%S"), motif, vente_id)
+        )
         if result:
-            logger.info(f"Vente {vente_id} annulee")
+            logger.info(f"Vente {vente_id} annulée (soft-delete)")
             if user_id:
                 from modules.utilisateurs import Utilisateur
                 Utilisateur.logger_action(user_id, 'annulation_vente',
-                                          f"Vente {vente_id} annulée")
-        return result
+                                          f"Vente {vente_id} annulée — {motif or ''}")
+        return bool(result)
 
     @staticmethod
     def obtenir_ventes_du_jour():
-        """Obtenir les ventes du jour"""
+        """Obtenir les ventes actives du jour."""
         aujourd_hui = datetime.now().strftime("%Y-%m-%d")
-        query = "SELECT * FROM ventes WHERE DATE(date_vente) = ? ORDER BY date_vente DESC"
+        query = "SELECT * FROM ventes WHERE DATE(date_vente) = ? AND statut != 'annulee' ORDER BY date_vente DESC"
         return db.fetch_all(query, (aujourd_hui,))
 
     @staticmethod
     def obtenir_chiffre_affaires(date_debut=None, date_fin=None):
-        """Calculer le chiffre d'affaires"""
+        """Calculer le chiffre d'affaires (ventes actives uniquement)."""
         if date_debut and date_fin:
-            query = "SELECT SUM(total) FROM ventes WHERE date_vente BETWEEN ? AND ?"
+            query = "SELECT SUM(total) FROM ventes WHERE statut != 'annulee' AND date_vente BETWEEN ? AND ?"
             result = db.fetch_one(query, (date_debut, date_fin))
         else:
-            query = "SELECT SUM(total) FROM ventes"
+            query = "SELECT SUM(total) FROM ventes WHERE statut != 'annulee'"
             result = db.fetch_one(query)
 
         return result[0] if result and result[0] else 0

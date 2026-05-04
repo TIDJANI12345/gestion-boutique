@@ -195,6 +195,10 @@ class PrincipaleWindow(QMainWindow):
             except Exception:
                 pass
 
+            a_annul = QAction("Annulation de vente", self)
+            a_annul.triggered.connect(self.ouvrir_annulation_vente)
+            menu_admin.addAction(a_annul)
+
             for label, slot in [
                 ("Logs d'audit", self.ouvrir_logs_audit),
                 ("Sauvegarde & Restauration", self.sauvegarder),
@@ -950,6 +954,14 @@ class PrincipaleWindow(QMainWindow):
             dlg.exec()
         except Exception as e:
             QMessageBox.critical(self, "Erreur", str(e))
+
+    # === ANNULATION VENTE ===
+
+    def ouvrir_annulation_vente(self):
+        from ui.windows.annulation_vente import AnnulationVenteWindow
+        dlg = AnnulationVenteWindow(self.utilisateur, self)
+        dlg.vente_annulee.connect(lambda _: self.actualiser_stats())
+        dlg.exec()
 
     # === ARDOISE ===
 

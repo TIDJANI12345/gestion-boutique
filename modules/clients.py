@@ -108,7 +108,7 @@ class Client:
         """Obtenir l'historique des achats d'un client"""
         return db.fetch_all(
             "SELECT id, numero_vente, date_vente, total, statut "
-            "FROM ventes WHERE client_id = ? AND deleted_at IS NULL "
+            "FROM ventes WHERE client_id = ? AND statut != 'annulee' "
             "ORDER BY date_vente DESC LIMIT ? OFFSET ?",
             (client_id, limit, offset)
         )
@@ -117,7 +117,7 @@ class Client:
     def compter_achats(client_id):
         """Compter le nombre d'achats d'un client"""
         result = db.fetch_one(
-            "SELECT COUNT(*) FROM ventes WHERE client_id = ? AND deleted_at IS NULL",
+            "SELECT COUNT(*) FROM ventes WHERE client_id = ? AND statut != 'annulee'",
             (client_id,)
         )
         return result[0] if result else 0
@@ -126,7 +126,7 @@ class Client:
     def calculer_total_achats(client_id):
         """Calculer le total des achats d'un client"""
         result = db.fetch_one(
-            "SELECT COALESCE(SUM(total), 0) FROM ventes WHERE client_id = ? AND deleted_at IS NULL",
+            "SELECT COALESCE(SUM(total), 0) FROM ventes WHERE client_id = ? AND statut != 'annulee'",
             (client_id,)
         )
         return result[0] if result else 0.0

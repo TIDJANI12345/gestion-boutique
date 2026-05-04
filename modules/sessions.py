@@ -43,7 +43,7 @@ def _calculer_totaux(session_id: int) -> dict:
     """Calculer les totaux de la session depuis les ventes et paiements."""
     # Ventes actives (non annulées) liées à cette session
     ventes = db.fetch_all(
-        "SELECT id, total FROM ventes WHERE id_session = ? AND deleted_at IS NULL",
+        "SELECT id, total FROM ventes WHERE id_session = ? AND statut != 'annulee'",
         (session_id,)
     )
     vente_ids = [v['id'] for v in ventes]
@@ -52,7 +52,7 @@ def _calculer_totaux(session_id: int) -> dict:
 
     # Ventes annulées
     annulees = db.fetch_all(
-        "SELECT COALESCE(SUM(total), 0) as s FROM ventes WHERE id_session = ? AND deleted_at IS NOT NULL",
+        "SELECT COALESCE(SUM(total), 0) as s FROM ventes WHERE id_session = ? AND statut = 'annulee'",
         (session_id,)
     )
     total_annule = int(annulees[0]['s']) if annulees else 0

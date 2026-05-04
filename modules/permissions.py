@@ -18,6 +18,7 @@ class Permissions:
             'parametres_systeme',
             'rapports_globaux',
             'sauvegarde_restore',
+            'annuler_ventes',
         ],
         'gestionnaire': [
             'gerer_produits',
@@ -25,10 +26,12 @@ class Permissions:
             'gerer_clients',
             'voir_mes_ventes',
             'effectuer_ventes',  # Optionnel selon config
+            'annuler_ventes',
         ],
         'caissier': [
             'effectuer_ventes',
             'voir_mes_ventes',
+            'annuler_ventes',
         ]
     }
 

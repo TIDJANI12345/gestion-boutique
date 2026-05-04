@@ -318,15 +318,20 @@ class PrincipaleGestionnaireWindow(QMainWindow):
         if Permissions.peut(self.utilisateur, 'voir_mes_ventes'):
             gestion_menu.addAction("Mes Ventes", self.voir_mes_ventes)
 
-        # Ardoise (Pro)
+        # Ardoise + Annulation (Pro)
         try:
             from modules.features import peut
+            from PySide6.QtGui import QAction
             if peut('credit_client'):
-                from PySide6.QtGui import QAction
                 ardoise_menu = menubar.addMenu("Ardoise")
                 a = QAction("Gérer les ardoises", self)
                 a.triggered.connect(self.ouvrir_ardoise)
                 ardoise_menu.addAction(a)
+
+            ventes_menu = menubar.addMenu("Ventes")
+            a_annul = QAction("Annulation de vente", self)
+            a_annul.triggered.connect(self.ouvrir_annulation_vente)
+            ventes_menu.addAction(a_annul)
         except Exception:
             pass
 
@@ -417,6 +422,12 @@ class PrincipaleGestionnaireWindow(QMainWindow):
             dlg.exec()
         else:
             QMessageBox.warning(self, "Accès refusé", "Vous n'avez pas la permission de voir vos ventes.")
+
+    def ouvrir_annulation_vente(self):
+        from ui.windows.annulation_vente import AnnulationVenteWindow
+        dlg = AnnulationVenteWindow(self.utilisateur, self)
+        dlg.vente_annulee.connect(lambda _: self.actualiser_stats())
+        dlg.exec()
 
     def ouvrir_ardoise(self):
         from ui.windows.ardoise import ArdoiseWindow

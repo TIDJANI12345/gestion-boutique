@@ -139,7 +139,7 @@ class Fiscalite:
         query = """
             SELECT COALESCE(SUM(total), 0)
             FROM ventes
-            WHERE date_vente >= ? AND date_vente < ?
+            WHERE statut != 'annulee' AND date_vente >= ? AND date_vente < ?
         """
         result = db.fetch_one(query, (date_debut, date_fin))
         total_ttc = result[0] if result else 0
