@@ -37,7 +37,10 @@ class VentesWindow(QDialog):
             self._remise_montant = 0.0  # montant en FCFA calculé
             self._remise_pct = True     # True=%, False=montant fixe
 
+            self._session_id = None  # rattaché à la session active
+
             self._setup_ui()
+            self._verifier_session()
 
             for btn in self.findChildren(QPushButton):
                 btn.setAutoDefault(False)
@@ -934,11 +937,67 @@ class VentesWindow(QDialog):
 
     # === VALIDATION ===
 
+    def _verifier_session(self):
+        """Vérifie si une session de caisse est ouverte (Pro only). Affiche bandeau sinon."""
+        try:
+            from modules.features import peut
+            if not peut('session_caisse'):
+                return  # Standard/Démo : pas de session requise
+            from modules.sessions import session_actuelle
+            session = session_actuelle()
+            if session:
+                self._session_id = session['id']
+                return
+            # Pas de session → bandeau rouge + bloquer paiement
+            bandeau = QFrame()
+            bandeau.setStyleSheet("background-color: #EF4444; padding: 6px;")
+            bl = QHBoxLayout(bandeau)
+            bl.setContentsMargins(20, 0, 20, 0)
+            lbl = QLabel("⚠️  Caisse non ouverte — Ouvrez la caisse avant de vendre.")
+            lbl.setStyleSheet("color: white; font-weight: bold; font-size: 11pt;")
+            bl.addWidget(lbl)
+            btn_ouvrir = QPushButton("Ouvrir la caisse")
+            btn_ouvrir.setStyleSheet(
+                "background: white; color: #EF4444; font-weight: bold; "
+                "border: none; border-radius: 4px; padding: 4px 12px;"
+            )
+            btn_ouvrir.clicked.connect(self._ouvrir_session_dialog)
+            bl.addWidget(btn_ouvrir)
+            if self.layout():
+                self.layout().insertWidget(0, bandeau)
+            self._bandeau_session = bandeau
+        except Exception:
+            pass
+
+    def _ouvrir_session_dialog(self):
+        from ui.dialogs.ouverture_caisse import OuvertureCaisseDialog
+        dlg = OuvertureCaisseDialog(self.utilisateur or {}, self)
+        def on_ouverte(session_id):
+            self._session_id = session_id
+            if hasattr(self, '_bandeau_session'):
+                self._bandeau_session.hide()
+        dlg.session_ouverte.connect(on_ouverte)
+        dlg.exec()
+
     def _valider_vente(self):
         """Ouvrir la fenetre de paiement."""
         if not self.panier:
             QMessageBox.warning(self, "Attention", "Le panier est vide!")
             return
+
+        # Vérification session caisse (Pro)
+        try:
+            from modules.features import peut
+            if peut('session_caisse'):
+                from modules.sessions import session_actuelle
+                if not session_actuelle():
+                    QMessageBox.warning(
+                        self, "Caisse non ouverte",
+                        "Vous devez ouvrir la caisse avant de vendre."
+                    )
+                    return
+        except Exception:
+            pass
 
         # Vérification démo et expiration
         from modules.features import ventes_autorisees, est_demo, demo_peut_vendre, statut_expiration
@@ -985,16 +1044,30 @@ class VentesWindow(QDialog):
 
             # INSERT vente
             utilisateur_id = self.utilisateur['id'] if self.utilisateur else None
+            # Récupérer session active si feature Pro
+            session_id = getattr(self, '_session_id', None)
+            try:
+                from modules.features import peut
+                from modules.sessions import session_actuelle
+                if peut('session_caisse') and not session_id:
+                    s = session_actuelle()
+                    if s:
+                        session_id = s['id']
+            except Exception:
+                pass
+
             vente_id = db.execute_query(
-                """INSERT INTO ventes (numero_vente, date_vente, total, remise, client, client_id, utilisateur_id)
-                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                """INSERT INTO ventes
+                   (numero_vente, date_vente, total, remise, client, client_id, utilisateur_id, id_session)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
                 (numero_vente,
                  datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                  total,
                  remise,
                  client_nom or None,
                  client_id,
-                 utilisateur_id)
+                 utilisateur_id,
+                 session_id)
             )
 
             # INSERT details + MAJ stock (avec re-verification)

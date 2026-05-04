@@ -35,7 +35,7 @@ PLANS: dict[str, list[str]] = {
         # Pro uniquement
         'multi_caissiers', 'clients_fidelite', 'exports',
         'scanner_mobile', 'rapports_avances', 'sauvegarde_auto',
-        'fiscalite_tva',
+        'fiscalite_tva', 'session_caisse', 'credit_client',
     ],
     'white_label': [
         # Tout Pro + white label
@@ -44,7 +44,7 @@ PLANS: dict[str, list[str]] = {
         'parametres',
         'multi_caissiers', 'clients_fidelite', 'exports',
         'scanner_mobile', 'rapports_avances', 'sauvegarde_auto',
-        'fiscalite_tva',
+        'fiscalite_tva', 'session_caisse', 'credit_client',
         'white_label',
     ],
 }

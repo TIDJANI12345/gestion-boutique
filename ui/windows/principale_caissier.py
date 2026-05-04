@@ -204,6 +204,36 @@ class PrincipaleCaissierWindow(QMainWindow):
         stats_layout.addLayout(cards_layout)
         content_layout.addWidget(stats_frame)
 
+        # Boutons session caisse
+        try:
+            from modules.features import peut
+            if peut('session_caisse'):
+                caisse_row = QHBoxLayout()
+                btn_ouvrir_caisse = QPushButton("Ouvrir la caisse")
+                btn_ouvrir_caisse.setFont(QFont("Segoe UI", 12, QFont.Bold))
+                btn_ouvrir_caisse.setCursor(Qt.PointingHandCursor)
+                btn_ouvrir_caisse.setMinimumHeight(48)
+                btn_ouvrir_caisse.setStyleSheet(
+                    f"background-color: {Theme.c('success')}; color: white; "
+                    "border: none; border-radius: 6px;"
+                )
+                btn_ouvrir_caisse.clicked.connect(self.ouvrir_caisse)
+                caisse_row.addWidget(btn_ouvrir_caisse)
+
+                btn_cloture_z = QPushButton("Clôture Z")
+                btn_cloture_z.setFont(QFont("Segoe UI", 12, QFont.Bold))
+                btn_cloture_z.setCursor(Qt.PointingHandCursor)
+                btn_cloture_z.setMinimumHeight(48)
+                btn_cloture_z.setStyleSheet(
+                    f"background-color: {Theme.c('danger')}; color: white; "
+                    "border: none; border-radius: 6px;"
+                )
+                btn_cloture_z.clicked.connect(self.cloturer_z)
+                caisse_row.addWidget(btn_cloture_z)
+                content_layout.addLayout(caisse_row)
+        except Exception:
+            pass
+
         # Bouton voir mes ventes
         btn_mes_ventes = QPushButton("Voir mes ventes")
         btn_mes_ventes.setFont(QFont("Segoe UI", 13, QFont.Bold))
@@ -259,6 +289,44 @@ class PrincipaleCaissierWindow(QMainWindow):
         dlg = VentesWindow(parent=self, utilisateur=self.utilisateur)
         dlg.vente_terminee.connect(self.actualiser_stats)
         dlg.exec()
+
+    # === SESSION CAISSE ===
+
+    def ouvrir_caisse(self):
+        try:
+            from modules.features import peut
+            if not peut('session_caisse'):
+                from PySide6.QtWidgets import QMessageBox
+                QMessageBox.information(self, "Pro requis",
+                    "Les sessions de caisse nécessitent le plan Pro.")
+                return
+            from ui.dialogs.ouverture_caisse import OuvertureCaisseDialog
+            dlg = OuvertureCaisseDialog(self.utilisateur, self)
+            dlg.exec()
+        except Exception as e:
+            from PySide6.QtWidgets import QMessageBox
+            QMessageBox.critical(self, "Erreur", str(e))
+
+    def cloturer_z(self):
+        try:
+            from modules.features import peut
+            if not peut('session_caisse'):
+                from PySide6.QtWidgets import QMessageBox
+                QMessageBox.information(self, "Pro requis",
+                    "Les sessions de caisse nécessitent le plan Pro.")
+                return
+            from modules.sessions import session_actuelle
+            if not session_actuelle():
+                from PySide6.QtWidgets import QMessageBox
+                QMessageBox.information(self, "Info", "Aucune session ouverte.")
+                return
+            from ui.dialogs.cloture_z import ClotureZDialog
+            dlg = ClotureZDialog(self.utilisateur, self)
+            dlg.cloture_effectuee.connect(lambda _: self.actualiser_stats())
+            dlg.exec()
+        except Exception as e:
+            from PySide6.QtWidgets import QMessageBox
+            QMessageBox.critical(self, "Erreur", str(e))
 
     def voir_mes_ventes(self):
         """Ouvrir la liste de MES ventes (filtré caissier)"""

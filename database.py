@@ -284,6 +284,37 @@ class Database:
             END
         ''')
 
+        # Table Sessions de caisse
+        self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS sessions_caisse (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id_caisse TEXT DEFAULT 'C1',
+                id_caissier INTEGER NOT NULL,
+                date_ouverture TIMESTAMP NOT NULL,
+                fond_ouverture INTEGER NOT NULL DEFAULT 0,
+                date_cloture TIMESTAMP NULL,
+                fond_cloture_declare INTEGER NULL,
+                fond_cloture_calcule INTEGER DEFAULT 0,
+                ecart INTEGER DEFAULT 0,
+                total_especes INTEGER DEFAULT 0,
+                total_mobile INTEGER DEFAULT 0,
+                total_credit INTEGER DEFAULT 0,
+                total_annule INTEGER DEFAULT 0,
+                nb_ventes INTEGER DEFAULT 0,
+                statut TEXT DEFAULT 'ouverte',
+                hash_cloture TEXT NULL,
+                FOREIGN KEY (id_caissier) REFERENCES utilisateurs(id)
+            )
+        ''')
+
+        # Migration : id_session dans ventes
+        try:
+            self.cursor.execute("SELECT id_session FROM ventes LIMIT 1")
+        except sqlite3.OperationalError:
+            logger.info("Migration: Ajout colonne id_session à table ventes")
+            self.cursor.execute("ALTER TABLE ventes ADD COLUMN id_session INTEGER NULL")
+            self.conn.commit()
+
         self.conn.commit()
         logger.info("Tables creees/verifiees avec succes")
 

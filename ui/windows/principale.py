@@ -171,6 +171,23 @@ class PrincipaleWindow(QMainWindow):
 
             menu_admin.addSeparator()
 
+            # Caisse (Pro)
+            try:
+                from modules.features import peut
+                if peut('session_caisse'):
+                    menu_caisse = menu_admin.addMenu("Caisse")
+                    for label, slot in [
+                        ("Ouvrir la caisse", self.ouvrir_caisse),
+                        ("Clôture Z", self.cloturer_z),
+                        ("Historique clôtures", self.historique_clotures),
+                    ]:
+                        a = QAction(label, self)
+                        a.triggered.connect(slot)
+                        menu_caisse.addAction(a)
+                    menu_admin.addSeparator()
+            except Exception:
+                pass
+
             for label, slot in [
                 ("Logs d'audit", self.ouvrir_logs_audit),
                 ("Sauvegarde & Restauration", self.sauvegarder),
@@ -857,6 +874,75 @@ class PrincipaleWindow(QMainWindow):
             self, "En construction",
             f"La fenetre '{nom}' sera disponible apres sa migration vers PySide6."
         )
+
+    # === SESSION CAISSE ===
+
+    def ouvrir_caisse(self):
+        try:
+            from modules.sessions import session_actuelle
+            if session_actuelle():
+                QMessageBox.information(self, "Info", "Une session est déjà ouverte.")
+                return
+            from ui.dialogs.ouverture_caisse import OuvertureCaisseDialog
+            dlg = OuvertureCaisseDialog(self.utilisateur, self)
+            dlg.exec()
+        except Exception as e:
+            QMessageBox.critical(self, "Erreur", str(e))
+
+    def cloturer_z(self):
+        try:
+            from modules.sessions import session_actuelle
+            if not session_actuelle():
+                QMessageBox.information(self, "Info", "Aucune session ouverte à clôturer.")
+                return
+            from ui.dialogs.cloture_z import ClotureZDialog
+            dlg = ClotureZDialog(self.utilisateur, self)
+            dlg.cloture_effectuee.connect(lambda _: self.actualiser_stats())
+            dlg.exec()
+        except Exception as e:
+            QMessageBox.critical(self, "Erreur", str(e))
+
+    def historique_clotures(self):
+        try:
+            from modules.sessions import historique_clotures
+            from PySide6.QtWidgets import QDialog, QTableWidget, QTableWidgetItem, QHeaderView, QVBoxLayout
+            clotures = historique_clotures()
+            dlg = QDialog(self)
+            dlg.setWindowTitle("Historique des clôtures Z")
+            dlg.resize(800, 400)
+            layout = QVBoxLayout(dlg)
+            table = QTableWidget(len(clotures), 7)
+            table.setHorizontalHeaderLabels(
+                ["Date clôture", "Caisse", "Caissier", "Nb ventes",
+                 "Total", "Écart", "Hash Z"]
+            )
+            table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+            table.setEditTriggers(QTableWidget.NoEditTriggers)
+            devise = 'FCFA'
+            try:
+                from modules.fiscalite import get_devise
+                devise = get_devise()
+            except Exception:
+                pass
+            for i, c in enumerate(clotures):
+                table.setItem(i, 0, QTableWidgetItem(c.get('date_cloture', '')))
+                table.setItem(i, 1, QTableWidgetItem(c.get('id_caisse', '')))
+                table.setItem(i, 2, QTableWidgetItem(c.get('caissier_nom', '')))
+                table.setItem(i, 3, QTableWidgetItem(str(c.get('nb_ventes', 0))))
+                table.setItem(i, 4, QTableWidgetItem(f"{c.get('total_general', 0):,} {devise}"))
+                ecart = c.get('ecart', 0)
+                item_ecart = QTableWidgetItem(f"{ecart:+,} {devise}")
+                item_ecart.setForeground(
+                    __import__('PySide6.QtGui', fromlist=['QColor']).QColor(
+                        '#10B981' if ecart == 0 else '#EF4444'
+                    )
+                )
+                table.setItem(i, 5, item_ecart)
+                table.setItem(i, 6, QTableWidgetItem(c.get('hash_cloture', '')))
+            layout.addWidget(table)
+            dlg.exec()
+        except Exception as e:
+            QMessageBox.critical(self, "Erreur", str(e))
 
     # === SAUVEGARDE / RESTAURATION ===
 
