@@ -1,12 +1,14 @@
 """
 Fenêtre Paramètres Caisse - Configuration point de vente
 """
+import os
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QFrame, QLabel,
     QPushButton, QRadioButton, QButtonGroup, QCheckBox, QScrollArea, QLineEdit,
-    QComboBox
+    QComboBox, QFileDialog, QColorDialog
 )
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QPixmap
 
 from ui.theme import Theme
 from ui.components.dialogs import information, erreur
@@ -288,8 +290,123 @@ class PreferencesCaisseWindow(QDialog):
         self.input_adresse_boutique = _champ("Adresse :",  "Cotonou, Bénin")
         self.input_tel_boutique     = _champ("Téléphone :", "+229 XX XX XX XX")
         self.input_email_boutique   = _champ("Email :",    "contact@maboutique.bj")
+        self.input_ifu_boutique     = _champ("IFU :",      "Numéro IFU (ex: 1234567890123)")
+        self.input_rccm_boutique    = _champ("RCCM :",     "Numéro RCCM (ex: RB/ABC/24 B 12345)")
+
+        # Réseaux sociaux
+        boutique_layout.addSpacing(6)
+        rs_title = QLabel("Réseaux sociaux (optionnel) :")
+        rs_title.setStyleSheet("font-size: 10pt; font-weight: bold;")
+        boutique_layout.addWidget(rs_title)
+
+        self.input_facebook  = _champ("Facebook :",  "fb.com/maboutique ou @MaBoutique")
+        self.input_instagram = _champ("Instagram :", "@maboutique")
+        self.input_whatsapp  = _champ("WhatsApp :",  "+229 XX XX XX XX")
+
+        boutique_layout.addSpacing(4)
+
+        # Message pied de page
+        msg_label = QLabel("Message pied de page :")
+        msg_label.setStyleSheet("font-size: 10pt;")
+        boutique_layout.addWidget(msg_label)
+        self.input_message_pied = QLineEdit()
+        self.input_message_pied.setPlaceholderText("Ex: Retour accepté sous 7 jours avec ticket de caisse")
+        self.input_message_pied.setStyleSheet(f"padding: 6px; border: 1px solid {Theme.c('gray')}; border-radius: 4px;")
+        boutique_layout.addWidget(self.input_message_pied)
+
+        # Logo boutique
+        boutique_layout.addSpacing(10)
+        logo_title = QLabel("Logo boutique :")
+        logo_title.setStyleSheet("font-size: 10pt;")
+        boutique_layout.addWidget(logo_title)
+
+        logo_row = QHBoxLayout()
+
+        self._label_logo_preview = QLabel("Aucun\nlogo")
+        self._label_logo_preview.setFixedSize(80, 80)
+        self._label_logo_preview.setAlignment(Qt.AlignCenter)
+        self._label_logo_preview.setStyleSheet(
+            f"border: 1px dashed {Theme.c('gray')}; border-radius: 4px; "
+            f"background: white; color: {Theme.c('gray')}; font-size: 9pt;"
+        )
+        logo_row.addWidget(self._label_logo_preview)
+
+        logo_btns = QVBoxLayout()
+        btn_choisir_logo = QPushButton("Choisir un logo…")
+        btn_choisir_logo.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {Theme.c('info')};
+                color: white; padding: 8px 12px;
+                border-radius: 4px; font-weight: bold;
+            }}
+            QPushButton:hover {{ background-color: #0284C7; }}
+        """)
+        btn_choisir_logo.clicked.connect(self._choisir_logo)
+        logo_btns.addWidget(btn_choisir_logo)
+
+        self._btn_suppr_logo = QPushButton("Supprimer le logo")
+        self._btn_suppr_logo.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {Theme.c('danger')};
+                color: white; padding: 8px 12px;
+                border-radius: 4px;
+            }}
+            QPushButton:hover {{ background-color: #DC2626; }}
+        """)
+        self._btn_suppr_logo.clicked.connect(self._supprimer_logo)
+        logo_btns.addWidget(self._btn_suppr_logo)
+        logo_btns.addStretch()
+
+        logo_row.addLayout(logo_btns)
+        logo_row.addStretch()
+        boutique_layout.addLayout(logo_row)
+
+        logo_hint = QLabel("PNG ou JPG recommandé · Sera affiché sur les reçus PDF et en filigrane.")
+        logo_hint.setStyleSheet(f"color: {Theme.c('gray')}; font-size: 9pt;")
+        boutique_layout.addWidget(logo_hint)
 
         content_layout.addWidget(boutique_frame)
+
+        content_layout.addSpacing(20)
+
+        # === APPARENCE ===
+        app_label = QLabel("Apparence")
+        app_label.setStyleSheet(f"font-size: 14pt; font-weight: bold; color: {Theme.c('dark')};")
+        content_layout.addWidget(app_label)
+
+        app_desc = QLabel("Personnalisez la couleur principale de l'interface.")
+        app_desc.setStyleSheet(f"color: {Theme.c('gray')}; font-size: 10pt;")
+        content_layout.addWidget(app_desc)
+
+        app_frame = QFrame()
+        app_frame.setStyleSheet(f"background-color: {Theme.c('light')}; border-radius: 8px; padding: 20px;")
+        app_frame_layout = QHBoxLayout(app_frame)
+        app_frame_layout.setSpacing(12)
+
+        couleur_lbl = QLabel("Couleur principale :")
+        couleur_lbl.setStyleSheet("font-size: 10pt;")
+        app_frame_layout.addWidget(couleur_lbl)
+
+        self._btn_couleur_primaire = QPushButton()
+        self._btn_couleur_primaire.setFixedSize(40, 40)
+        self._btn_couleur_primaire.setToolTip("Cliquer pour changer la couleur")
+        self._btn_couleur_primaire.setCursor(Qt.PointingHandCursor)
+        self._btn_couleur_primaire.clicked.connect(self._choisir_couleur_primaire)
+        app_frame_layout.addWidget(self._btn_couleur_primaire)
+
+        self._lbl_couleur_hex = QLabel()
+        self._lbl_couleur_hex.setStyleSheet(f"color: {Theme.c('gray')}; font-size: 10pt; font-family: Consolas;")
+        app_frame_layout.addWidget(self._lbl_couleur_hex)
+
+        app_frame_layout.addStretch()
+
+        btn_reset_couleur = QPushButton("Réinitialiser")
+        btn_reset_couleur.setProperty("class", "secondary")
+        btn_reset_couleur.setCursor(Qt.PointingHandCursor)
+        btn_reset_couleur.clicked.connect(self._reinitialiser_couleur)
+        app_frame_layout.addWidget(btn_reset_couleur)
+
+        content_layout.addWidget(app_frame)
 
         content_layout.addStretch()
 
@@ -356,6 +473,17 @@ class PreferencesCaisseWindow(QDialog):
         self.input_adresse_boutique.setText(db.get_parametre('boutique_adresse', BOUTIQUE_ADRESSE))
         self.input_tel_boutique.setText(db.get_parametre('boutique_telephone', BOUTIQUE_TELEPHONE))
         self.input_email_boutique.setText(db.get_parametre('boutique_email', BOUTIQUE_EMAIL))
+        self.input_ifu_boutique.setText(db.get_parametre('boutique_ifu', ''))
+        self.input_rccm_boutique.setText(db.get_parametre('boutique_rccm', ''))
+        self.input_facebook.setText(db.get_parametre('boutique_facebook', ''))
+        self.input_instagram.setText(db.get_parametre('boutique_instagram', ''))
+        self.input_whatsapp.setText(db.get_parametre('boutique_whatsapp', ''))
+        self.input_message_pied.setText(db.get_parametre('recu_message_pied', ''))
+        self._actualiser_apercu_logo(db.get_parametre('boutique_logo_path', ''))
+
+        # Couleur primaire
+        couleur = db.get_parametre('theme_couleur_primaire', Theme.c('primary'))
+        self._actualiser_btn_couleur(couleur)
 
     def _enregistrer(self):
         """Sauvegarder les paramètres"""
@@ -393,9 +521,74 @@ class PreferencesCaisseWindow(QDialog):
             db.set_parametre('boutique_telephone', tel)
         if email:
             db.set_parametre('boutique_email', email)
+        db.set_parametre('boutique_ifu', self.input_ifu_boutique.text().strip())
+        db.set_parametre('boutique_rccm', self.input_rccm_boutique.text().strip())
+        db.set_parametre('boutique_facebook', self.input_facebook.text().strip())
+        db.set_parametre('boutique_instagram', self.input_instagram.text().strip())
+        db.set_parametre('boutique_whatsapp', self.input_whatsapp.text().strip())
+        db.set_parametre('recu_message_pied', self.input_message_pied.text().strip())
 
         information(self, "Paramètres sauvegardés", "Paramètres enregistrés avec succès.")
         self.accept()
+
+    def _choisir_logo(self):
+        chemin, _ = QFileDialog.getOpenFileName(
+            self, "Choisir un logo", "",
+            "Images (*.png *.jpg *.jpeg *.bmp *.gif *.webp)"
+        )
+        if not chemin:
+            return
+        from config import IMAGES_DIR
+        dest = os.path.join(IMAGES_DIR, 'logo_boutique.png')
+        try:
+            px = QPixmap(chemin)
+            if px.isNull():
+                erreur(self, "Erreur", "Impossible de lire cette image.")
+                return
+            px.save(dest, 'PNG')
+            db.set_parametre('boutique_logo_path', dest)
+            self._actualiser_apercu_logo(dest)
+            information(self, "Logo enregistré", "Le logo a été enregistré avec succès.")
+        except Exception as e:
+            erreur(self, "Erreur", f"Impossible d'enregistrer le logo : {e}")
+
+    def _supprimer_logo(self):
+        db.set_parametre('boutique_logo_path', '')
+        self._actualiser_apercu_logo('')
+        information(self, "Logo supprimé", "Le logo a été supprimé.")
+
+    def _actualiser_apercu_logo(self, logo_path):
+        if logo_path and os.path.exists(logo_path):
+            px = QPixmap(logo_path).scaled(76, 76, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            self._label_logo_preview.setPixmap(px)
+            self._label_logo_preview.setText('')
+        else:
+            self._label_logo_preview.clear()
+            self._label_logo_preview.setText("Aucun\nlogo")
+
+    def _actualiser_btn_couleur(self, hex_color: str):
+        from PySide6.QtGui import QColor
+        if not QColor(hex_color).isValid():
+            hex_color = Theme.c('primary')
+        self._btn_couleur_primaire.setStyleSheet(
+            f"QPushButton {{ background-color: {hex_color}; border-radius: 6px; border: 2px solid rgba(0,0,0,0.2); }}"
+            f"QPushButton:hover {{ border: 2px solid rgba(0,0,0,0.4); }}"
+        )
+        self._lbl_couleur_hex.setText(hex_color.upper())
+
+    def _choisir_couleur_primaire(self):
+        from PySide6.QtGui import QColor
+        couleur_actuelle = db.get_parametre('theme_couleur_primaire', Theme.c('primary'))
+        couleur = QColorDialog.getColor(QColor(couleur_actuelle), self, "Choisir la couleur principale")
+        if couleur.isValid():
+            hex_color = couleur.name()
+            Theme.appliquer_couleur_primaire(hex_color, sauvegarder=True)
+            self._actualiser_btn_couleur(hex_color)
+
+    def _reinitialiser_couleur(self):
+        hex_default = '#3B82F6'
+        Theme.appliquer_couleur_primaire(hex_default, sauvegarder=True)
+        self._actualiser_btn_couleur(hex_default)
 
     def _tester_impression(self):
         """Tester l'impression thermique"""

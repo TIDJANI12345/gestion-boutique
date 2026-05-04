@@ -22,7 +22,7 @@ class LicenceWindow(QDialog):
         super().__init__(parent)
         self.licence_manager = GestionLicence()
         self.setWindowTitle(f"Activation - {APP_NAME}")
-        self.setFixedSize(500, 400)
+        self.setFixedSize(500, 460)
         self.setModal(True)
         self._setup_ui()
 
@@ -78,6 +78,40 @@ class LicenceWindow(QDialog):
 
         layout.addStretch()
 
+        # Séparateur
+        sep = QFrame()
+        sep.setFrameShape(QFrame.HLine)
+        sep.setStyleSheet(f"color: {Theme.c('separator')};")
+        layout.addWidget(sep)
+
+        # Bouton démo
+        btn_demo = QPushButton("Essayer en mode démonstration (gratuit)")
+        btn_demo.setCursor(Qt.PointingHandCursor)
+        btn_demo.setFont(QFont("Segoe UI", 10))
+        btn_demo.setStyleSheet(f"""
+            QPushButton {{
+                color: {Theme.c('primary')};
+                background: transparent;
+                border: 1px solid {Theme.c('primary')};
+                border-radius: 6px;
+                padding: 8px;
+            }}
+            QPushButton:hover {{
+                background-color: {Theme.c('light')};
+            }}
+        """)
+        btn_demo.clicked.connect(self._demarrer_demo)
+        layout.addWidget(btn_demo)
+
+        lbl_demo_info = QLabel(
+            f"50 ventes • 14 jours • Fonctionnalités Standard • Reçus marqués DÉMONSTRATION"
+        )
+        lbl_demo_info.setAlignment(Qt.AlignCenter)
+        lbl_demo_info.setStyleSheet(f"color: {Theme.c('gray')}; font-size: 9pt;")
+        layout.addWidget(lbl_demo_info)
+
+        layout.addSpacing(8)
+
         # Bouton quitter
         btn_quitter = QPushButton("Quitter")
         btn_quitter.setProperty("class", "secondary")
@@ -113,6 +147,21 @@ class LicenceWindow(QDialog):
             QMessageBox.critical(self, "Echec de l'activation", message)
             self._btn_activer.setEnabled(True)
             self._btn_activer.setText("ACTIVER LE LOGICIEL")
+
+    def _demarrer_demo(self):
+        ok = self.licence_manager.activer_demo()
+        if ok:
+            QMessageBox.information(
+                self, "Mode démonstration",
+                "Bienvenue dans la démonstration !\n\n"
+                "• 50 ventes disponibles\n"
+                "• Durée : 14 jours\n"
+                "• Les reçus PDF seront marqués DÉMONSTRATION\n\n"
+                "Activez une licence pour débloquer toutes les fonctionnalités."
+            )
+            self.accept()
+        else:
+            QMessageBox.critical(self, "Erreur", "Impossible d'activer le mode démonstration.")
 
     def closeEvent(self, event):
         self.reject()

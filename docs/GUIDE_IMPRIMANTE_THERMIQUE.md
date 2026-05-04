@@ -1,123 +1,167 @@
-# Guide : Imprimante Thermique
-
-## Matériel recommandé
-
-| Modèle | Largeur | Prix indicatif | Connexion |
-|--------|---------|----------------|-----------|
-| **Xprinter XP-58IIH** | 58 mm | ~15 000 FCFA | USB |
-| **Xprinter XP-80C** | 80 mm | ~25 000 FCFA | USB + Réseau |
-| **EPSON TM-T20III** | 80 mm | ~60 000 FCFA | USB + Réseau |
-
-**Recommandé pour démarrer :** Xprinter XP-58IIH (USB, 58 mm). Simple, robuste, courante au Bénin.
+# Guide : Imprimante Thermique & Lecteur de Codes-Barres
 
 ---
 
-## Connexion USB (le plus simple)
+## 1. Imprimante Thermique
 
-### 1. Installer le pilote
+### ✅ Modèle recommandé : Xprinter 80mm — 35 000 FCFA (Sayen Electronics, Cotonou)
 
-Télécharger le pilote sur le site du fabricant (ex. xprinter.net) ou utiliser le CD fourni.  
-Sous Windows 10/11, l'imprimante est souvent reconnue automatiquement.
+**Caractéristiques :** USB + RJ11, 80mm, cutter automatique, 300mm/s, 203 dpi  
+**Contact vendeur :** +229 01 91 06 06 09 / 01 97 10 28 33
 
-### 2. Trouver le Vendor ID et Product ID
+C'est le meilleur choix pour cette application :
+- **USB** → plug and play, aucune configuration complexe
+- **80mm** → tickets plus larges (48 caractères), plus lisibles
+- **Cutter automatique** → le ticket se coupe seul après chaque impression
+- **RJ11** → compatible tiroir-caisse si besoin plus tard
+- **Vendeur physique local** → SAV possible
 
-Brancher l'imprimante via USB, puis ouvrir **Gestionnaire de périphériques** → **Contrôleurs de bus USB**.  
-Clic droit sur l'imprimante → Propriétés → Détails → ID matériel.  
-On voit quelque chose comme : `USB\VID_0483&PID_5720`  
-- `VID_0483` → Vendor ID = `0x0483`
-- `PID_5720` → Product ID = `0x5720`
+### Configuration dans l'application (Xprinter USB)
 
-### 3. Configurer dans l'application
+#### Étape 1 — Brancher et installer
 
-Aller dans **Paramètres Caisse** → section **Impression thermique** :
-- Mode : `USB`
-- Enregistrer
+Brancher l'imprimante en USB. Windows 10/11 installe le pilote automatiquement dans la plupart des cas. Sinon, télécharger le pilote sur xprinter.net.
 
-Puis aller dans **Paramètres avancés** (base de données) ou directement via la DB :
-```
-imprimante_usb_vendor = 0x0483
-imprimante_usb_product = 0x5720
-imprimante_format = 58mm   (ou 80mm selon votre modèle)
-```
+#### Étape 2 — Trouver le Vendor ID et Product ID
 
-> Pour modifier directement : ouvrir `boutique.db` avec DB Browser for SQLite,  
-> table `parametres`, modifier les lignes correspondantes.
+Ouvrir **Gestionnaire de périphériques** → **Contrôleurs de bus USB** → clic droit sur l'imprimante → Propriétés → Détails → ID matériel.  
+Exemple : `USB\VID_0483&PID_5720` → Vendor = `0x0483`, Product = `0x5720`
 
-### 4. Tester
+#### Étape 3 — Configurer dans la DB
 
-Cliquer **"Imprimer ticket de test"** dans Paramètres Caisse.  
-Un ticket doit sortir avec le nom de la boutique, la date et "Imprimante OK !".
+Ouvrir `%APPDATA%\GestionBoutique\data\boutique.db` avec **DB Browser for SQLite** :
 
----
+| Clé | Valeur |
+|-----|--------|
+| `imprimante_mode` | `usb` |
+| `imprimante_usb_vendor` | `0x0483` *(adapter selon l'étape 2)* |
+| `imprimante_usb_product` | `0x5720` *(adapter selon l'étape 2)* |
+| `imprimante_format` | `80mm` |
 
-## Connexion Réseau (IP)
+#### Étape 4 — Tester
 
-Utile si l'imprimante est partagée entre plusieurs postes.
-
-### 1. Connecter l'imprimante au réseau
-
-Via câble Ethernet (RJ45) ou WiFi selon le modèle.  
-Imprimer la page de configuration (maintenir le bouton FEED à l'allumage) pour voir l'IP assignée.
-
-### 2. Configurer dans l'application (DB)
-
-```
-imprimante_mode = reseau
-imprimante_ip = 192.168.1.50    (l'IP de votre imprimante)
-imprimante_port = 9100           (port standard ESC/POS)
-imprimante_format = 80mm
-```
-
-### 3. Tester la connectivité réseau (optionnel)
-
-Depuis le PC, ouvrir un terminal et taper :
-```
-ping 192.168.1.50
-```
-Si la réponse arrive → l'imprimante est joignable.
+Dans **Paramètres Caisse** → sélectionner **USB** → **Enregistrer** → **Imprimer ticket de test**.
 
 ---
 
-## Connexion Série (COM) — rare
+### Alternative budget : Imprimante Thermique Portable 58mm — 22 000 FCFA (Bluetooth)
 
-Pour les vieilles imprimantes avec port RS-232.
+> ⚠️ **C'est une imprimante Bluetooth, pas USB.**  
+> `python-escpos` ne gère pas le Bluetooth directement sur Windows.  
+> Elle fonctionne via un **port COM virtuel Bluetooth** (mode Série dans l'app).
 
-```
-imprimante_mode = serie
-imprimante_serie_port = COM3      (vérifier dans Gestionnaire de périphériques)
-imprimante_serie_baudrate = 9600
-```
+### Connexion : Bluetooth → Port COM Virtuel
+
+#### Étape 1 — Appairer l'imprimante
+
+1. Allumer l'imprimante (maintenir le bouton power)
+2. Windows → **Paramètres** → **Bluetooth et appareils** → **Ajouter un appareil**
+3. Sélectionner l'imprimante dans la liste (nom type "MTP-II" ou "Thermal Printer")
+4. Valider l'appairage
+
+#### Étape 2 — Trouver le port COM attribué
+
+1. Clic droit sur **Démarrer** → **Gestionnaire de périphériques**
+2. Développer **Ports (COM et LPT)**
+3. Repérer le port de l'imprimante Bluetooth (ex. `COM4` ou `COM5`)
+4. Noter ce numéro — c'est celui à utiliser dans l'app
+
+#### Étape 3 — Configurer dans l'application
+
+Aller dans **Paramètres Caisse** → **Impression thermique** :
+- Mode : `Série (COM)`
+- Cliquer **Enregistrer**
+
+Puis ouvrir `boutique.db` avec **DB Browser for SQLite** (gratuit) :
+- Table `parametres`
+- Modifier ou ajouter :
+
+| Clé | Valeur |
+|-----|--------|
+| `imprimante_mode` | `serie` |
+| `imprimante_serie_port` | `COM4` *(adapter selon ton gestionnaire de périphériques)* |
+| `imprimante_serie_baudrate` | `9600` |
+| `imprimante_format` | `58mm` |
+
+#### Étape 4 — Tester
+
+Dans **Paramètres Caisse** → cliquer **"Imprimer ticket de test"**.  
+Un ticket doit sortir avec le nom de la boutique et "Imprimante OK !".
 
 ---
 
-## Modifier les paramètres avancés (DB)
+---
 
-Pour les paramètres non exposés dans l'interface (Vendor ID, IP, port...) :
+### Connexion Réseau (IP)
+
+Pour une imprimante partagée entre plusieurs postes.
+
+Imprimer la page de configuration (maintenir FEED à l'allumage) pour voir l'IP.
+
+| Clé | Valeur |
+|-----|--------|
+| `imprimante_mode` | `reseau` |
+| `imprimante_ip` | `192.168.1.50` *(l'IP de l'imprimante)* |
+| `imprimante_port` | `9100` |
+| `imprimante_format` | `80mm` |
+
+---
+
+### Modifier les paramètres via DB Browser for SQLite
 
 1. Télécharger **DB Browser for SQLite** (gratuit) : https://sqlitebrowser.org
 2. Ouvrir `%APPDATA%\GestionBoutique\data\boutique.db`
 3. Onglet **Parcourir les données** → table `parametres`
-4. Modifier les valeurs directement
+4. Modifier les valeurs
 5. Cliquer **Écrire les modifications**
 
 ---
 
-## Dépannage
+### Format papier
 
-| Symptôme | Cause probable | Solution |
-|----------|---------------|----------|
-| "Impossible de se connecter" (USB) | Mauvais Vendor/Product ID | Vérifier dans Gestionnaire de périphériques |
-| "Impossible de se connecter" (USB) | Pilote non installé | Installer le pilote du fabricant |
-| Ticket vide / blanc | Papier thermique à l'envers | Retourner le rouleau (face brillante vers le bas) |
-| Caractères illisibles | Mauvais baudrate (série) | Essayer 19200 ou 115200 |
-| "python-escpos non installé" | Dépendance manquante | `pip install python-escpos==3.1` |
-| Ticket coupé à mi-chemin | Format papier mal configuré | Vérifier `imprimante_format` (58mm vs 80mm) |
+| `imprimante_format` | Largeur | Caractères par ligne |
+|---------------------|---------|----------------------|
+| `58mm` | 58 mm | 32 |
+| `80mm` | 80 mm | 48 |
 
 ---
 
-## Format papier
+### Dépannage imprimante
 
-| Paramètre `imprimante_format` | Largeur caractères | Adapté à |
-|-------------------------------|-------------------|----------|
-| `58mm` | 32 caractères | Petites boutiques, reçus courts |
-| `80mm` | 48 caractères | Tickets détaillés, plus lisible |
+| Symptôme | Cause | Solution |
+|----------|-------|----------|
+| "Impossible de se connecter" (Série) | Mauvais port COM | Vérifier dans Gestionnaire de périphériques |
+| "Impossible de se connecter" (Série) | Imprimante non appairée | Refaire l'appairage Bluetooth |
+| Ticket vide / blanc | Papier à l'envers | Retourner le rouleau (face brillante vers le bas) |
+| Caractères illisibles | Mauvais baudrate | Essayer `19200` |
+| "python-escpos non installé" | Dépendance manquante | `pip install python-escpos==3.1` |
+| Ticket coupé à mi-chemin | Mauvais format papier | Vérifier `imprimante_format` = `58mm` |
+
+---
+
+## 2. Lecteur de Codes-Barres
+
+### Modèle disponible localement : 1D 2D Wired/Wireless Barcode Scanner
+
+- **Avec fil (USB) :** 20 000 FCFA ✅ Recommandé
+- **Sans fil :** 23 000 FCFA
+
+### Pourquoi c'est le bon choix
+
+| Critère | Détail |
+|---------|--------|
+| Type | HID (Human Interface Device) — se comporte comme un clavier |
+| Codes supportés | 1D (Code128, EAN13, EAN8, Code39) + 2D (QR Code) |
+| Configuration requise | **Aucune** — plug and play |
+| Compatibilité avec l'app | **100%** — fonctionne nativement |
+
+### Comment ça fonctionne avec l'application
+
+Le lecteur tape automatiquement le code-barres dans le champ de saisie de la fenêtre **Ventes**, puis simule la touche Entrée. L'article est ajouté au panier instantanément.
+
+En mode **AUTO** (Paramètres Caisse → Mode AUTOMATIQUE) : ajout direct, quantité 1, pas de popup.  
+En mode **MANUEL** : une fenêtre demande la quantité à chaque scan.
+
+### Conseil
+
+Prendre le **filaire à 20 000 FCFA** pour démarrer — plus fiable, pas de batterie à gérer, aucune latence. Le sans fil est utile seulement si le caissier doit se déplacer dans la boutique.

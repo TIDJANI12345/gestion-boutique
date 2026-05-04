@@ -46,15 +46,22 @@ def init_db():
             machine_id TEXT DEFAULT NULL,
             date_activation TIMESTAMP DEFAULT NULL,
             nb_activations INTEGER DEFAULT 0,
-            source TEXT DEFAULT 'admin'
+            source TEXT DEFAULT 'admin',
+            plan TEXT DEFAULT 'standard',
+            features_extra TEXT DEFAULT ''
         )
     ''')
-    # Migration : ajouter source si la table existait déjà sans cette colonne
-    try:
-        c.execute("ALTER TABLE licences ADD COLUMN source TEXT DEFAULT 'admin'")
-        conn.commit()
-    except Exception:
-        pass
+    # Migrations
+    for migration in [
+        "ALTER TABLE licences ADD COLUMN source TEXT DEFAULT 'admin'",
+        "ALTER TABLE licences ADD COLUMN plan TEXT DEFAULT 'standard'",
+        "ALTER TABLE licences ADD COLUMN features_extra TEXT DEFAULT ''",
+    ]:
+        try:
+            c.execute(migration)
+            conn.commit()
+        except Exception:
+            pass
     
     conn.commit()
     conn.close()
@@ -285,7 +292,12 @@ def verifier_licence():
             })
         
         # Licence trouvée
-        id_lic, cle_lic, type_lic, date_creation, date_exp, statut, machine_id_db, date_activ, nb_activ, *_ = licence
+        row = dict(zip([d[0] for d in c.description], licence)) if hasattr(c, 'description') else {}
+        id_lic = licence[0]; cle_lic = licence[1]; type_lic = licence[2]
+        date_creation = licence[3]; date_exp = licence[4]; statut = licence[5]
+        machine_id_db = licence[6]; date_activ = licence[7]; nb_activ = licence[8]
+        plan_lic = licence[10] if len(licence) > 10 else 'standard'
+        features_extra_lic = licence[11] if len(licence) > 11 else ''
         
         # Vérifier si expirée
         if date_exp:
@@ -321,12 +333,14 @@ def verifier_licence():
             
             return jsonify({
                 'valide': True,
-                'succes': True,  # Pour compatibilité avec Gestion Boutique
+                'succes': True,
                 'message': 'Première activation réussie',
-                'type': type_lic,  # Format attendu par le logiciel
+                'type': type_lic,
                 'type_licence': type_lic,
-                'expiration': date_exp,  # Format attendu par le logiciel
-                'date_expiration': date_exp
+                'expiration': date_exp,
+                'date_expiration': date_exp,
+                'plan': plan_lic,
+                'features_extra': features_extra_lic or '',
             })
         
         # Activation ultérieure → Vérifier machine_id
@@ -348,12 +362,14 @@ def verifier_licence():
         
         return jsonify({
             'valide': True,
-            'succes': True,  # Pour compatibilité avec Gestion Boutique
+            'succes': True,
             'message': 'Licence valide',
-            'type': type_lic,  # Format attendu par le logiciel
+            'type': type_lic,
             'type_licence': type_lic,
-            'expiration': date_exp,  # Format attendu par le logiciel
-            'date_expiration': date_exp
+            'expiration': date_exp,
+            'date_expiration': date_exp,
+            'plan': plan_lic,
+            'features_extra': features_extra_lic or '',
         })
     
     except Exception as e:

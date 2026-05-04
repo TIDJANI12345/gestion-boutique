@@ -118,6 +118,9 @@ class GestionLicence:
                     with open(FICHIER_LICENCE, 'wb') as f:
                         f.write(encrypted_data)
 
+                    # Stocker plan + features extra chiffrés en DB
+                    self._stocker_plan_db(cle, data)
+
                     logger.info("Activation licence reussie")
                     return True, "Activation reussie !"
                 else:
@@ -138,3 +141,53 @@ class GestionLicence:
         except Exception as e:
             logger.error(f"Erreur technique activation : {e}")
             return False, f"Erreur technique : {str(e)}"
+
+    def _stocker_plan_db(self, cle: str, data: dict):
+        """Stocke le plan de licence chiffré en DB après activation."""
+        try:
+            from database import db as _db
+            import base64
+
+            plan = data.get('plan', 'standard')
+            features_extra = data.get('features_extra', '')
+            expiration = data.get('expiration', '')
+
+            # Hash de la clé (utilisé pour dériver la clé Fernet dans features.py)
+            key_hash = hashlib.sha256(cle.strip().encode()).hexdigest()
+            _db.set_parametre('licence_key_hash', key_hash)
+            _db.set_parametre('licence_expire', expiration[:10] if expiration else '')
+
+            # Chiffrer le plan
+            from modules.features import chiffrer_plan, charger_extras
+            plan_enc = chiffrer_plan(plan)
+            _db.set_parametre('licence_plan_enc', plan_enc)
+
+            # Chiffrer les features extra (ou stocker __none__ si vides)
+            if features_extra:
+                extras_enc = chiffrer_plan(features_extra)
+                _db.set_parametre('licence_features_enc', extras_enc)
+            else:
+                _db.set_parametre('licence_features_enc', '__none__')
+
+            # Recharger les extras en mémoire
+            charger_extras()
+            logger.info(f"Plan '{plan}' stocké en DB (chiffré)")
+
+        except Exception as e:
+            logger.error(f"Erreur stockage plan DB : {e}")
+
+    def activer_demo(self):
+        """Active le mode démonstration (pas de serveur requis)."""
+        try:
+            from database import db as _db
+            import time
+            _db.set_parametre('licence_plan_enc', '__demo__')
+            _db.set_parametre('licence_features_enc', '__none__')
+            # Enregistrer le début démo si pas déjà fait
+            if not _db.get_parametre('licence_demo_debut', ''):
+                _db.set_parametre('licence_demo_debut', str(int(time.time())))
+            logger.info("Mode démonstration activé")
+            return True
+        except Exception as e:
+            logger.error(f"Erreur activation démo : {e}")
+            return False

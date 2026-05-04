@@ -9,7 +9,12 @@
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "Bash(git push:*)",
-      "Bash(sqlite3:*)"
+      "Bash(sqlite3:*)",
+      "Bash(gh auth login:*)",
+      "Bash(zip:*)",
+      "Bash(python scripts/preview_ticket.py)",
+      "Read(//mnt/d/Projects/Python/**)",
+      "Bash(python -c ' *)"
     ]
   }
 }

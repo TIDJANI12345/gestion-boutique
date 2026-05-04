@@ -82,6 +82,21 @@ class Utilisateur:
             return False, message
 
         try:
+            # Limite dure caissiers selon le plan
+            if role == 'caissier':
+                try:
+                    from modules.features import limite_caissiers
+                    nb = db.fetch_one(
+                        "SELECT COUNT(*) as n FROM utilisateurs WHERE role='caissier'"
+                    )['n']
+                    if nb >= limite_caissiers():
+                        return False, (
+                            "Limite atteinte : l'offre Standard est limitée à 1 caissier.\n"
+                            "Passez à l'offre Pro pour créer des caissiers supplémentaires."
+                        )
+                except Exception:
+                    pass
+
             hashed = bcrypt.hashpw(mot_de_passe.encode(), bcrypt.gensalt())
 
             super_admin_flag = 0

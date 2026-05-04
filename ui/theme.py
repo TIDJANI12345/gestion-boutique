@@ -105,6 +105,37 @@ class Theme:
             pass
 
     @classmethod
+    def _deriver_variantes(cls, hex_color: str) -> tuple:
+        """Dérive hover, pressed, table_selection depuis une couleur primaire hex."""
+        c = QColor(hex_color)
+        hover = c.darker(115).name()
+        pressed = c.darker(130).name()
+        r, g, b = c.red(), c.green(), c.blue()
+        sel = QColor(int(r * 0.2 + 255 * 0.8), int(g * 0.2 + 255 * 0.8), int(b * 0.2 + 255 * 0.8)).name()
+        return hover, pressed, sel
+
+    @classmethod
+    def appliquer_couleur_primaire(cls, hex_color: str, sauvegarder: bool = True):
+        """Changer la couleur primaire et recharger le style immédiatement."""
+        if not QColor(hex_color).isValid():
+            return
+        hover, pressed, sel = cls._deriver_variantes(hex_color)
+        cls._current['primary'] = hex_color
+        cls._current['primary_hover'] = hover
+        cls._current['primary_pressed'] = pressed
+        cls._current['input_focus'] = hex_color
+        cls._current['table_selection'] = sel
+        if sauvegarder:
+            try:
+                from database import db
+                db.set_parametre('theme_couleur_primaire', hex_color)
+            except Exception:
+                pass
+        app = QApplication.instance()
+        if app:
+            app.setStyleSheet(cls.stylesheet())
+
+    @classmethod
     def charger(cls):
         """Charge le thème sauvegardé depuis la base de données."""
         try:
@@ -116,6 +147,14 @@ class Theme:
             else:
                 cls._current = dict(THEME_CLAIR)
                 cls._is_dark = False
+            couleur = db.get_parametre('theme_couleur_primaire', '')
+            if couleur and QColor(couleur).isValid():
+                hover, pressed, sel = cls._deriver_variantes(couleur)
+                cls._current['primary'] = couleur
+                cls._current['primary_hover'] = hover
+                cls._current['primary_pressed'] = pressed
+                cls._current['input_focus'] = couleur
+                cls._current['table_selection'] = sel
         except Exception:
             pass
 
