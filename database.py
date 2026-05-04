@@ -284,6 +284,38 @@ class Database:
             END
         ''')
 
+        # Table Ardoise (crédits clients)
+        self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS ardoise (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                client_id INTEGER NOT NULL,
+                vente_id INTEGER,
+                montant_initial REAL NOT NULL,
+                montant_restant REAL NOT NULL,
+                date_creation TIMESTAMP DEFAULT (strftime('%Y-%m-%d %H:%M:%S', 'now', 'localtime')),
+                date_echeance TIMESTAMP NULL,
+                statut TEXT DEFAULT 'en_cours',
+                notes TEXT,
+                FOREIGN KEY (client_id) REFERENCES clients(id),
+                FOREIGN KEY (vente_id) REFERENCES ventes(id)
+            )
+        ''')
+
+        # Table Encaissements ardoise
+        self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS encaissements_ardoise (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ardoise_id INTEGER NOT NULL,
+                montant REAL NOT NULL,
+                mode_paiement TEXT DEFAULT 'especes',
+                reference TEXT,
+                date_encaissement TIMESTAMP DEFAULT (strftime('%Y-%m-%d %H:%M:%S', 'now', 'localtime')),
+                notes TEXT,
+                id_session INTEGER NULL,
+                FOREIGN KEY (ardoise_id) REFERENCES ardoise(id)
+            )
+        ''')
+
         # Table Sessions de caisse
         self.cursor.execute('''
             CREATE TABLE IF NOT EXISTS sessions_caisse (

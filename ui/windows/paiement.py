@@ -18,9 +18,10 @@ class PaiementWindow(QDialog):
 
     paiement_confirme = Signal(list)  # liste de dicts paiement
 
-    def __init__(self, total: float, parent=None):
+    def __init__(self, total: float, parent=None, client_id: int = None):
         super().__init__(parent)
         self.total = total
+        self.client_id = client_id
         self._result = None
         from modules.fiscalite import get_devise
         self._devise = get_devise()
@@ -77,6 +78,15 @@ class PaiementWindow(QDialog):
         modes = [(m['key'], m['label']) for m in modes_actifs()]
         if not modes:
             modes = [('especes', 'Espèces')]
+
+        # Ajouter "À crédit" si plan Pro
+        try:
+            from modules.features import peut
+            if peut('credit_client'):
+                modes.append(('credit', 'À crédit (ardoise)'))
+        except Exception:
+            pass
+
         for value, label in modes:
             rb = QRadioButton(label)
             rb.setProperty("mode", value)
@@ -141,6 +151,8 @@ class PaiementWindow(QDialog):
             self._champs_mixte()
         elif mode == 'mobile_money':
             self._champs_mobile()
+        elif mode == 'credit':
+            self._champs_credit()
         else:
             # virement, cheque, modes custom → référence simple
             self._champs_reference()
@@ -208,6 +220,56 @@ class PaiementWindow(QDialog):
         self._zone_saisie.addWidget(info)
 
         self._entry_reference.setFocus()
+
+    def _champs_credit(self):
+        """Mode crédit : acompte optionnel + le reste en ardoise."""
+        if not self.client_id:
+            lbl_warn = QLabel("⚠️  Sélectionnez un client avant de vendre à crédit.")
+            lbl_warn.setStyleSheet(f"color: {Theme.c('danger')}; font-weight: bold;")
+            lbl_warn.setWordWrap(True)
+            self._zone_saisie.addWidget(lbl_warn)
+            return
+
+        lbl_info = QLabel(f"Montant total : {self.total:,.0f} {self._devise}")
+        lbl_info.setFont(QFont("Segoe UI", 13, QFont.Bold))
+        lbl_info.setStyleSheet(f"color: {Theme.c('primary')};")
+        lbl_info.setAlignment(Qt.AlignCenter)
+        self._zone_saisie.addWidget(lbl_info)
+
+        lbl = QLabel("Acompte espèces (optionnel) :")
+        lbl.setFont(QFont("Segoe UI", 11, QFont.Bold))
+        self._zone_saisie.addWidget(lbl)
+
+        self._entry_acompte = QLineEdit("0")
+        self._entry_acompte.setFont(QFont("Segoe UI", 14))
+        self._entry_acompte.setAlignment(Qt.AlignRight)
+        self._entry_acompte.textChanged.connect(self._maj_credit)
+        self._zone_saisie.addWidget(self._entry_acompte)
+
+        self._lbl_credit_restant = QLabel(f"À mettre en ardoise : {self.total:,.0f} {self._devise}")
+        self._lbl_credit_restant.setFont(QFont("Segoe UI", 13, QFont.Bold))
+        self._lbl_credit_restant.setStyleSheet(f"color: {Theme.c('danger')};")
+        self._lbl_credit_restant.setAlignment(Qt.AlignCenter)
+        self._zone_saisie.addWidget(self._lbl_credit_restant)
+
+        lbl_ech = QLabel("Échéance (optionnel, JJ/MM/AAAA) :")
+        lbl_ech.setFont(QFont("Segoe UI", 10))
+        self._zone_saisie.addWidget(lbl_ech)
+
+        self._entry_echeance = QLineEdit()
+        self._entry_echeance.setPlaceholderText("Ex : 15/06/2026")
+        self._zone_saisie.addWidget(self._entry_echeance)
+
+        self._entry_acompte.setFocus()
+
+    def _maj_credit(self):
+        try:
+            acompte = float(self._entry_acompte.text().replace(',', '').replace(' ', '') or 0)
+            acompte = min(acompte, self.total)
+            restant = self.total - acompte
+            self._lbl_credit_restant.setText(f"À mettre en ardoise : {restant:,.0f} {self._devise}")
+        except ValueError:
+            pass
 
     def _champs_reference(self):
         """Virement bancaire, Chèque, modes personnalisés : référence optionnelle."""
@@ -367,6 +429,34 @@ class PaiementWindow(QDialog):
                         'reference': reference, 'montant_recu': None,
                         'monnaie_rendue': None,
                     })
+
+            elif mode == 'credit':
+                if not self.client_id:
+                    QMessageBox.warning(self, "Client requis",
+                        "Sélectionnez un client pour une vente à crédit.")
+                    return
+                try:
+                    acompte = float(
+                        self._entry_acompte.text().replace(',', '').replace(' ', '') or 0
+                    )
+                    acompte = max(0, min(acompte, self.total))
+                except (ValueError, AttributeError):
+                    acompte = 0
+
+                credit = self.total - acompte
+                self._result = []
+                if acompte > 0:
+                    self._result.append({
+                        'mode': 'especes', 'montant': acompte,
+                        'reference': None, 'montant_recu': acompte,
+                        'monnaie_rendue': 0,
+                    })
+                self._result.append({
+                    'mode': 'credit', 'montant': credit,
+                    'reference': None, 'montant_recu': None,
+                    'monnaie_rendue': None,
+                    'echeance': self._entry_echeance.text().strip() if hasattr(self, '_entry_echeance') else None,
+                })
 
             self.paiement_confirme.emit(self._result)
             self.accept()

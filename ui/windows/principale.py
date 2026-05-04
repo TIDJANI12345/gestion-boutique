@@ -185,6 +185,13 @@ class PrincipaleWindow(QMainWindow):
                         a.triggered.connect(slot)
                         menu_caisse.addAction(a)
                     menu_admin.addSeparator()
+
+                if peut('credit_client'):
+                    menu_ardoise = menu_admin.addMenu("Ardoise (Crédit)")
+                    a = QAction("Gérer les ardoises", self)
+                    a.triggered.connect(self.ouvrir_ardoise)
+                    menu_ardoise.addAction(a)
+                    menu_admin.addSeparator()
             except Exception:
                 pass
 
@@ -943,6 +950,13 @@ class PrincipaleWindow(QMainWindow):
             dlg.exec()
         except Exception as e:
             QMessageBox.critical(self, "Erreur", str(e))
+
+    # === ARDOISE ===
+
+    def ouvrir_ardoise(self):
+        from ui.windows.ardoise import ArdoiseWindow
+        dlg = ArdoiseWindow(self)
+        dlg.exec()
 
     # === SAUVEGARDE / RESTAURATION ===
 

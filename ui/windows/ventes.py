@@ -1020,7 +1020,7 @@ class VentesWindow(QDialog):
         total = sum(item['sous_total'] for item in self.panier) - self._remise_montant
 
         from ui.windows.paiement import PaiementWindow
-        dlg = PaiementWindow(total, parent=self)
+        dlg = PaiementWindow(total, parent=self, client_id=self.client_id)
         dlg.paiement_confirme.connect(self._finaliser_vente)
         dlg.exec()
 
@@ -1121,12 +1121,25 @@ class VentesWindow(QDialog):
 
             # Enregistrer les paiements
             for p in paiements:
+                if p.get('mode') == 'credit':
+                    continue  # ardoise gérée séparément
                 Paiement.enregistrer_paiement(
                     vente_id, p['mode'], p['montant'],
                     reference=p.get('reference'),
                     montant_recu=p.get('montant_recu'),
                     monnaie_rendue=p.get('monnaie_rendue')
                 )
+
+            # Ardoise (crédit client)
+            for p in paiements:
+                if p.get('mode') == 'credit' and p['montant'] > 0 and client_id:
+                    from modules.ardoise import creer_ardoise
+                    creer_ardoise(
+                        client_id, p['montant'],
+                        vente_id=vente_id,
+                        date_echeance=p.get('echeance') or None,
+                        notes=f"Vente {numero_vente}"
+                    )
 
             # Points fidelite
             if client_id:

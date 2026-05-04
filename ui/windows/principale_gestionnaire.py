@@ -318,6 +318,18 @@ class PrincipaleGestionnaireWindow(QMainWindow):
         if Permissions.peut(self.utilisateur, 'voir_mes_ventes'):
             gestion_menu.addAction("Mes Ventes", self.voir_mes_ventes)
 
+        # Ardoise (Pro)
+        try:
+            from modules.features import peut
+            if peut('credit_client'):
+                from PySide6.QtGui import QAction
+                ardoise_menu = menubar.addMenu("Ardoise")
+                a = QAction("Gérer les ardoises", self)
+                a.triggered.connect(self.ouvrir_ardoise)
+                ardoise_menu.addAction(a)
+        except Exception:
+            pass
+
         # Menu Aide
         help_menu = menubar.addMenu("Aide")
         help_menu.addAction("À Propos", self.ouvrir_a_propos)
@@ -405,6 +417,11 @@ class PrincipaleGestionnaireWindow(QMainWindow):
             dlg.exec()
         else:
             QMessageBox.warning(self, "Accès refusé", "Vous n'avez pas la permission de voir vos ventes.")
+
+    def ouvrir_ardoise(self):
+        from ui.windows.ardoise import ArdoiseWindow
+        dlg = ArdoiseWindow(self)
+        dlg.exec()
 
     def ouvrir_a_propos(self):
         from ui.windows.a_propos import AProposWindow
