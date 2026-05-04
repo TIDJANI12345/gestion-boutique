@@ -85,6 +85,39 @@ class Database:
             self.cursor.execute("ALTER TABLE ventes ADD COLUMN client_id INTEGER")
             self.conn.commit()
 
+        # Migration : Ajouter colonne remise si absente
+        try:
+            self.cursor.execute("SELECT remise FROM ventes LIMIT 1")
+        except sqlite3.OperationalError:
+            logger.info("Migration: Ajout colonne remise à table ventes")
+            self.cursor.execute("ALTER TABLE ventes ADD COLUMN remise REAL DEFAULT 0")
+            self.conn.commit()
+
+        # Migration : Ajouter colonnes prix_gros / seuil_gros à produits
+        try:
+            self.cursor.execute("SELECT prix_gros FROM produits LIMIT 1")
+        except sqlite3.OperationalError:
+            logger.info("Migration: Ajout colonnes prix_gros / seuil_gros à table produits")
+            self.cursor.execute("ALTER TABLE produits ADD COLUMN prix_gros REAL DEFAULT 0")
+            self.cursor.execute("ALTER TABLE produits ADD COLUMN seuil_gros INTEGER DEFAULT 0")
+            self.conn.commit()
+
+        # Migration : Ajouter colonne unite_mesure à produits
+        try:
+            self.cursor.execute("SELECT unite_mesure FROM produits LIMIT 1")
+        except sqlite3.OperationalError:
+            logger.info("Migration: Ajout colonne unite_mesure à table produits")
+            self.cursor.execute("ALTER TABLE produits ADD COLUMN unite_mesure TEXT DEFAULT 'pièce'")
+            self.conn.commit()
+
+        # Migration : Ajouter colonne is_prix_gros à details_ventes
+        try:
+            self.cursor.execute("SELECT is_prix_gros FROM details_ventes LIMIT 1")
+        except sqlite3.OperationalError:
+            logger.info("Migration: Ajout colonne is_prix_gros à table details_ventes")
+            self.cursor.execute("ALTER TABLE details_ventes ADD COLUMN is_prix_gros INTEGER DEFAULT 0")
+            self.conn.commit()
+
         # Table Details des ventes
         self.cursor.execute('''
             CREATE TABLE IF NOT EXISTS details_ventes (

@@ -16,6 +16,27 @@ from ui.platform import fix_encoding, ensure_directories, get_base_dir
 from config import APP_NAME, APP_VERSION
 
 
+def initialiser_features():
+    """Charge les features extras et initialise le démo si besoin."""
+    try:
+        from modules.features import charger_extras, est_demo, statut_expiration
+        charger_extras()
+        statut = statut_expiration()
+        if statut == 'grace':
+            from database import db
+            expire = db.get_parametre('licence_expire', '')
+            from modules.logger import get_logger
+            get_logger('main').warning(f"Licence en grace period, expire le {expire}")
+    except Exception:
+        pass
+
+    try:
+        from modules.sauvegarde import sauvegarde_auto_si_necessaire
+        sauvegarde_auto_si_necessaire()
+    except Exception:
+        pass
+
+
 def verifier_licence() -> bool:
     """Verifie la licence. Affiche la fenetre d'activation si invalide."""
     from modules.licence import GestionLicence
@@ -24,11 +45,15 @@ def verifier_licence() -> bool:
     est_valide, message = manager.verifier_locale()
 
     if est_valide:
+        initialiser_features()
         return True
 
     from ui.windows.licence import LicenceWindow
     dlg = LicenceWindow()
-    return dlg.exec() == QDialog.Accepted
+    result = dlg.exec() == QDialog.Accepted
+    if result:
+        initialiser_features()
+    return result
 
 
 def verifier_premier_lancement() -> bool:

@@ -12,7 +12,7 @@ from modules.logger import get_logger
 logger = get_logger('sauvegarde')
 
 BACKUP_DIR = os.path.join(config.BASE_DIR, 'sauvegardes')
-MAX_BACKUPS = 10
+MAX_BACKUPS = 7
 
 
 def _assurer_dossier_backup():
@@ -243,6 +243,24 @@ def importer_zip(chemin_zip):
         except Exception:
             pass
         return False, f"Erreur d'import: {e}"
+
+
+def sauvegarde_auto_si_necessaire():
+    """Sauvegarde auto au démarrage si 24h+ se sont écoulées depuis la dernière."""
+    try:
+        from database import db
+        if db.get_parametre('sauvegarde_auto_actif', '1') != '1':
+            return
+        derniere = db.get_parametre('sauvegarde_derniere_date', '')
+        if derniere:
+            dt = datetime.strptime(derniere, '%Y-%m-%d %H:%M:%S')
+            if (datetime.now() - dt).total_seconds() < 86400:
+                return
+        ok, _, _ = sauvegarder_locale()
+        if ok:
+            db.set_parametre('sauvegarde_derniere_date', datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+    except Exception as e:
+        logger.error(f"Sauvegarde auto échouée : {e}")
 
 
 def planifier_sauvegarde_auto():

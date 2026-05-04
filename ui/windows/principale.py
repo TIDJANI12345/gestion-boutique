@@ -108,14 +108,25 @@ class PrincipaleWindow(QMainWindow):
     def __init__(self, utilisateur: dict, parent=None):
         super().__init__(parent)
         self.utilisateur = utilisateur
-        self.setWindowTitle(
-            f"{APP_NAME} - {utilisateur['nom']} ({utilisateur['role'].upper()})"
-        )
+
+        # Titre : white label si activé
+        try:
+            from modules.features import peut
+            from database import db
+            if peut('white_label'):
+                titre = db.get_parametre('boutique_nom', APP_NAME)
+            else:
+                titre = f"{APP_NAME} - {utilisateur['nom']} ({utilisateur['role'].upper()})"
+        except Exception:
+            titre = f"{APP_NAME} - {utilisateur['nom']} ({utilisateur['role'].upper()})"
+        self.setWindowTitle(titre)
+
         self.setMinimumSize(1024, 600)
         self.resize(WINDOW_WIDTH, WINDOW_HEIGHT)
 
         self._setup_menubar()
         self._setup_ui()
+        self._afficher_bandeau_statut()
         self._setup_raccourcis()
         self._setup_session_timeout()
 
@@ -127,13 +138,6 @@ class PrincipaleWindow(QMainWindow):
         self._timer_refresh.setInterval(10000)
         self._timer_refresh.timeout.connect(self.actualiser_stats)
         self._timer_refresh.start()
-
-        # Sauvegarde auto
-        try:
-            from modules.sauvegarde import planifier_sauvegarde_auto
-            planifier_sauvegarde_auto()
-        except Exception:
-            pass
 
         self.statusBar().showMessage("Pret")
 
@@ -169,18 +173,7 @@ class PrincipaleWindow(QMainWindow):
 
             for label, slot in [
                 ("Logs d'audit", self.ouvrir_logs_audit),
-                ("Sauvegarde", self.sauvegarder),
-                ("Restaurer", self.restaurer),
-            ]:
-                action = QAction(label, self)
-                action.triggered.connect(slot)
-                menu_admin.addAction(action)
-
-            menu_admin.addSeparator()
-
-            for label, slot in [
-                ("Exporter (ZIP)", self.exporter_zip),
-                ("Importer (ZIP)", self.importer_zip),
+                ("Sauvegarde & Restauration", self.sauvegarder),
             ]:
                 action = QAction(label, self)
                 action.triggered.connect(slot)
@@ -221,6 +214,16 @@ class PrincipaleWindow(QMainWindow):
         header_layout.addWidget(titre)
 
         header_layout.addStretch()
+
+        # Badge plan
+        self._badge_plan = QLabel("")
+        self._badge_plan.setObjectName("badge_plan")
+        self._badge_plan.setStyleSheet(
+            "background: #6B7280; color: white; border-radius: 4px; "
+            "padding: 3px 10px; font-weight: bold; font-size: 10pt;"
+        )
+        header_layout.addWidget(self._badge_plan)
+        header_layout.addSpacing(8)
 
         # Info session
         session_label = QLabel(
@@ -317,6 +320,7 @@ class PrincipaleWindow(QMainWindow):
             self._boutons_actions.get("F4  Rapports", QPushButton()).hide()
             self._boutons_actions.get("F2  Produits", QPushButton()).hide()
 
+        self._appliquer_restrictions_plan()
         content_layout.addLayout(actions_grid)
 
         # === Section inferieure : Graphique + Listes ===
@@ -542,6 +546,118 @@ class PrincipaleWindow(QMainWindow):
         except Exception as e:
             pass
 
+    # === RESTRICTIONS PAR PLAN ===
+
+    def _appliquer_restrictions_plan(self):
+        """Grise les fonctionnalités Pro non disponibles sur le plan actuel."""
+        try:
+            from modules.features import peut, plan_actuel
+        except Exception:
+            return
+
+        _MSG_PRO = "Disponible en offre Pro — contactez votre revendeur"
+        _STYLE_VERROU = """
+            QPushButton {
+                background-color: #9CA3AF;
+                color: white; border: none; border-radius: 6px;
+                font-weight: bold; font-size: 13px;
+            }
+        """
+
+        # Clients & fidélité
+        btn_clients = self._boutons_actions.get("F7  Clients")
+        if btn_clients and not peut('clients_fidelite'):
+            btn_clients.setEnabled(False)
+            btn_clients.setText("🔒  Clients  [Pro]")
+            btn_clients.setStyleSheet(_STYLE_VERROU)
+            btn_clients.setToolTip(_MSG_PRO)
+
+        # Exports (dans les menus)
+        try:
+            for action in self.menuBar().actions():
+                menu = action.menu()
+                if not menu:
+                    continue
+                for sub in menu.actions():
+                    if 'export' in sub.text().lower() or 'sauvegarde' in sub.text().lower():
+                        feature = 'exports' if 'export' in sub.text().lower() else 'sauvegarde_auto'
+                        if not peut(feature):
+                            sub.setEnabled(False)
+                            sub.setText(sub.text() + "  [Pro]")
+        except Exception:
+            pass
+
+        # Badge plan dans le header (coin droit)
+        plan = plan_actuel()
+        badges = {
+            'demo':        ('DÉMO', '#3B82F6'),
+            'standard':    ('STANDARD', '#6B7280'),
+            'pro':         ('PRO', '#10B981'),
+            'white_label': ('PRO', '#10B981'),
+        }
+        label_txt, couleur = badges.get(plan, ('STANDARD', '#6B7280'))
+        try:
+            self._badge_plan.setText(label_txt)
+            self._badge_plan.setStyleSheet(
+                f"background: {couleur}; color: white; border-radius: 4px; "
+                f"padding: 3px 10px; font-weight: bold; font-size: 10pt;"
+            )
+        except Exception:
+            pass
+
+    # === BANDEAU STATUT LICENCE ===
+
+    def _afficher_bandeau_statut(self):
+        """Affiche un bandeau si licence en grace period ou mode démo."""
+        try:
+            from modules.features import statut_expiration, est_demo, demo_infos
+            from database import db
+            from PySide6.QtWidgets import QLabel, QFrame, QHBoxLayout
+
+            statut = statut_expiration()
+
+            if statut == 'grace':
+                expire = db.get_parametre('licence_expire', '')
+                bandeau = QFrame()
+                bandeau.setStyleSheet(
+                    "background-color: #F59E0B; color: white; padding: 6px;"
+                )
+                bl = QHBoxLayout(bandeau)
+                bl.setContentsMargins(20, 0, 20, 0)
+                lbl = QLabel(
+                    f"⚠️  Votre licence a expiré le {expire}. "
+                    f"Renouvelez dans les 7 jours pour continuer à vendre."
+                )
+                lbl.setStyleSheet("color: white; font-weight: bold; font-size: 10pt;")
+                bl.addWidget(lbl)
+                # Insérer sous la barre de menus
+                central = self.centralWidget()
+                if central and central.layout():
+                    central.layout().insertWidget(0, bandeau)
+
+            elif statut == 'demo':
+                infos = demo_infos()
+                bandeau = QFrame()
+                bandeau.setStyleSheet(
+                    "background-color: #3B82F6; color: white; padding: 6px;"
+                )
+                bl = QHBoxLayout(bandeau)
+                bl.setContentsMargins(20, 0, 20, 0)
+                lbl = QLabel(
+                    f"🔵  Mode DÉMONSTRATION — "
+                    f"{infos['ventes_utilisees']}/{infos['ventes_max']} ventes utilisées — "
+                    f"{infos['jours_restants']} jour(s) restant(s). "
+                    f"Activez une licence pour débloquer toutes les fonctionnalités."
+                )
+                lbl.setStyleSheet("color: white; font-size: 10pt;")
+                bl.addWidget(lbl)
+                central = self.centralWidget()
+                if central and central.layout():
+                    central.layout().insertWidget(0, bandeau)
+
+        except Exception:
+            pass
+
     # === SESSION TIMEOUT ===
 
     def _setup_session_timeout(self):
@@ -745,66 +861,16 @@ class PrincipaleWindow(QMainWindow):
     # === SAUVEGARDE / RESTAURATION ===
 
     def sauvegarder(self):
-        from modules.sauvegarde import sauvegarder_locale
-        succes, message, chemin = sauvegarder_locale()
-        if succes:
-            QMessageBox.information(self, "Succes", f"Sauvegarde creee!\n\n{chemin}")
-        else:
-            QMessageBox.critical(self, "Erreur", f"Erreur de sauvegarde:\n{message}")
+        from ui.windows.sauvegarde import SauvegardeWindow
+        dlg = SauvegardeWindow(self)
+        dlg.exec()
+        self.actualiser_stats()
 
     def restaurer(self):
-        from modules.sauvegarde import lister_sauvegardes, restaurer
-        sauvegardes = lister_sauvegardes()
-        if not sauvegardes:
-            QMessageBox.information(self, "Info", "Aucune sauvegarde disponible.")
-            return
-        # Dialogue simplifie : choisir fichier .db directement
-        chemin, _ = QFileDialog.getOpenFileName(
-            self, "Selectionner une sauvegarde",
-            "", "Base de donnees (*.db)"
-        )
-        if not chemin:
-            return
-        reponse = QMessageBox.question(
-            self, "Confirmation",
-            "Restaurer cette sauvegarde ?\n\n"
-            "La base actuelle sera sauvegardee avant la restauration.",
-            QMessageBox.Yes | QMessageBox.No
-        )
-        if reponse == QMessageBox.Yes:
-            succes, message = restaurer(chemin)
-            if succes:
-                QMessageBox.information(self, "Succes", message)
-                self.actualiser_stats()
-            else:
-                QMessageBox.critical(self, "Erreur", message)
+        self.sauvegarder()
 
     def exporter_zip(self):
-        from modules.sauvegarde import exporter_zip
-        succes, message, chemin = exporter_zip()
-        if succes:
-            QMessageBox.information(self, "Succes", f"Export ZIP cree!\n\n{chemin}")
-        else:
-            QMessageBox.critical(self, "Erreur", message)
+        self.sauvegarder()
 
     def importer_zip(self):
-        from modules.sauvegarde import importer_zip
-        chemin, _ = QFileDialog.getOpenFileName(
-            self, "Selectionner un fichier ZIP",
-            "", "Fichiers ZIP (*.zip)"
-        )
-        if not chemin:
-            return
-        reponse = QMessageBox.question(
-            self, "Confirmation",
-            "Importer ce fichier?\n\n"
-            "Les donnees actuelles seront sauvegardees puis remplacees.",
-            QMessageBox.Yes | QMessageBox.No
-        )
-        if reponse == QMessageBox.Yes:
-            succes, message = importer_zip(chemin)
-            if succes:
-                QMessageBox.information(self, "Succes", message)
-                self.actualiser_stats()
-            else:
-                QMessageBox.critical(self, "Erreur", message)
+        self.sauvegarder()

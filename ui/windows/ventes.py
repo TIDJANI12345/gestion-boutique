@@ -33,6 +33,9 @@ class VentesWindow(QDialog):
             self.client_id = None
             self.client_selectionne = None
             self.utilisateur = utilisateur
+            self._remise_valeur = 0.0   # valeur saisie
+            self._remise_montant = 0.0  # montant en FCFA calculé
+            self._remise_pct = True     # True=%, False=montant fixe
 
             self._setup_ui()
 
@@ -219,6 +222,57 @@ class VentesWindow(QDialog):
         sep3.setFrameShape(QFrame.HLine)
         sep3.setStyleSheet(f"color: {Theme.c('separator')};")
         resume_layout.addWidget(sep3)
+
+        # Sous-total
+        row_soustotal = QHBoxLayout()
+        lbl_st = QLabel("Sous-total:")
+        lbl_st.setFont(QFont("Segoe UI", 10))
+        row_soustotal.addWidget(lbl_st)
+        row_soustotal.addStretch()
+        self._label_soustotal = QLabel("0")
+        self._label_soustotal.setFont(QFont("Segoe UI", 10))
+        row_soustotal.addWidget(self._label_soustotal)
+        resume_layout.addLayout(row_soustotal)
+
+        # Remise
+        remise_row = QHBoxLayout()
+        lbl_remise = QLabel("Remise:")
+        lbl_remise.setFont(QFont("Segoe UI", 10))
+        remise_row.addWidget(lbl_remise)
+        remise_row.addStretch()
+        self._entry_remise = QLineEdit()
+        self._entry_remise.setPlaceholderText("0")
+        self._entry_remise.setFixedWidth(70)
+        self._entry_remise.setFont(QFont("Segoe UI", 10))
+        self._entry_remise.setStyleSheet(
+            f"padding: 4px; border: 1px solid {Theme.c('gray')}; border-radius: 4px;"
+        )
+        self._entry_remise.textChanged.connect(self._on_remise_changed)
+        remise_row.addWidget(self._entry_remise)
+        self._btn_remise_mode = QPushButton("%")
+        self._btn_remise_mode.setFixedSize(36, 28)
+        self._btn_remise_mode.setFont(QFont("Segoe UI", 9, QFont.Bold))
+        self._btn_remise_mode.setCursor(Qt.PointingHandCursor)
+        self._btn_remise_mode.setAutoDefault(False)
+        self._btn_remise_mode.setStyleSheet(
+            f"background-color: {Theme.c('info')}; color: white; "
+            f"border: none; border-radius: 4px;"
+        )
+        self._btn_remise_mode.clicked.connect(self._toggle_remise_mode)
+        remise_row.addWidget(self._btn_remise_mode)
+        resume_layout.addLayout(remise_row)
+
+        # Montant remise calculé (affiché en rouge si > 0)
+        self._label_remise_montant = QLabel("")
+        self._label_remise_montant.setFont(QFont("Segoe UI", 9))
+        self._label_remise_montant.setStyleSheet(f"color: {Theme.c('danger')};")
+        self._label_remise_montant.setAlignment(Qt.AlignRight)
+        resume_layout.addWidget(self._label_remise_montant)
+
+        sep_remise = QFrame()
+        sep_remise.setFrameShape(QFrame.HLine)
+        sep_remise.setStyleSheet(f"color: {Theme.c('separator')};")
+        resume_layout.addWidget(sep_remise)
 
         # Total
         row_total = QHBoxLayout()
@@ -561,31 +615,53 @@ class VentesWindow(QDialog):
 
     # === PANIER ===
 
+    @staticmethod
+    def _prix_effectif(item: dict) -> float:
+        """Prix unitaire selon quantité : prix_gros si seuil atteint, sinon prix_vente."""
+        pg = item.get('prix_gros') or 0
+        sg = item.get('seuil_gros') or 0
+        if pg > 0 and sg > 0 and item['quantite'] >= sg:
+            return pg
+        return item['prix_vente']
+
     def _ajouter_au_panier(self, produit_tuple, quantite: int):
         """Ajouter un produit au panier memoire."""
         produit_id = produit_tuple['id']
         nom = produit_tuple['nom']
         prix_vente = produit_tuple['prix_vente']
+        try:
+            prix_gros = float(produit_tuple['prix_gros'] or 0)
+            seuil_gros = int(produit_tuple['seuil_gros'] or 0)
+        except Exception:
+            prix_gros = 0
+            seuil_gros = 0
+        try:
+            unite = produit_tuple['unite_mesure'] or 'pièce'
+        except Exception:
+            unite = 'pièce'
 
         # Fusionner si deja present
         for item in self.panier:
             if item['produit_id'] == produit_id:
                 item['quantite'] += quantite
-                item['sous_total'] = item['prix_vente'] * item['quantite']
+                item['sous_total'] = self._prix_effectif(item) * item['quantite']
                 self._actualiser_panier()
-                # Son de confirmation
                 self._play_scan_sound()
                 return
 
-        self.panier.append({
+        item = {
             'produit_id': produit_id,
             'nom': nom,
             'prix_vente': prix_vente,
+            'prix_gros': prix_gros,
+            'seuil_gros': seuil_gros,
+            'unite_mesure': unite,
             'quantite': quantite,
-            'sous_total': prix_vente * quantite,
-        })
+            'sous_total': 0.0,
+        }
+        item['sous_total'] = self._prix_effectif(item) * quantite
+        self.panier.append(item)
         self._actualiser_panier()
-        # Son de confirmation
         self._play_scan_sound()
 
     def _actualiser_panier(self):
@@ -617,7 +693,23 @@ class VentesWindow(QDialog):
 
         self._label_nb_articles.setText(str(total_articles))
         from modules.fiscalite import get_devise
-        self._label_total.setText(f"{total_prix:,.0f} {get_devise()}")
+        devise = get_devise()
+
+        self._label_soustotal.setText(f"{total_prix:,.0f} {devise}")
+
+        # Calculer remise
+        if self._remise_pct:
+            self._remise_montant = round(total_prix * self._remise_valeur / 100, 0)
+        else:
+            self._remise_montant = min(self._remise_valeur, total_prix)
+
+        if self._remise_montant > 0:
+            self._label_remise_montant.setText(f"- {self._remise_montant:,.0f} {devise}")
+        else:
+            self._label_remise_montant.setText("")
+
+        total_net = total_prix - self._remise_montant
+        self._label_total.setText(f"{total_net:,.0f} {devise}")
 
     def _creer_widget_article(self, idx: int, item: dict) -> QWidget:
         """Créer un widget de ligne de panier avec contrôles +/−/×."""
@@ -631,12 +723,29 @@ class VentesWindow(QDialog):
         layout.setSpacing(8)
 
         # Nom + prix unitaire
+        prix_eff = self._prix_effectif(item)
+        prix_gros_actif = (
+            item.get('prix_gros', 0) > 0
+            and item.get('seuil_gros', 0) > 0
+            and item['quantite'] >= item.get('seuil_gros', 0)
+        )
+
         info = QVBoxLayout()
-        lbl_nom = QLabel(item['nom'])
+        nom_txt = item['nom']
+        lbl_nom = QLabel(nom_txt)
         lbl_nom.setFont(QFont("Segoe UI", 10, QFont.Bold))
         lbl_nom.setStyleSheet("border: none; background: transparent;")
         info.addWidget(lbl_nom)
-        lbl_prix = QLabel(f"{item['prix_vente']:,.0f} F / unité")
+
+        unite = item.get('unite_mesure', 'pièce') or 'pièce'
+        if prix_gros_actif:
+            lbl_prix = QLabel(
+                f"{prix_eff:,.0f} F / {unite}  "
+                f"<span style='color:#10B981; font-weight:bold;'>[Prix gros]</span>"
+            )
+            lbl_prix.setTextFormat(Qt.RichText)
+        else:
+            lbl_prix = QLabel(f"{prix_eff:,.0f} F / {unite}")
         lbl_prix.setFont(QFont("Segoe UI", 8))
         lbl_prix.setStyleSheet(f"color: {Theme.c('gray')}; border: none; background: transparent;")
         info.addWidget(lbl_prix)
@@ -710,7 +819,7 @@ class VentesWindow(QDialog):
             QMessageBox.warning(self, "Stock", f"Stock max atteint ({stock_max})")
             return
         item['quantite'] += 1
-        item['sous_total'] = item['prix_vente'] * item['quantite']
+        item['sous_total'] = self._prix_effectif(item) * item['quantite']
         self._actualiser_panier()
 
     def _diminuer_quantite(self, idx: int):
@@ -721,7 +830,7 @@ class VentesWindow(QDialog):
             self._retirer_ligne(idx)
         else:
             item['quantite'] -= 1
-            item['sous_total'] = item['prix_vente'] * item['quantite']
+            item['sous_total'] = self._prix_effectif(item) * item['quantite']
             self._actualiser_panier()
 
     def _flash_ligne_ajoutee(self, produit_id):
@@ -740,6 +849,18 @@ class VentesWindow(QDialog):
             self, "Mode scan",
             f"✓ Mode scan basculé :\n\n{mode_txt}\n\nAppuyez F9 pour changer à tout moment."
         )
+
+    def _on_remise_changed(self, texte: str):
+        try:
+            self._remise_valeur = float(texte.replace(',', '.')) if texte.strip() else 0.0
+        except ValueError:
+            self._remise_valeur = 0.0
+        self._actualiser_panier()
+
+    def _toggle_remise_mode(self):
+        self._remise_pct = not self._remise_pct
+        self._btn_remise_mode.setText("%" if self._remise_pct else "F")
+        self._actualiser_panier()
 
     def _retirer_ligne(self, row: int):
         """Retirer un article du panier."""
@@ -819,7 +940,25 @@ class VentesWindow(QDialog):
             QMessageBox.warning(self, "Attention", "Le panier est vide!")
             return
 
-        total = sum(item['sous_total'] for item in self.panier)
+        # Vérification démo et expiration
+        from modules.features import ventes_autorisees, est_demo, demo_peut_vendre, statut_expiration
+        if not ventes_autorisees():
+            QMessageBox.critical(
+                self, "Licence expirée",
+                "Votre licence a expiré.\n"
+                "Contactez votre revendeur pour renouveler."
+            )
+            return
+        if est_demo():
+            ok, raison = demo_peut_vendre()
+            if not ok:
+                QMessageBox.critical(
+                    self, "Limite démonstration",
+                    f"{raison}\n\nActivez une licence pour continuer."
+                )
+                return
+
+        total = sum(item['sous_total'] for item in self.panier) - self._remise_montant
 
         from ui.windows.paiement import PaiementWindow
         dlg = PaiementWindow(total, parent=self)
@@ -840,16 +979,19 @@ class VentesWindow(QDialog):
             numero_vente = Vente.generer_numero_vente()
 
             # Total
-            total = sum(item['sous_total'] for item in self.panier)
+            sous_total = sum(item['sous_total'] for item in self.panier)
+            remise = self._remise_montant
+            total = sous_total - remise
 
             # INSERT vente
             utilisateur_id = self.utilisateur['id'] if self.utilisateur else None
             vente_id = db.execute_query(
-                """INSERT INTO ventes (numero_vente, date_vente, total, client, client_id, utilisateur_id)
-                   VALUES (?, ?, ?, ?, ?, ?)""",
+                """INSERT INTO ventes (numero_vente, date_vente, total, remise, client, client_id, utilisateur_id)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
                 (numero_vente,
                  datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                  total,
+                 remise,
                  client_nom or None,
                  client_id,
                  utilisateur_id)
@@ -876,12 +1018,14 @@ class VentesWindow(QDialog):
                     return False
 
                 # INSERT details
+                prix_eff = self._prix_effectif(item)
+                is_pg = 1 if prix_eff != item['prix_vente'] else 0
                 db.execute_query(
                     """INSERT INTO details_ventes
-                       (vente_id, produit_id, quantite, prix_unitaire, sous_total)
-                       VALUES (?, ?, ?, ?, ?)""",
+                       (vente_id, produit_id, quantite, prix_unitaire, sous_total, is_prix_gros)
+                       VALUES (?, ?, ?, ?, ?, ?)""",
                     (vente_id, item['produit_id'], item['quantite'],
-                     item['prix_vente'], item['sous_total'])
+                     prix_eff, item['sous_total'], is_pg)
                 )
 
                 # UPDATE stock ATOMIQUE avec WHERE clause
@@ -916,6 +1060,13 @@ class VentesWindow(QDialog):
                 from modules.clients import Client as ClientModule
                 ClientModule.ajouter_points(client_id, total)
 
+            # Incrémenter le compteur démo si applicable
+            try:
+                from modules.features import demo_incrementer_ventes
+                demo_incrementer_ventes()
+            except Exception:
+                pass
+
             # Generer le recu PDF
             chemin_recu = ""
             try:
@@ -934,6 +1085,7 @@ class VentesWindow(QDialog):
                 'numero': numero_vente,
                 'date': datetime.now().strftime("%d/%m/%Y a %H:%M"),
                 'total': total,
+                'remise': remise,
                 'client': client_nom,
                 'items': self.panier.copy(),
                 'vente_id': vente_id,
@@ -966,6 +1118,11 @@ class VentesWindow(QDialog):
     def _reset_pour_nouvelle_vente(self):
         """Reinitialiser le panier pour une nouvelle vente."""
         self.panier.clear()
+        self._remise_valeur = 0.0
+        self._remise_montant = 0.0
+        self._entry_remise.blockSignals(True)
+        self._entry_remise.clear()
+        self._entry_remise.blockSignals(False)
         self._effacer_client()
         self._actualiser_panier()
         QTimer.singleShot(0, self._entry_scan.setFocus)

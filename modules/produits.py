@@ -73,7 +73,8 @@ class Produit:
 
     @staticmethod
     def ajouter(nom, categorie, prix_achat, prix_vente, stock_actuel, stock_alerte,
-                code_barre=None, type_code_barre='code128', description=""):
+                code_barre=None, type_code_barre='code128', description="",
+                prix_gros=0, seuil_gros=0, unite_mesure='pièce'):
         """Ajouter un nouveau produit avec validation"""
 
         # Validation des donnees
@@ -99,11 +100,12 @@ class Produit:
         query = """
             INSERT INTO produits
             (nom, categorie, prix_achat, prix_vente, stock_actuel, stock_alerte,
-             code_barre, type_code_barre, description)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+             code_barre, type_code_barre, description, prix_gros, seuil_gros, unite_mesure)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
         result = db.execute_query(query, (nom, categorie, prix_achat, prix_vente, stock_actuel,
-                                          stock_alerte, code_barre, type_code_barre, description))
+                                          stock_alerte, code_barre, type_code_barre, description,
+                                          prix_gros, seuil_gros, unite_mesure or 'pièce'))
         if result:
             logger.info(f"Produit ajoute : '{nom}' (code: {code_barre})")
             return code_barre
@@ -111,7 +113,7 @@ class Produit:
 
     @staticmethod
     def modifier(id_produit, nom, categorie, prix_achat, prix_vente, stock_actuel,
-                 stock_alerte, description=""):
+                 stock_alerte, description="", prix_gros=0, seuil_gros=0, unite_mesure='pièce'):
         """Modifier un produit existant avec validation"""
 
         if prix_vente is not None and prix_vente < 0:
@@ -128,11 +130,13 @@ class Produit:
             UPDATE produits
             SET nom = ?, categorie = ?, prix_achat = ?, prix_vente = ?,
                 stock_actuel = ?, stock_alerte = ?, description = ?,
+                prix_gros = ?, seuil_gros = ?, unite_mesure = ?,
                 updated_at = strftime('%Y-%m-%d %H:%M:%S', 'now', 'localtime')
             WHERE id = ?
         """
         result = db.execute_query(query, (nom, categorie, prix_achat, prix_vente, stock_actuel,
-                                          stock_alerte, description, id_produit))
+                                          stock_alerte, description, prix_gros, seuil_gros,
+                                          unite_mesure or 'pièce', id_produit))
         if result:
             logger.info(f"Produit modifie : ID {id_produit}")
             return True

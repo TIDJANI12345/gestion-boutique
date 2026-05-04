@@ -85,7 +85,9 @@ class Vente:
     def obtenir_details_vente(vente_id):
         """Obtenir les details d'une vente"""
         query = """
-            SELECT dv.id, p.nom, dv.quantite, dv.prix_unitaire, dv.sous_total, p.code_barre
+            SELECT dv.id, p.nom, dv.quantite, dv.prix_unitaire, dv.sous_total,
+                   p.code_barre, COALESCE(dv.is_prix_gros, 0) as is_prix_gros,
+                   COALESCE(p.unite_mesure, 'pièce') as unite_mesure
             FROM details_ventes dv
             JOIN produits p ON dv.produit_id = p.id
             WHERE dv.vente_id = ?

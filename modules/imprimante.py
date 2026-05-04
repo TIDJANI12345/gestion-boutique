@@ -2,6 +2,7 @@
 Module d'impression thermique ESC/POS
 Support imprimantes 58mm et 80mm
 """
+import os
 from modules.logger import get_logger
 from database import db
 
@@ -104,9 +105,31 @@ class ImprimanteThermique:
             nom_boutique = db.get_parametre('boutique_nom', BOUTIQUE_NOM)
             adresse = db.get_parametre('boutique_adresse', BOUTIQUE_ADRESSE)
             telephone = db.get_parametre('boutique_telephone', BOUTIQUE_TELEPHONE)
+            ifu = db.get_parametre('boutique_ifu', '')
+            rccm = db.get_parametre('boutique_rccm', '')
+            message_pied = db.get_parametre('recu_message_pied', '')
 
             format_papier = db.get_parametre('imprimante_format', '80mm')
             largeur = LARGEURS.get(format_papier, 48)
+
+            # === LOGO (si disponible et imprimante supporte les images) ===
+            if QRCODE_DISPONIBLE:
+                try:
+                    logo_path = db.get_parametre('boutique_logo_path', '')
+                    if logo_path and os.path.exists(logo_path):
+                        from PIL import Image as PilImage
+                        img = PilImage.open(logo_path).convert('L')  # Niveaux de gris
+                        max_px = 384 if largeur >= 48 else 256
+                        ratio = min(max_px / img.width, max_px / img.height)
+                        new_w = int(img.width * ratio)
+                        new_h = int(img.height * ratio)
+                        img = img.resize((new_w, new_h), PilImage.LANCZOS)
+                        img = img.convert('1')  # Noir & blanc pour ESC/POS
+                        printer.set(align='center')
+                        printer.image(img)
+                        printer.text("\n")
+                except Exception as e:
+                    logger.warning(f"Logo ticket impossible : {e}")
 
             # === EN-TETE ===
             printer.set(align='center', bold=True, double_height=True, double_width=True)
@@ -115,6 +138,10 @@ class ImprimanteThermique:
             printer.set(align='center', bold=False, double_height=False, double_width=False)
             printer.text(f"{adresse}\n")
             printer.text(f"Tel: {telephone}\n")
+            if ifu:
+                printer.text(f"IFU: {ifu}\n")
+            if rccm:
+                printer.text(f"RCCM: {rccm}\n")
             printer.text(ImprimanteThermique._ligne('=', largeur) + "\n")
 
             # === INFOS VENTE ===
@@ -146,22 +173,47 @@ class ImprimanteThermique:
             printer.text(ImprimanteThermique._ligne('-', largeur) + "\n")
 
             printer.set(align='left', bold=False)
+            has_gros = False
             for detail in details:
                 nom = detail['nom']
                 quantite = detail['quantite']
                 prix_unit = detail['prix_unitaire']
                 sous_total = detail['sous_total']
+                try:
+                    is_gros = bool(detail['is_prix_gros'])
+                except Exception:
+                    is_gros = False
+                try:
+                    unite = detail['unite_mesure'] or 'pce'
+                    # Abréger pour ticket thermique
+                    unite = unite if len(unite) <= 3 else unite[:3]
+                except Exception:
+                    unite = 'pce'
+                if is_gros:
+                    has_gros = True
 
+                qte_str = f"{quantite}{unite}"
                 if largeur >= 48:
-                    # Tronquer le nom si trop long
-                    nom_court = nom[:24] if len(nom) > 24 else nom
-                    ligne = f"{nom_court:<24}{quantite:>4}{prix_unit:>9,.0f}{sous_total:>11,.0f}"
+                    nom_court = nom[:23] if len(nom) > 23 else nom
+                    if is_gros:
+                        nom_court = nom_court + "*"
+                    ligne = f"{nom_court:<24}{qte_str:>6}{prix_unit:>7,.0f}{sous_total:>11,.0f}"
                 else:
-                    nom_court = nom[:14] if len(nom) > 14 else nom
-                    ligne = f"{nom_court:<14}{quantite:>3}{prix_unit:>7,.0f}{sous_total:>8,.0f}"
+                    nom_court = nom[:13] if len(nom) > 13 else nom
+                    if is_gros:
+                        nom_court = nom_court + "*"
+                    ligne = f"{nom_court:<14}{qte_str:>4}{prix_unit:>6,.0f}{sous_total:>8,.0f}"
                 printer.text(ligne + "\n")
 
+            if has_gros:
+                printer.text("* Prix gros applique\n")
+
             printer.text(ImprimanteThermique._ligne('=', largeur) + "\n")
+
+            try:
+                remise = float(vente['remise'] or 0)
+            except Exception:
+                remise = 0
 
             # === TVA (si active) ===
             try:
@@ -174,6 +226,13 @@ class ImprimanteThermique:
                     printer.text(ImprimanteThermique._ligne('-', largeur) + "\n")
             except Exception:
                 pass
+
+            # === REMISE ===
+            if remise > 0:
+                printer.set(align='right', bold=False, double_height=False)
+                printer.text(f"Sous-total: {total + remise:,.0f} FCFA\n")
+                printer.text(f"Remise: -{remise:,.0f} FCFA\n")
+                printer.text(ImprimanteThermique._ligne('-', largeur) + "\n")
 
             # === TOTAL ===
             printer.set(align='right', bold=True, double_height=True)
@@ -195,10 +254,14 @@ class ImprimanteThermique:
                             'orange_money': 'Orange Money',
                             'mtn_momo': 'MTN MoMo',
                             'moov_money': 'Moov Money',
+                            'wave': 'Wave Money',
+                            'carte': 'Carte bancaire',
+                            'virement': 'Virement',
+                            'cheque': 'Cheque',
                         }
-                        mode_label = mode_labels.get(p['mode_paiement'], p['mode_paiement'])
+                        mode_label = mode_labels.get(p['mode'], p['mode'])
                         printer.text(f"Paiement: {mode_label}\n")
-                        if p['mode_paiement'] == 'especes' and p['montant_recu'] and p['monnaie_rendue']:
+                        if p['mode'] == 'especes' and p['montant_recu'] and p['monnaie_rendue']:
                             printer.text(f"Recu: {p['montant_recu']:,.0f} FCFA\n")
                             printer.set(bold=True)
                             printer.text(f"Monnaie: {p['monnaie_rendue']:,.0f} FCFA\n")
@@ -220,6 +283,22 @@ class ImprimanteThermique:
             printer.text("\n")
             printer.set(align='center', bold=False)
             printer.text("Merci pour votre confiance !\n")
+
+            facebook  = db.get_parametre('boutique_facebook', '')
+            instagram = db.get_parametre('boutique_instagram', '')
+            whatsapp  = db.get_parametre('boutique_whatsapp', '')
+            if facebook or instagram or whatsapp:
+                printer.text(ImprimanteThermique._ligne('-', largeur) + "\n")
+                if facebook:
+                    printer.text(f"Facebook: {facebook}\n")
+                if instagram:
+                    printer.text(f"Instagram: {instagram}\n")
+                if whatsapp:
+                    printer.text(f"WhatsApp: {whatsapp}\n")
+
+            if message_pied:
+                printer.text(ImprimanteThermique._ligne('-', largeur) + "\n")
+                printer.text(f"{message_pied}\n")
             printer.text(f"{nom_boutique}\n")
             printer.text("\n\n\n")
 

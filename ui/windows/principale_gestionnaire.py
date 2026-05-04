@@ -34,6 +34,7 @@ class PrincipaleGestionnaireWindow(QMainWindow):
 
         self._setup_ui()
         self._setup_menubar()
+        self._afficher_bandeau_statut()
         self._setup_raccourcis()
         self._setup_session_timeout()
 
@@ -75,6 +76,16 @@ class PrincipaleGestionnaireWindow(QMainWindow):
 
         header_layout.addLayout(info_layout)
         header_layout.addStretch()
+
+        # Badge plan
+        self._badge_plan = QLabel("")
+        self._badge_plan.setObjectName("badge_plan")
+        self._badge_plan.setStyleSheet(
+            "background: #6B7280; color: white; border-radius: 4px; "
+            "padding: 3px 10px; font-weight: bold; font-size: 10pt;"
+        )
+        header_layout.addWidget(self._badge_plan)
+        header_layout.addSpacing(8)
 
         # Bouton deconnexion
         btn_deconnexion = QPushButton("Deconnexion")
@@ -450,3 +461,60 @@ class PrincipaleGestionnaireWindow(QMainWindow):
         )
         self.session_expiree.emit()
         self.close()
+
+    # === BADGE + BANDEAU LICENCE ===
+
+    def _afficher_bandeau_statut(self):
+        try:
+            from modules.features import statut_expiration, demo_infos, plan_actuel
+            from PySide6.QtWidgets import QFrame, QHBoxLayout
+
+            plan = plan_actuel()
+            badges = {
+                'demo':        ('DÉMO', '#3B82F6'),
+                'standard':    ('STANDARD', '#6B7280'),
+                'pro':         ('PRO', '#10B981'),
+                'white_label': ('PRO', '#10B981'),
+            }
+            label_txt, couleur = badges.get(plan, ('STANDARD', '#6B7280'))
+            self._badge_plan.setText(label_txt)
+            self._badge_plan.setStyleSheet(
+                f"background: {couleur}; color: white; border-radius: 4px; "
+                f"padding: 3px 10px; font-weight: bold; font-size: 10pt;"
+            )
+
+            statut = statut_expiration()
+            if statut == 'grace':
+                expire = db.get_parametre('licence_expire', '')
+                bandeau = QFrame()
+                bandeau.setStyleSheet("background-color: #F59E0B; color: white; padding: 6px;")
+                bl = QHBoxLayout(bandeau)
+                bl.setContentsMargins(20, 0, 20, 0)
+                lbl = QLabel(
+                    f"⚠️  Votre licence a expiré le {expire}. "
+                    f"Renouvelez dans les 7 jours pour continuer à vendre."
+                )
+                lbl.setStyleSheet("color: white; font-weight: bold; font-size: 10pt;")
+                bl.addWidget(lbl)
+                central = self.centralWidget()
+                if central and central.layout():
+                    central.layout().insertWidget(0, bandeau)
+            elif statut == 'demo':
+                infos = demo_infos()
+                bandeau = QFrame()
+                bandeau.setStyleSheet("background-color: #3B82F6; color: white; padding: 6px;")
+                bl = QHBoxLayout(bandeau)
+                bl.setContentsMargins(20, 0, 20, 0)
+                lbl = QLabel(
+                    f"🔵  Mode DÉMONSTRATION — "
+                    f"{infos['ventes_utilisees']}/{infos['ventes_max']} ventes utilisées — "
+                    f"{infos['jours_restants']} jour(s) restant(s). "
+                    f"Activez une licence pour débloquer toutes les fonctionnalités."
+                )
+                lbl.setStyleSheet("color: white; font-size: 10pt;")
+                bl.addWidget(lbl)
+                central = self.centralWidget()
+                if central and central.layout():
+                    central.layout().insertWidget(0, bandeau)
+        except Exception:
+            pass

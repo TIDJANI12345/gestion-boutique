@@ -59,8 +59,8 @@ def ajouter_filigrane_footer(canvas, doc):
 
     # 1. WATERMARK (Logo en fond)
     try:
-        logo_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'images', 'logo.png')
-        if os.path.exists(logo_path):
+        logo_path = db.get_parametre('boutique_logo_path', '')
+        if logo_path and os.path.exists(logo_path):
             canvas.setFillAlpha(0.1)  # Transparence très faible (10%)
             # Centrer l'image (calcul approximatif pour A4)
             page_width, page_height = A4
@@ -71,6 +71,21 @@ def ajouter_filigrane_footer(canvas, doc):
             canvas.setFillAlpha(1)  # Rétablir l'opacité
     except Exception as e:
         logger.warning(f"Erreur watermark: {e}")
+
+    # 2. WATERMARK DEMO
+    try:
+        from modules.features import est_demo
+        if est_demo():
+            page_width, page_height = A4
+            canvas.saveState()
+            canvas.setFont("Helvetica-Bold", 72)
+            canvas.setFillColorRGB(0.85, 0.85, 0.85)
+            canvas.translate(page_width / 2, page_height / 2)
+            canvas.rotate(45)
+            canvas.drawCentredString(0, 0, "DÉMONSTRATION")
+            canvas.restoreState()
+    except Exception:
+        pass
 
     canvas.restoreState()
 
@@ -114,6 +129,9 @@ def generer_recu_pdf(vente_id):
         adresse = db.get_parametre('boutique_adresse', BOUTIQUE_ADRESSE)
         telephone = db.get_parametre('boutique_telephone', BOUTIQUE_TELEPHONE)
         email_boutique = db.get_parametre('boutique_email', BOUTIQUE_EMAIL)
+        ifu = db.get_parametre('boutique_ifu', '')
+        rccm = db.get_parametre('boutique_rccm', '')
+        message_pied = db.get_parametre('recu_message_pied', '')
         from modules.fiscalite import get_devise
         devise = get_devise()
 
@@ -175,9 +193,9 @@ def generer_recu_pdf(vente_id):
         # ==========================================
 
         # Vérifier si un logo existe
-        logo_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'images', 'logo.png')
+        logo_path = db.get_parametre('boutique_logo_path', '')
 
-        if os.path.exists(logo_path):
+        if logo_path and os.path.exists(logo_path):
             # AVEC LOGO : Disposition logo à gauche + infos à droite
             logo_img = Image(logo_path, width=3*cm, height=3*cm)
 
@@ -188,6 +206,10 @@ def generer_recu_pdf(vente_id):
             ]
             if email_boutique:
                 info_boutique.append([Paragraph(email_boutique, style_info)])
+            if ifu:
+                info_boutique.append([Paragraph(f"IFU: {ifu}", style_info)])
+            if rccm:
+                info_boutique.append([Paragraph(f"RCCM: {rccm}", style_info)])
 
             info_table = Table(info_boutique, colWidths=[13*cm])
             info_table.setStyle(TableStyle([
@@ -212,6 +234,10 @@ def generer_recu_pdf(vente_id):
             elements.append(Paragraph(f"Tél: {telephone}", style_info))
             if email_boutique:
                 elements.append(Paragraph(email_boutique, style_info))
+            if ifu:
+                elements.append(Paragraph(f"IFU: {ifu}", style_info))
+            if rccm:
+                elements.append(Paragraph(f"RCCM: {rccm}", style_info))
 
         elements.append(Spacer(1, 0.7*cm))
 
@@ -323,10 +349,19 @@ def generer_recu_pdf(vente_id):
             quantite = detail['quantite']
             prix_unit = detail['prix_unitaire']
             sous_total = detail['sous_total']
+            try:
+                is_gros = bool(detail['is_prix_gros'])
+            except Exception:
+                is_gros = False
 
+            try:
+                unite = detail['unite_mesure'] or 'pièce'
+            except Exception:
+                unite = 'pièce'
+            nom_affiche = f"{nom} ★" if is_gros else nom
             data.append([
-                nom,
-                str(quantite),
+                nom_affiche,
+                f"{quantite} {unite}",
                 f"{prix_unit:,.0f} {devise}",
                 f"{sous_total:,.0f} {devise}"
             ])
@@ -349,6 +384,19 @@ def generer_recu_pdf(vente_id):
         ]))
 
         elements.append(table)
+
+        # Légende prix gros si au moins un article concerné
+        if any(bool(d['is_prix_gros']) for d in details if 'is_prix_gros' in d.keys()):
+            legende_gros = ParagraphStyle(
+                'LégendeGros',
+                parent=styles['Normal'],
+                fontSize=8,
+                textColor=colors.HexColor('#059669'),
+                spaceBefore=3,
+                fontName='Helvetica-Oblique'
+            )
+            elements.append(Paragraph("★ Prix gros appliqué", legende_gros))
+
         elements.append(Spacer(1, 0.3*cm))
 
         # ==========================================
@@ -383,6 +431,31 @@ def generer_recu_pdf(vente_id):
         # ==========================================
         # TOTAL (fond vert)
         # ==========================================
+
+        try:
+            remise = float(vente['remise'] or 0)
+        except Exception:
+            remise = 0
+        if remise > 0:
+            sous_total_brut = total + remise
+            remise_data = [
+                ["Sous-total:", f"{sous_total_brut:,.0f} {devise}"],
+                ["Remise:", f"- {remise:,.0f} {devise}"],
+            ]
+            remise_table = Table(remise_data, colWidths=[13*cm, 3*cm])
+            remise_table.setStyle(TableStyle([
+                ('ALIGN', (0, 0), (0, -1), 'RIGHT'),
+                ('ALIGN', (1, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 0), (-1, -1), 10),
+                ('TEXTCOLOR', (1, 1), (1, 1), colors.HexColor('#EF4444')),
+                ('LEFTPADDING', (0, 0), (-1, -1), 10),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 10),
+                ('TOPPADDING', (0, 0), (-1, -1), 4),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+            ]))
+            elements.append(remise_table)
+            elements.append(Spacer(1, 0.1*cm))
 
         total_label = "TOTAL TTC" if Fiscalite.tva_active() else "TOTAL A PAYER"
         total_data = [[total_label, f"{total:,.0f} {devise}"]]
@@ -437,7 +510,7 @@ def generer_recu_pdf(vente_id):
                 mode_key = p['mode']
                 mode = mode_labels.get(mode_key, mode_key)
                 # For mobile_money, extract operator from reference if present
-                if mode_key == 'mobile_money' and p.get('reference') and p['reference'].startswith('['):
+                if mode_key == 'mobile_money' and p['reference'] and p['reference'].startswith('['):
                     end = p['reference'].find(']')
                     if end > 0:
                         mode = p['reference'][1:end]
@@ -517,6 +590,40 @@ def generer_recu_pdf(vente_id):
 
         elements.append(Paragraph("Merci pour votre confiance !", footer_style))
         elements.append(Paragraph(f"Ce reçu a été généré automatiquement par {nom_boutique}", footer_style))
+
+        # Réseaux sociaux
+        facebook  = db.get_parametre('boutique_facebook', '')
+        instagram = db.get_parametre('boutique_instagram', '')
+        whatsapp  = db.get_parametre('boutique_whatsapp', '')
+        rs_parts = []
+        if facebook:
+            rs_parts.append(f"Facebook: {facebook}")
+        if instagram:
+            rs_parts.append(f"Instagram: {instagram}")
+        if whatsapp:
+            rs_parts.append(f"WhatsApp: {whatsapp}")
+        if rs_parts:
+            style_rs = ParagraphStyle(
+                'Socials',
+                parent=styles['Normal'],
+                fontSize=9,
+                alignment=TA_CENTER,
+                textColor=colors.HexColor('#3B82F6'),
+                spaceBefore=4,
+            )
+            elements.append(Paragraph("  |  ".join(rs_parts), style_rs))
+
+        if message_pied:
+            style_msg_pied = ParagraphStyle(
+                'MsgPied',
+                parent=styles['Normal'],
+                fontSize=9,
+                alignment=TA_CENTER,
+                textColor=colors.HexColor('#6B7280'),
+                spaceBefore=6,
+                fontName='Helvetica-Oblique'
+            )
+            elements.append(Paragraph(message_pied, style_msg_pied))
 
         # ==========================================
         # CONSTRUIRE LE PDF

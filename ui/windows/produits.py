@@ -8,8 +8,9 @@ from PySide6.QtWidgets import (
     QTextEdit, QRadioButton, QButtonGroup, QScrollArea,
     QSpinBox, QInputDialog
 )
-from PySide6.QtCore import Qt, QUrl
-from PySide6.QtGui import QFont, QDesktopServices, QDoubleValidator, QIntValidator
+from PySide6.QtCore import Qt, QUrl, QRectF
+from PySide6.QtGui import QFont, QDesktopServices, QDoubleValidator, QIntValidator, QImage, QPainter
+from PySide6.QtPrintSupport import QPrinter, QPrintDialog
 
 from ui.theme import Theme
 from ui.components.table import BoutiqueTableView, BoutiqueTableModel
@@ -148,6 +149,12 @@ class ProduitsWindow(QDialog):
         cat_row.addWidget(btn_new_cat)
         il.addLayout(cat_row)
 
+        il.addWidget(QLabel("Unité de mesure"))
+        self._combo_unite = QComboBox()
+        for u in ['pièce', 'kg', 'g', 'L', 'cL', 'mL', 'm', 'cm', 'carton', 'sachet', 'boite', 'lot']:
+            self._combo_unite.addItem(u)
+        il.addWidget(self._combo_unite)
+
         il.addWidget(QLabel("Description"))
         self._entry_description = QTextEdit()
         self._entry_description.setMaximumHeight(70)
@@ -179,6 +186,29 @@ class ProduitsWindow(QDialog):
         prix_row.addLayout(col_pv)
 
         pl.addLayout(prix_row)
+
+        # Prix de gros
+        pl.addWidget(QLabel("Prix de gros (optionnel)"))
+        gros_row = QHBoxLayout()
+
+        col_pg = QVBoxLayout()
+        col_pg.addWidget(QLabel("Prix gros"))
+        self._entry_prix_gros = QLineEdit()
+        self._entry_prix_gros.setPlaceholderText("0 = désactivé")
+        self._entry_prix_gros.setValidator(QDoubleValidator(0, 999999999, 0))
+        col_pg.addWidget(self._entry_prix_gros)
+        gros_row.addLayout(col_pg)
+
+        col_sg = QVBoxLayout()
+        col_sg.addWidget(QLabel("À partir de (qté)"))
+        self._spin_seuil_gros = QSpinBox()
+        self._spin_seuil_gros.setRange(0, 999999)
+        self._spin_seuil_gros.setValue(0)
+        self._spin_seuil_gros.setSpecialValueText("—")
+        col_sg.addWidget(self._spin_seuil_gros)
+        gros_row.addLayout(col_sg)
+
+        pl.addLayout(gros_row)
         form_layout.addWidget(prix_frame)
 
         # -- Section Stock --
@@ -304,7 +334,7 @@ class ProduitsWindow(QDialog):
         btn_supprimer.clicked.connect(self._supprimer_produit)
         actions_row.addWidget(btn_supprimer)
 
-        btn_voir_cb = QPushButton("Voir code-barres")
+        btn_voir_cb = QPushButton("Imprimer code-barres")
         btn_voir_cb.setCursor(Qt.PointingHandCursor)
         btn_voir_cb.setProperty("class", "secondary")
         btn_voir_cb.clicked.connect(self._voir_code_barre)
@@ -542,6 +572,23 @@ class ProduitsWindow(QDialog):
         if idx_type >= 0:
             self._combo_type_code.setCurrentIndex(idx_type)
 
+        # Unité de mesure
+        try:
+            unite = p['unite_mesure'] or 'pièce'
+            idx_u = self._combo_unite.findText(unite)
+            self._combo_unite.setCurrentIndex(idx_u if idx_u >= 0 else 0)
+        except Exception:
+            self._combo_unite.setCurrentIndex(0)
+
+        # Prix de gros
+        try:
+            pg = p['prix_gros']
+            self._entry_prix_gros.setText(str(int(pg)) if pg else "")
+            self._spin_seuil_gros.setValue(int(p['seuil_gros'] or 0))
+        except Exception:
+            self._entry_prix_gros.clear()
+            self._spin_seuil_gros.setValue(0)
+
         self._btn_enregistrer.setText("Enregistrer les modifications")
         self._btn_enregistrer.setStyleSheet(
             f"background-color: {Theme.c('primary')}; color: white; "
@@ -580,6 +627,12 @@ class ProduitsWindow(QDialog):
         stock = self._spin_stock.value()
         alerte = self._spin_alerte.value()
 
+        try:
+            prix_gros = float(self._entry_prix_gros.text() or 0)
+        except ValueError:
+            prix_gros = 0
+        seuil_gros = self._spin_seuil_gros.value()
+
         type_code = self._combo_type_code.currentData() or 'code128'
 
         # Code-barre
@@ -590,10 +643,13 @@ class ProduitsWindow(QDialog):
                 erreur(self, "Erreur", "Le code-barres est vide (mode manuel).")
                 return
 
+        unite = self._combo_unite.currentText()
+
         from modules.produits import Produit
         resultat = Produit.ajouter(
             nom, categorie, prix_achat, prix_vente, stock, alerte,
-            code_barre=code_barre, type_code_barre=type_code, description=description
+            code_barre=code_barre, type_code_barre=type_code, description=description,
+            prix_gros=prix_gros, seuil_gros=seuil_gros, unite_mesure=unite
         )
 
         if resultat:
@@ -639,10 +695,19 @@ class ProduitsWindow(QDialog):
         stock = self._spin_stock.value()
         alerte = self._spin_alerte.value()
 
+        try:
+            prix_gros = float(self._entry_prix_gros.text() or 0)
+        except ValueError:
+            prix_gros = 0
+        seuil_gros = self._spin_seuil_gros.value()
+
+        unite = self._combo_unite.currentText()
+
         from modules.produits import Produit
         succes = Produit.modifier(
             self._produit_selectionne_id, nom, categorie,
-            prix_achat, prix_vente, stock, alerte, description
+            prix_achat, prix_vente, stock, alerte, description,
+            prix_gros=prix_gros, seuil_gros=seuil_gros, unite_mesure=unite
         )
 
         if succes:
@@ -701,15 +766,47 @@ class ProduitsWindow(QDialog):
                 erreur(self, "Erreur", "Impossible de generer l'image du code-barres.")
                 return
 
-        QDesktopServices.openUrl(QUrl.fromLocalFile(chemin))
+        self._imprimer_etiquette(chemin)
+
+    def _imprimer_etiquette(self, chemin_image):
+        """Ouvrir la boite de dialogue d'impression pour une etiquette code-barres."""
+        image = QImage(chemin_image)
+        if image.isNull():
+            erreur(self, "Erreur", "Impossible de charger l'image du code-barres.")
+            return
+
+        printer = QPrinter(QPrinter.HighResolution)
+        dialog = QPrintDialog(printer, self)
+        dialog.setWindowTitle("Imprimer l'étiquette code-barres")
+
+        if dialog.exec() != QPrintDialog.Accepted:
+            return
+
+        painter = QPainter(printer)
+        page_rect = printer.pageRect(QPrinter.DevicePixel)
+
+        # Centrer l'image sur la page en conservant les proportions
+        img_rect = image.rect()
+        scaled = img_rect.scaled(
+            int(page_rect.width()), int(page_rect.height()),
+            Qt.KeepAspectRatio
+        )
+        x = (page_rect.width() - scaled.width()) / 2
+        y = (page_rect.height() - scaled.height()) / 2
+
+        painter.drawImage(QRectF(x, y, scaled.width(), scaled.height()), image)
+        painter.end()
 
     def _reinitialiser_formulaire(self):
         self._produit_selectionne_id = None
         self._entry_nom.clear()
         self._entry_categorie.setCurrentIndex(0)
+        self._combo_unite.setCurrentIndex(0)
         self._entry_description.clear()
         self._entry_prix_achat.clear()
         self._entry_prix_vente.clear()
+        self._entry_prix_gros.clear()
+        self._spin_seuil_gros.setValue(0)
         self._spin_stock.setValue(0)
         self._spin_alerte.setValue(5)
         self._entry_code.clear()
