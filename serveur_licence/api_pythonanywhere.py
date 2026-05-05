@@ -228,18 +228,21 @@ def enregistrer_licence():
         type_licence = data.get('type_licence', 'annuelle')
         date_expiration = data.get('date_expiration')
         statut = data.get('statut', 'active')
-        
+        plan = data.get('plan', 'standard')
+        if plan not in ('standard', 'pro', 'white_label'):
+            plan = 'standard'
+
         if not cle_licence:
             return jsonify({'error': 'Clé de licence requise'}), 400
-        
+
         # Enregistrer dans la base
         conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
-        
+
         c.execute('''
-            INSERT INTO licences (cle_licence, type_licence, date_expiration, statut, source)
-            VALUES (?, ?, ?, ?, 'hishamdigital')
-        ''', (cle_licence, type_licence, date_expiration, statut))
+            INSERT INTO licences (cle_licence, type_licence, date_expiration, statut, source, plan)
+            VALUES (?, ?, ?, ?, 'hishamdigital', ?)
+        ''', (cle_licence, type_licence, date_expiration, statut, plan))
         
         conn.commit()
         conn.close()
