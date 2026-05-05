@@ -291,6 +291,7 @@ class PrincipaleCaissierWindow(QMainWindow):
 
     def actualiser_stats(self):
         """Actualiser stats PERSONNELLES du caissier (uniquement ses ventes)"""
+        self._afficher_bandeau_statut()
         try:
             from modules.rapports import Rapport
             stats = Rapport.statistiques_utilisateur(self.utilisateur['id'])

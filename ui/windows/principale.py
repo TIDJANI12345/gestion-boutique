@@ -526,6 +526,7 @@ class PrincipaleWindow(QMainWindow):
     # === STATISTIQUES ===
 
     def actualiser_stats(self):
+        self._afficher_bandeau_statut()
         try:
             from modules.rapports import Rapport
             from modules.produits import Produit
