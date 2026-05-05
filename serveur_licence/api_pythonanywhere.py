@@ -320,17 +320,29 @@ def verifier_licence():
         
         # Première activation ?
         if not machine_id_db:
-            # Première activation → Enregistrer machine_id
+            # Calculer la date d'expiration maintenant (à l'activation)
+            durees = {
+                'annuelle':       365,
+                'trimestrielle':  90,
+                'mensuelle':      30,
+            }
+            jours = durees.get(type_lic)
+            if jours:
+                date_exp = (datetime.now() + timedelta(days=jours)).isoformat()
+            else:
+                date_exp = None  # perpetuelle
+
             c.execute('''
-                UPDATE licences 
-                SET machine_id = ?, 
+                UPDATE licences
+                SET machine_id = ?,
                     date_activation = ?,
+                    date_expiration = ?,
                     nb_activations = 1
                 WHERE cle_licence = ?
-            ''', (machine_id, datetime.now().isoformat(), cle))
+            ''', (machine_id, datetime.now().isoformat(), date_exp, cle))
             conn.commit()
             conn.close()
-            
+
             return jsonify({
                 'valide': True,
                 'succes': True,
@@ -825,25 +837,16 @@ def admin_generer():
             if plan not in ('standard', 'pro', 'white_label'):
                 plan = 'standard'
 
-            if type_licence == 'annuelle':
-                date_exp = (datetime.now() + timedelta(days=365)).isoformat()
-            elif type_licence == 'trimestrielle':
-                date_exp = (datetime.now() + timedelta(days=90)).isoformat()
-            elif type_licence == 'mensuelle':
-                date_exp = (datetime.now() + timedelta(days=30)).isoformat()
-            else:
-                date_exp = None  # perpetuelle
-
             nouvelle_cle = generer_cle_licence()
 
             conn = sqlite3.connect(DB_PATH)
             conn.execute(
                 'INSERT INTO licences (cle_licence, type_licence, date_expiration, statut, source, plan) VALUES (?, ?, ?, ?, ?, ?)',
-                (nouvelle_cle, type_licence, date_exp, statut, 'admin', plan)
+                (nouvelle_cle, type_licence, None, statut, 'admin', plan)
             )
             conn.commit()
             conn.close()
-            message = f'Licence {plan.upper()} créée avec succès.'
+            message = f'Licence {plan.upper()} ({type_licence}) créée — expiration calculée à la première activation.'
         except Exception as e:
             erreur = str(e)
 
