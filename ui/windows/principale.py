@@ -24,7 +24,7 @@ try:
     from matplotlib.figure import Figure
     from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
     MATPLOTLIB_DISPONIBLE = True
-except ImportError:
+except Exception:
     MATPLOTLIB_DISPONIBLE = False
 
 

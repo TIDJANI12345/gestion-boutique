@@ -48,7 +48,6 @@ a = Analysis(
     runtime_hooks=[],
     excludes=[
         'tkinter', 'ttkthemes', '_tkinter', 'Tkinter',
-        'matplotlib', 'numpy', 'pandas',
         'websockets',
         'modules.scanner_mobile_server', 'modules.scanner_mobile_http',
     ],
