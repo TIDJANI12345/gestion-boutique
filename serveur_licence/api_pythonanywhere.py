@@ -665,6 +665,14 @@ ADMIN_TEMPLATE = """
         </select>
       </div>
       <div>
+        <label>Plan</label>
+        <select name="plan">
+          <option value="standard">Standard</option>
+          <option value="pro">Pro</option>
+          <option value="white_label">White Label</option>
+        </select>
+      </div>
+      <div>
         <label>Statut initial</label>
         <select name="statut">
           <option value="active">Active</option>
@@ -682,6 +690,7 @@ ADMIN_TEMPLATE = """
     <tr>
       <th>Clé de licence</th>
       <th>Type</th>
+      <th>Plan</th>
       <th>Source</th>
       <th>État</th>
       <th>Générée le</th>
@@ -697,6 +706,15 @@ ADMIN_TEMPLATE = """
     <tr>
       <td style="font-family:monospace;font-size:.88em;white-space:nowrap">{{ l.cle_licence }}</td>
       <td>{{ l.type_licence }}</td>
+      <td>
+        {% if l.plan == 'pro' %}
+          <span class="badge badge-en-cours">Pro</span>
+        {% elif l.plan == 'white_label' %}
+          <span class="badge badge-active">White Label</span>
+        {% else %}
+          <span class="badge badge-dispo">Standard</span>
+        {% endif %}
+      </td>
       <td>
         {% if l.source == 'hishamdigital' %}
           <span class="badge badge-active">hishamdigital</span>
@@ -803,6 +821,9 @@ def admin_generer():
         try:
             type_licence = request.form.get('type_licence', 'annuelle')
             statut = request.form.get('statut', 'active')
+            plan = request.form.get('plan', 'standard')
+            if plan not in ('standard', 'pro', 'white_label'):
+                plan = 'standard'
 
             if type_licence == 'annuelle':
                 date_exp = (datetime.now() + timedelta(days=365)).isoformat()
@@ -817,12 +838,12 @@ def admin_generer():
 
             conn = sqlite3.connect(DB_PATH)
             conn.execute(
-                'INSERT INTO licences (cle_licence, type_licence, date_expiration, statut, source) VALUES (?, ?, ?, ?, ?)',
-                (nouvelle_cle, type_licence, date_exp, statut, 'admin')
+                'INSERT INTO licences (cle_licence, type_licence, date_expiration, statut, source, plan) VALUES (?, ?, ?, ?, ?, ?)',
+                (nouvelle_cle, type_licence, date_exp, statut, 'admin', plan)
             )
             conn.commit()
             conn.close()
-            message = 'Licence créée avec succès.'
+            message = f'Licence {plan.upper()} créée avec succès.'
         except Exception as e:
             erreur = str(e)
 
