@@ -411,6 +411,14 @@ class PrincipaleCaissierWindow(QMainWindow):
     # === BADGE + BANDEAU LICENCE ===
 
     def _afficher_bandeau_statut(self):
+        # Supprimer l'ancien bandeau
+        if getattr(self, '_bandeau_widget', None) is not None:
+            central = self.centralWidget()
+            if central and central.layout():
+                central.layout().removeWidget(self._bandeau_widget)
+            self._bandeau_widget.deleteLater()
+            self._bandeau_widget = None
+
         try:
             from modules.features import statut_expiration, demo_infos, plan_actuel
             from database import db
@@ -431,6 +439,8 @@ class PrincipaleCaissierWindow(QMainWindow):
             )
 
             statut = statut_expiration()
+            bandeau = None
+
             if statut == 'grace':
                 expire = db.get_parametre('licence_expire', '')
                 bandeau = QFrame()
@@ -443,9 +453,6 @@ class PrincipaleCaissierWindow(QMainWindow):
                 )
                 lbl.setStyleSheet("color: white; font-weight: bold; font-size: 10pt;")
                 bl.addWidget(lbl)
-                central = self.centralWidget()
-                if central and central.layout():
-                    central.layout().insertWidget(0, bandeau)
             elif statut == 'demo':
                 infos = demo_infos()
                 bandeau = QFrame()
@@ -459,8 +466,12 @@ class PrincipaleCaissierWindow(QMainWindow):
                 )
                 lbl.setStyleSheet("color: white; font-size: 10pt;")
                 bl.addWidget(lbl)
+
+            if bandeau is not None:
                 central = self.centralWidget()
                 if central and central.layout():
                     central.layout().insertWidget(0, bandeau)
+                self._bandeau_widget = bandeau
+
         except Exception:
             pass

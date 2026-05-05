@@ -566,7 +566,7 @@ class PrincipaleWindow(QMainWindow):
                 for v in ventes_jour[:5]:
                     client = v['client'] if v['client'] else "Client anonyme"
                     total = v['total'] or 0
-                    heure = str(v['date_vente'])[11:16] if v.get('date_vente') else ""
+                    heure = str(v['date_vente'])[11:16] if v['date_vente'] else ""
                     lines.append(f"  {heure}  {client:<18} {total:>10,.0f} {get_devise()}")
                 self._text_ventes.setPlainText("\n".join(lines))
 
@@ -576,9 +576,7 @@ class PrincipaleWindow(QMainWindow):
             else:
                 lines = []
                 for p in produits_alerte[:5]:
-                    nom = p['nom'] if isinstance(p, dict) else p[1]
-                    stock = p['stock_actuel'] if isinstance(p, dict) else p[5]
-                    lines.append(f"  {nom}: Stock {stock}")
+                    lines.append(f"  {p['nom']}: Stock {p['stock_actuel']}")
                 self._text_stock.setPlainText("\n".join(lines))
 
             # Graphique
@@ -650,12 +648,21 @@ class PrincipaleWindow(QMainWindow):
 
     def _afficher_bandeau_statut(self):
         """Affiche un bandeau si licence en grace period ou mode démo."""
+        # Supprimer l'ancien bandeau
+        if getattr(self, '_bandeau_widget', None) is not None:
+            central = self.centralWidget()
+            if central and central.layout():
+                central.layout().removeWidget(self._bandeau_widget)
+            self._bandeau_widget.deleteLater()
+            self._bandeau_widget = None
+
         try:
-            from modules.features import statut_expiration, est_demo, demo_infos
+            from modules.features import statut_expiration, demo_infos
             from database import db
             from PySide6.QtWidgets import QLabel, QFrame, QHBoxLayout
 
             statut = statut_expiration()
+            bandeau = None
 
             if statut == 'grace':
                 expire = db.get_parametre('licence_expire', '')
@@ -671,10 +678,6 @@ class PrincipaleWindow(QMainWindow):
                 )
                 lbl.setStyleSheet("color: white; font-weight: bold; font-size: 10pt;")
                 bl.addWidget(lbl)
-                # Insérer sous la barre de menus
-                central = self.centralWidget()
-                if central and central.layout():
-                    central.layout().insertWidget(0, bandeau)
 
             elif statut == 'demo':
                 infos = demo_infos()
@@ -692,9 +695,12 @@ class PrincipaleWindow(QMainWindow):
                 )
                 lbl.setStyleSheet("color: white; font-size: 10pt;")
                 bl.addWidget(lbl)
+
+            if bandeau is not None:
                 central = self.centralWidget()
                 if central and central.layout():
                     central.layout().insertWidget(0, bandeau)
+                self._bandeau_widget = bandeau
 
         except Exception:
             pass
