@@ -104,9 +104,11 @@ class LicenceWindow(QDialog):
         layout.addWidget(btn_demo)
 
         lbl_demo_info = QLabel(
-            f"50 ventes • 14 jours • Fonctionnalités Standard • Reçus marqués DÉMONSTRATION"
+            "50 ventes  •  14 jours  •  Fonctionnalités Standard\n"
+            "Reçus marqués DÉMONSTRATION"
         )
         lbl_demo_info.setAlignment(Qt.AlignCenter)
+        lbl_demo_info.setWordWrap(True)
         lbl_demo_info.setStyleSheet(f"color: {Theme.c('gray')}; font-size: 9pt;")
         layout.addWidget(lbl_demo_info)
 
