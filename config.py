@@ -141,6 +141,9 @@ PAGINATION = {
 # Configuration des codes-barres
 BARCODE_TYPES = {
     'code128': 'Code 128 (recommandé)',
+    'ean13':   'EAN-13 (produits importés)',
+    'ean8':    'EAN-8 (petits produits)',
+    'qrcode':  'QR Code',
 }
 BARCODE_DEFAULT = 'code128'
 BARCODE_FORMAT = 'code128'
