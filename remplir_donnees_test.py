@@ -130,6 +130,9 @@ def main():
         ids = remplir_produits()
         ca = remplir_ventes(ids)
         afficher_resume(ca)
+        # Synchroniser le compteur démo avec le nb de ventes créées
+        db.set_parametre('licence_demo_ventes', str(len(VENTES)))
+        print(f"  Compteur démo mis à jour : {len(VENTES)}/50")
     except Exception as e:
         import traceback
         traceback.print_exc()
