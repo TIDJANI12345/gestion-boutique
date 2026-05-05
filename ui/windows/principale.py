@@ -563,9 +563,10 @@ class PrincipaleWindow(QMainWindow):
             else:
                 lines = []
                 for v in ventes_jour[:5]:
-                    numero = v[1] if len(v) > 1 else "N/A"
-                    total = v[3] if len(v) > 3 else 0
-                    lines.append(f"  {numero}: {total:,.0f} {get_devise()}")
+                    client = v['client'] if v['client'] else "Client anonyme"
+                    total = v['total'] or 0
+                    heure = str(v['date_vente'])[11:16] if v.get('date_vente') else ""
+                    lines.append(f"  {heure}  {client:<18} {total:>10,.0f} {get_devise()}")
                 self._text_ventes.setPlainText("\n".join(lines))
 
             # Stock faible
@@ -574,7 +575,9 @@ class PrincipaleWindow(QMainWindow):
             else:
                 lines = []
                 for p in produits_alerte[:5]:
-                    lines.append(f"  {p[1]}: Stock {p[5]}")
+                    nom = p['nom'] if isinstance(p, dict) else p[1]
+                    stock = p['stock_actuel'] if isinstance(p, dict) else p[5]
+                    lines.append(f"  {nom}: Stock {stock}")
                 self._text_stock.setPlainText("\n".join(lines))
 
             # Graphique
