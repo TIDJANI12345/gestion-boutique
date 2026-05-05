@@ -110,14 +110,6 @@ class Database:
             self.cursor.execute("ALTER TABLE produits ADD COLUMN unite_mesure TEXT DEFAULT 'pièce'")
             self.conn.commit()
 
-        # Migration : Ajouter colonne is_prix_gros à details_ventes
-        try:
-            self.cursor.execute("SELECT is_prix_gros FROM details_ventes LIMIT 1")
-        except sqlite3.OperationalError:
-            logger.info("Migration: Ajout colonne is_prix_gros à table details_ventes")
-            self.cursor.execute("ALTER TABLE details_ventes ADD COLUMN is_prix_gros INTEGER DEFAULT 0")
-            self.conn.commit()
-
         # Table Details des ventes
         self.cursor.execute('''
             CREATE TABLE IF NOT EXISTS details_ventes (
@@ -131,6 +123,14 @@ class Database:
                 FOREIGN KEY (produit_id) REFERENCES produits(id)
             )
         ''')
+
+        # Migration : Ajouter colonne is_prix_gros à details_ventes
+        try:
+            self.cursor.execute("SELECT is_prix_gros FROM details_ventes LIMIT 1")
+        except sqlite3.OperationalError:
+            logger.info("Migration: Ajout colonne is_prix_gros à table details_ventes")
+            self.cursor.execute("ALTER TABLE details_ventes ADD COLUMN is_prix_gros INTEGER DEFAULT 0")
+            self.conn.commit()
 
         # Table Historique du stock
         self.cursor.execute('''

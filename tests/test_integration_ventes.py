@@ -103,8 +103,10 @@ def test_flux_annulation_complete():
     # Verifier stock restaure
     assert Produit.obtenir_par_id(produit_id)['stock_actuel'] == 100
 
-    # Verifier vente supprimee
-    assert Vente.obtenir_vente(vente_id) is None
+    # Soft-delete : vente marquée annulee, non supprimée
+    vente = Vente.obtenir_vente(vente_id)
+    assert vente is not None
+    assert vente['statut'] == 'annulee'
 
 
 def test_protection_stock_negatif():

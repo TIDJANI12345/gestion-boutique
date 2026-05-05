@@ -60,10 +60,13 @@ class TestVenteCycleComplet(unittest.TestCase):
         produit = Produit.obtenir_par_id(self.produit_id)
         self.assertEqual(produit['stock_actuel'], 15)
 
-        Vente.annuler_vente(vente_id)
+        Vente.annuler_vente(vente_id, motif="Test annulation")
         produit = Produit.obtenir_par_id(self.produit_id)
         self.assertEqual(produit['stock_actuel'], 20)
-        self.assertIsNone(Vente.obtenir_vente(vente_id))
+        # Soft-delete : la vente existe toujours mais est marquée annulee
+        vente = Vente.obtenir_vente(vente_id)
+        self.assertIsNotNone(vente)
+        self.assertEqual(vente['statut'], 'annulee')
 
     def test_supprimer_ligne_vente(self):
         vente_id = Vente.creer_vente()
@@ -76,20 +79,35 @@ class TestVenteCycleComplet(unittest.TestCase):
         self.assertEqual(produit['stock_actuel'], 20)
 
     def test_annulation_vente_restore_stock(self):
-        """Annulation restaure le stock correctement"""
+        """Annulation restaure le stock correctement (soft-delete)"""
         vente_id = Vente.creer_vente()
         Vente.ajouter_produit(vente_id, self.produit_id, 5)
 
-        # Verifier stock reduit
         produit = Produit.obtenir_par_id(self.produit_id)
         self.assertEqual(produit['stock_actuel'], 15)
 
-        # Annuler vente
-        Vente.annuler_vente(vente_id)
+        ok = Vente.annuler_vente(vente_id, motif="Test")
+        self.assertTrue(ok)
 
-        # Verifier stock restaure
         produit = Produit.obtenir_par_id(self.produit_id)
         self.assertEqual(produit['stock_actuel'], 20)
+
+    def test_annulation_double_impossible(self):
+        """Une vente déjà annulée ne peut pas être annulée une deuxième fois."""
+        vente_id = Vente.creer_vente()
+        Vente.ajouter_produit(vente_id, self.produit_id, 2)
+        Vente.annuler_vente(vente_id, motif="Premier")
+        ok2 = Vente.annuler_vente(vente_id, motif="Second")
+        self.assertFalse(ok2)
+
+    def test_ventes_du_jour_exclut_annulees(self):
+        """obtenir_ventes_du_jour ne retourne pas les ventes annulées."""
+        vente_id = Vente.creer_vente("Client X")
+        Vente.ajouter_produit(vente_id, self.produit_id, 1)
+        Vente.annuler_vente(vente_id, motif="Test exclusion")
+        ventes = Vente.obtenir_ventes_du_jour()
+        ids = [v['id'] for v in (ventes or [])]
+        self.assertNotIn(vente_id, ids)
 
 
 if __name__ == '__main__':

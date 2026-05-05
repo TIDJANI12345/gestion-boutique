@@ -191,11 +191,11 @@ class TestHistoriqueAchats(unittest.TestCase):
         self.assertEqual(Client.compter_achats(client_id), 3)
         self.assertEqual(Client.calculer_total_achats(client_id), 60000.0)
 
-    def test_historique_ignore_ventes_supprimees(self):
+    def test_historique_ignore_ventes_annulees(self):
         client_id = Client.ajouter("Client Soft Del")
         database.db.execute_query(
-            "INSERT INTO ventes (numero_vente, date_vente, total, client_id, deleted_at) VALUES (?, ?, ?, ?, ?)",
-            ("V-DEL-1", "2025-01-01 10:00:00", 5000, client_id, "2025-01-02 10:00:00")
+            "INSERT INTO ventes (numero_vente, date_vente, total, client_id, statut, deleted_at) VALUES (?, ?, ?, ?, ?, ?)",
+            ("V-DEL-1", "2025-01-01 10:00:00", 5000, client_id, "annulee", "2025-01-02 10:00:00")
         )
         database.db.execute_query(
             "INSERT INTO ventes (numero_vente, date_vente, total, client_id) VALUES (?, ?, ?, ?)",

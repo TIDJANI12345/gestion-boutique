@@ -201,7 +201,7 @@ class TestRapportCaisse(unittest.TestCase):
 
         rapport = Paiement.rapport_caisse_jour()
         self.assertEqual(rapport['total_especes'], 1000)
-        self.assertEqual(rapport['total_orange_money'], 1500)
+        self.assertEqual(rapport['total_mobile_money'], 1500)
         self.assertEqual(rapport['total_general'], 2500)
         self.assertEqual(rapport['nb_transactions'], 2)
 
