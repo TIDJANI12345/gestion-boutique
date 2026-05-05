@@ -231,6 +231,66 @@ class PreferencesCaisseWindow(QDialog):
 
         content_layout.addSpacing(20)
 
+        # === REMISE PAR DÉFAUT ===
+        remise_label = QLabel("Remise par défaut")
+        remise_label.setStyleSheet(f"font-size: 14pt; font-weight: bold; color: {Theme.c('dark')};")
+        content_layout.addWidget(remise_label)
+
+        remise_desc = QLabel("Mode de remise affiché par défaut dans la fenêtre Nouvelle Vente.")
+        remise_desc.setStyleSheet(f"color: {Theme.c('gray')}; font-size: 10pt;")
+        content_layout.addWidget(remise_desc)
+
+        remise_frame = QFrame()
+        remise_frame.setStyleSheet(f"background-color: {Theme.c('light')}; border-radius: 8px; padding: 20px;")
+        remise_frame_layout = QVBoxLayout(remise_frame)
+        remise_frame_layout.setSpacing(10)
+
+        self.radio_remise_group = QButtonGroup(self)
+        self.radio_remise_pct = QRadioButton("% Pourcentage  (ex: 10%)")
+        self.radio_remise_pct.setStyleSheet("font-size: 11pt; font-weight: bold;")
+        self.radio_remise_montant = QRadioButton("FCFA Montant fixe  (ex: 500 FCFA)")
+        self.radio_remise_montant.setStyleSheet("font-size: 11pt; font-weight: bold;")
+        self.radio_remise_group.addButton(self.radio_remise_pct, 0)
+        self.radio_remise_group.addButton(self.radio_remise_montant, 1)
+        remise_frame_layout.addWidget(self.radio_remise_pct)
+        remise_frame_layout.addWidget(self.radio_remise_montant)
+
+        content_layout.addWidget(remise_frame)
+
+        content_layout.addSpacing(20)
+
+        # === CODE-BARRES PAR DÉFAUT ===
+        cb_label = QLabel("Code-barres produit par défaut")
+        cb_label.setStyleSheet(f"font-size: 14pt; font-weight: bold; color: {Theme.c('dark')};")
+        content_layout.addWidget(cb_label)
+
+        cb_desc = QLabel("Mode par défaut lors de l'ajout d'un nouveau produit.")
+        cb_desc.setStyleSheet(f"color: {Theme.c('gray')}; font-size: 10pt;")
+        content_layout.addWidget(cb_desc)
+
+        cb_frame = QFrame()
+        cb_frame.setStyleSheet(f"background-color: {Theme.c('light')}; border-radius: 8px; padding: 20px;")
+        cb_frame_layout = QVBoxLayout(cb_frame)
+        cb_frame_layout.setSpacing(10)
+
+        self.radio_cb_group = QButtonGroup(self)
+        self.radio_cb_auto = QRadioButton("Automatique — générer un code (produits sans étiquette)")
+        self.radio_cb_auto.setStyleSheet("font-size: 11pt; font-weight: bold;")
+        self.radio_cb_manuel = QRadioButton("Manuel — saisir ou scanner le code existant (produits importés EAN-13)")
+        self.radio_cb_manuel.setStyleSheet("font-size: 11pt; font-weight: bold;")
+        self.radio_cb_group.addButton(self.radio_cb_auto, 0)
+        self.radio_cb_group.addButton(self.radio_cb_manuel, 1)
+        cb_frame_layout.addWidget(self.radio_cb_auto)
+        cb_frame_layout.addWidget(self.radio_cb_manuel)
+
+        cb_hint = QLabel("💡 En mode Manuel, un lecteur USB scanne directement dans le champ Code.")
+        cb_hint.setStyleSheet(f"color: {Theme.c('info')}; font-size: 9pt; font-style: italic;")
+        cb_frame_layout.addWidget(cb_hint)
+
+        content_layout.addWidget(cb_frame)
+
+        content_layout.addSpacing(20)
+
         # === IMPRESSION THERMIQUE ===
         imp_label = QLabel("Impression thermique")
         imp_label.setStyleSheet(f"font-size: 14pt; font-weight: bold; color: {Theme.c('dark')};")
@@ -481,6 +541,16 @@ class PreferencesCaisseWindow(QDialog):
         self.input_message_pied.setText(db.get_parametre('recu_message_pied', ''))
         self._actualiser_apercu_logo(db.get_parametre('boutique_logo_path', ''))
 
+        # Remise par défaut
+        remise_pct = db.get_parametre('remise_type_defaut', 'pct') == 'pct'
+        self.radio_remise_pct.setChecked(remise_pct)
+        self.radio_remise_montant.setChecked(not remise_pct)
+
+        # Code-barres par défaut
+        cb_auto = db.get_parametre('barcode_mode_defaut', 'auto') == 'auto'
+        self.radio_cb_auto.setChecked(cb_auto)
+        self.radio_cb_manuel.setChecked(not cb_auto)
+
         # Couleur primaire
         couleur = db.get_parametre('theme_couleur_primaire', Theme.c('primary'))
         self._actualiser_btn_couleur(couleur)
@@ -527,6 +597,12 @@ class PreferencesCaisseWindow(QDialog):
         db.set_parametre('boutique_instagram', self.input_instagram.text().strip())
         db.set_parametre('boutique_whatsapp', self.input_whatsapp.text().strip())
         db.set_parametre('recu_message_pied', self.input_message_pied.text().strip())
+
+        # Remise par défaut
+        db.set_parametre('remise_type_defaut', 'pct' if self.radio_remise_pct.isChecked() else 'montant')
+
+        # Code-barres par défaut
+        db.set_parametre('barcode_mode_defaut', 'auto' if self.radio_cb_auto.isChecked() else 'manuel')
 
         information(self, "Paramètres sauvegardés", "Paramètres enregistrés avec succès.")
         self.accept()

@@ -810,6 +810,10 @@ class ProduitsWindow(QDialog):
         self._spin_stock.setValue(0)
         self._spin_alerte.setValue(5)
         self._entry_code.clear()
-        self._radio_auto.setChecked(True)
+        from database import db as _db
+        if _db.get_parametre('barcode_mode_defaut', 'auto') == 'manuel':
+            self._radio_manual.setChecked(True)
+        else:
+            self._radio_auto.setChecked(True)
         self._btn_enregistrer.setText("Ajouter le produit")
         self._btn_enregistrer.setStyleSheet("")

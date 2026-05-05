@@ -33,9 +33,10 @@ class VentesWindow(QDialog):
             self.client_id = None
             self.client_selectionne = None
             self.utilisateur = utilisateur
-            self._remise_valeur = 0.0   # valeur saisie
-            self._remise_montant = 0.0  # montant en FCFA calculé
-            self._remise_pct = True     # True=%, False=montant fixe
+            self._remise_valeur = 0.0
+            self._remise_montant = 0.0
+            from database import db as _db
+            self._remise_pct = _db.get_parametre('remise_type_defaut', 'pct') == 'pct'
 
             self._session_id = None  # rattaché à la session active
 
