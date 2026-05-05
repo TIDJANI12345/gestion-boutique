@@ -332,6 +332,12 @@ class PrincipaleGestionnaireWindow(QMainWindow):
             a_annul = QAction("Annulation de vente", self)
             a_annul.triggered.connect(self.ouvrir_annulation_vente)
             ventes_menu.addAction(a_annul)
+
+            if peut('import_csv'):
+                produits_menu = menubar.addMenu("Produits")
+                a_csv = QAction("Import CSV produits", self)
+                a_csv.triggered.connect(self.ouvrir_import_csv)
+                produits_menu.addAction(a_csv)
         except Exception:
             pass
 
@@ -422,6 +428,12 @@ class PrincipaleGestionnaireWindow(QMainWindow):
             dlg.exec()
         else:
             QMessageBox.warning(self, "Accès refusé", "Vous n'avez pas la permission de voir vos ventes.")
+
+    def ouvrir_import_csv(self):
+        from ui.windows.import_csv import ImportCSVWindow
+        dlg = ImportCSVWindow(self)
+        dlg.import_termine.connect(lambda _: self.actualiser_stats())
+        dlg.exec()
 
     def ouvrir_annulation_vente(self):
         from ui.windows.annulation_vente import AnnulationVenteWindow

@@ -199,6 +199,15 @@ class PrincipaleWindow(QMainWindow):
             a_annul.triggered.connect(self.ouvrir_annulation_vente)
             menu_admin.addAction(a_annul)
 
+            try:
+                from modules.features import peut as _peut
+                if _peut('import_csv'):
+                    a_csv = QAction("Import CSV produits", self)
+                    a_csv.triggered.connect(self.ouvrir_import_csv)
+                    menu_admin.addAction(a_csv)
+            except Exception:
+                pass
+
             for label, slot in [
                 ("Logs d'audit", self.ouvrir_logs_audit),
                 ("Sauvegarde & Restauration", self.sauvegarder),
@@ -954,6 +963,14 @@ class PrincipaleWindow(QMainWindow):
             dlg.exec()
         except Exception as e:
             QMessageBox.critical(self, "Erreur", str(e))
+
+    # === IMPORT CSV ===
+
+    def ouvrir_import_csv(self):
+        from ui.windows.import_csv import ImportCSVWindow
+        dlg = ImportCSVWindow(self)
+        dlg.import_termine.connect(lambda _: self.actualiser_stats())
+        dlg.exec()
 
     # === ANNULATION VENTE ===
 
