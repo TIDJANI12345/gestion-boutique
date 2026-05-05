@@ -1,14 +1,14 @@
 [Setup]
 AppId={{B3F7A2E1-5C4D-4E8F-9A1B-2D3E4F5A6B7C}
 AppName=Gestion Boutique
-AppVersion=2.0.0
-AppVerName=Gestion Boutique 2.0.0
+AppVersion=2.5.0
+AppVerName=Gestion Boutique 2.5.0
 AppPublisher=TIDJANI
 AppPublisherURL=https://github.com/TIDJANI12345/gestion-boutique
 DefaultDirName={autopf}\GestionBoutique
 DefaultGroupName=Gestion Boutique
 OutputDir=output
-OutputBaseFilename=GestionBoutique_Setup_v2.0.0
+OutputBaseFilename=GestionBoutique_Setup_v2.5.0
 Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
