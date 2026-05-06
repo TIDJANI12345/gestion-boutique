@@ -5,7 +5,7 @@ import json
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QFrame, QLabel,
     QPushButton, QCheckBox, QLineEdit, QScrollArea, QWidget,
-    QMessageBox
+    QMessageBox, QButtonGroup, QRadioButton, QComboBox
 )
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
@@ -14,38 +14,63 @@ from ui.theme import Theme
 from ui.components.dialogs import information, erreur, confirmer
 from database import db
 
-# Modes natifs (toujours disponibles, jamais supprimables)
+# Modes natifs (jamais supprimables)
 MODES_NATIFS = {
-    'especes':       'Espèces',
-    'mobile_money':  'Mobile Money (Orange, MTN, Moov, Wave…)',
-    'virement':      'Virement bancaire',
-    'cheque':        'Chèque',
-    'mixte':         'Paiement mixte',
+    'especes':      {'label': 'Espèces',                          'type': 'especes'},
+    'mobile_money': {'label': 'Mobile Money (Orange, MTN, Moov, Wave…)', 'type': 'mobile_money'},
+    'virement':     {'label': 'Virement bancaire',                 'type': 'virement'},
+    'cheque':       {'label': 'Chèque',                            'type': 'cheque'},
+    'mixte':        {'label': 'Paiement mixte',                    'type': 'mixte'},
 }
 
+TYPES_LABELS = {
+    'mobile_money': 'Mobile Money',
+    'virement':     'Virement bancaire',
+    'cheque':       'Chèque',
+    'carte':        'Carte bancaire',
+    'autre':        'Autre',
+}
 
 _MODES_OBSOLETES = {'orange_money', 'mtn_momo', 'moov_money', 'wave'}
 
 
 def charger_config_paiement() -> dict:
-    """Retourne {key: {label, actif}} pour tous les modes (natifs + custom)."""
+    """Retourne {key: {label, actif, type}} pour tous les modes."""
     raw = db.get_parametre('modes_paiement', None)
+    config = {}
     if raw:
         try:
             config = json.loads(raw)
-            # Migrer les anciens modes opérateur vers mobile_money
-            anciens_presents = _MODES_OBSOLETES & config.keys()
-            if anciens_presents:
-                for k in anciens_presents:
-                    del config[k]
-                if 'mobile_money' not in config:
-                    config['mobile_money'] = {'label': 'Mobile Money', 'actif': True}
-                sauvegarder_config_paiement(config)
-            return config
         except Exception:
-            pass
-    # Valeur par défaut : tous actifs
-    return {k: {'label': v, 'actif': True} for k, v in MODES_NATIFS.items()}
+            config = {}
+
+    # Migration : anciens modes opérateur → mobile_money
+    anciens = _MODES_OBSOLETES & config.keys()
+    if anciens:
+        for k in anciens:
+            del config[k]
+        if 'mobile_money' not in config:
+            config['mobile_money'] = {'label': 'Mobile Money', 'actif': True, 'type': 'mobile_money'}
+        sauvegarder_config_paiement(config)
+
+    # Migration : ajouter type aux modes sans type
+    modifie = False
+    for key, val in config.items():
+        if 'type' not in val:
+            if key in MODES_NATIFS:
+                val['type'] = MODES_NATIFS[key]['type']
+            else:
+                val['type'] = 'autre'
+            modifie = True
+    if modifie:
+        sauvegarder_config_paiement(config)
+
+    # Si config vide, retourner les natifs par défaut
+    if not config:
+        return {k: {'label': v['label'], 'actif': True, 'type': v['type']}
+                for k, v in MODES_NATIFS.items()}
+
+    return config
 
 
 def sauvegarder_config_paiement(config: dict):
@@ -53,16 +78,27 @@ def sauvegarder_config_paiement(config: dict):
 
 
 def modes_actifs() -> list[dict]:
-    """Retourne [{key, label}] pour les modes actifs uniquement."""
+    """Retourne [{key, label, type}] pour les modes actifs uniquement."""
     config = charger_config_paiement()
-    return [{'key': k, 'label': v['label']} for k, v in config.items() if v.get('actif')]
+    return [
+        {'key': k, 'label': v['label'], 'type': v.get('type', 'autre')}
+        for k, v in config.items()
+        if v.get('actif')
+    ]
+
+
+def get_type_mode(key: str) -> str:
+    """Retourne le type d'un mode de paiement depuis la config."""
+    config = charger_config_paiement()
+    return config.get(key, {}).get('type', 'autre')
 
 
 class ParametresPaiementWindow(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Modes de paiement")
-        self.setFixedSize(480, 560)
+        self.setMinimumSize(500, 600)
+        self.resize(500, 640)
         self.setModal(True)
         self._config = charger_config_paiement()
         self._checkboxes = {}
@@ -97,7 +133,7 @@ class ParametresPaiementWindow(QDialog):
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
-        scroll.setFixedHeight(220)
+        scroll.setFixedHeight(230)
         scroll.setStyleSheet("QScrollArea { border: 1px solid #E5E7EB; border-radius: 6px; }")
 
         scroll_w = QWidget()
@@ -106,25 +142,27 @@ class ParametresPaiementWindow(QDialog):
         scroll_l.setSpacing(8)
 
         for key, val in self._config.items():
-            cb = QCheckBox(val['label'])
+            is_custom = key not in MODES_NATIFS
+            type_label = TYPES_LABELS.get(val.get('type', 'autre'), '')
+            label_text = val['label']
+            if is_custom and type_label:
+                label_text = f"{val['label']}  [{type_label}]"
+
+            cb = QCheckBox(label_text)
             cb.setChecked(val.get('actif', True))
             cb.setFont(QFont("Segoe UI", 11))
-            # Marquer les modes custom
-            if key not in MODES_NATIFS:
-                cb.setText(f"{val['label']}  (personnalisé)")
             self._checkboxes[key] = cb
 
             row = QHBoxLayout()
             row.addWidget(cb, 1)
 
-            if key not in MODES_NATIFS:
-                btn_del = QPushButton("Supprimer")
-                btn_del.setFixedHeight(28)
+            if is_custom:
+                btn_del = QPushButton("✕")
+                btn_del.setFixedSize(28, 28)
                 btn_del.setStyleSheet(
                     f"background-color: {Theme.c('danger')}; color: white; "
-                    f"border: none; border-radius: 4px; padding: 0 10px; font-size: 11px;"
+                    f"border: none; border-radius: 4px; font-size: 12px;"
                 )
-                btn_del.setToolTip(f"Supprimer le mode personnalisé « {val['label']} »")
                 btn_del.setCursor(Qt.PointingHandCursor)
                 btn_del.clicked.connect(lambda _, k=key: self._supprimer_mode(k))
                 row.addWidget(btn_del)
@@ -142,21 +180,56 @@ class ParametresPaiementWindow(QDialog):
 
         add_frame = QFrame()
         add_frame.setStyleSheet(
-            f"QFrame {{ background-color: {Theme.c('light')}; border-radius: 6px; "
+            f"QFrame {{ background-color: {Theme.c('light')}; border-radius: 8px; "
             f"border: 1px solid {Theme.c('card_border')}; }}"
         )
-        add_l = QHBoxLayout(add_frame)
-        add_l.setContentsMargins(12, 10, 12, 10)
+        add_l = QVBoxLayout(add_frame)
+        add_l.setContentsMargins(14, 12, 14, 12)
+        add_l.setSpacing(10)
 
+        # Nom
+        nom_row = QHBoxLayout()
+        nom_row.addWidget(QLabel("Nom :"))
         self._entry_new = QLineEdit()
-        self._entry_new.setPlaceholderText("Ex: Wave, Virement, Chèque…")
+        self._entry_new.setPlaceholderText("Ex : PayPal, Payoneer, Orange Money…")
         self._entry_new.setFont(QFont("Segoe UI", 11))
-        add_l.addWidget(self._entry_new, 1)
+        nom_row.addWidget(self._entry_new, 1)
+        add_l.addLayout(nom_row)
 
-        btn_add = QPushButton("Ajouter")
+        # Question Mobile Money
+        mm_lbl = QLabel("Ce mode est-il un Mobile Money ?")
+        mm_lbl.setFont(QFont("Segoe UI", 10))
+        add_l.addWidget(mm_lbl)
+
+        mm_row = QHBoxLayout()
+        self._rb_mm_group = QButtonGroup(self)
+        self._rb_mm_oui = QRadioButton("Oui  (compté dans Mobile Money du rapport Z)")
+        self._rb_mm_non = QRadioButton("Non")
+        self._rb_mm_non.setChecked(True)
+        self._rb_mm_group.addButton(self._rb_mm_oui)
+        self._rb_mm_group.addButton(self._rb_mm_non)
+        mm_row.addWidget(self._rb_mm_oui)
+        mm_row.addWidget(self._rb_mm_non)
+        mm_row.addStretch()
+        add_l.addLayout(mm_row)
+
+        # Sélecteur de type (visible seulement si "Non")
+        self._type_row = QHBoxLayout()
+        self._type_row.addWidget(QLabel("Type :"))
+        self._combo_type = QComboBox()
+        for k, v in TYPES_LABELS.items():
+            if k != 'mobile_money':
+                self._combo_type.addItem(v, k)
+        self._combo_type.setFont(QFont("Segoe UI", 10))
+        self._type_row.addWidget(self._combo_type, 1)
+        add_l.addLayout(self._type_row)
+
+        self._rb_mm_oui.toggled.connect(self._on_mm_toggle)
+
+        btn_add = QPushButton("+ Ajouter ce mode")
         btn_add.setStyleSheet(
             f"background-color: {Theme.c('success')}; color: white; "
-            f"border: none; border-radius: 4px; padding: 6px 14px;"
+            f"border: none; border-radius: 4px; padding: 7px 14px; font-size: 11px;"
         )
         btn_add.setCursor(Qt.PointingHandCursor)
         btn_add.clicked.connect(self._ajouter_mode)
@@ -188,23 +261,48 @@ class ParametresPaiementWindow(QDialog):
         cl.addLayout(btn_row)
         layout.addWidget(content, 1)
 
+    def _on_mm_toggle(self, checked: bool):
+        for i in range(self._type_row.count()):
+            item = self._type_row.itemAt(i)
+            if item and item.widget():
+                item.widget().setVisible(not checked)
+
     def _ajouter_mode(self):
         label = self._entry_new.text().strip()
         if not label:
+            erreur(self, "Erreur", "Veuillez saisir un nom.")
             return
-        key = label.lower().replace(" ", "_").replace("é", "e").replace("è", "e")
+        key = label.lower().replace(" ", "_")
+        for c in 'éèêë':
+            key = key.replace(c, 'e')
+        for c in 'àâä':
+            key = key.replace(c, 'a')
+        for c in 'ùûü':
+            key = key.replace(c, 'u')
         if key in self._config:
-            erreur(self, "Erreur", f"Un mode '{label}' existe déjà.")
+            erreur(self, "Erreur", f"Un mode « {label} » existe déjà.")
             return
-        self._config[key] = {'label': label, 'actif': True}
-        information(self, "Ajouté", f"Mode '{label}' ajouté.\nFerme et réouvre pour voir la modification.")
+
+        if self._rb_mm_oui.isChecked():
+            type_mode = 'mobile_money'
+        else:
+            type_mode = self._combo_type.currentData()
+
+        self._config[key] = {'label': label, 'actif': True, 'type': type_mode}
+        sauvegarder_config_paiement(self._config)
+        information(self, "Ajouté",
+            f"Mode « {label} » ajouté (type : {TYPES_LABELS.get(type_mode, type_mode)}).\n"
+            "Réouvre la fenêtre pour voir la mise à jour.")
         self._entry_new.clear()
+        self._rb_mm_non.setChecked(True)
 
     def _supprimer_mode(self, key: str):
         label = self._config[key]['label']
-        if confirmer(self, "Supprimer", f"Supprimer le mode '{label}' ?"):
+        if confirmer(self, "Supprimer", f"Supprimer le mode « {label} » ?"):
             del self._config[key]
-            information(self, "Supprimé", f"Mode '{label}' supprimé.\nFerme et réouvre pour voir la modification.")
+            sauvegarder_config_paiement(self._config)
+            information(self, "Supprimé",
+                f"Mode « {label} » supprimé.\nRéouvre la fenêtre pour voir la mise à jour.")
 
     def _enregistrer(self):
         actif_count = 0
@@ -213,11 +311,9 @@ class ParametresPaiementWindow(QDialog):
                 self._config[key]['actif'] = cb.isChecked()
                 if cb.isChecked():
                     actif_count += 1
-
         if actif_count == 0:
             erreur(self, "Erreur", "Au moins un mode de paiement doit être actif.")
             return
-
         sauvegarder_config_paiement(self._config)
         information(self, "Succès", "Modes de paiement enregistrés.")
         self.accept()

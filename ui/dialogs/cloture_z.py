@@ -166,10 +166,18 @@ class ClotureZDialog(QDialog):
         sep2.setStyleSheet(f"color: {Theme.c('card_border')};")
         self._rapport_layout.addWidget(sep2)
 
-        _ligne_rapport(self._rapport_layout, "Espèces encaissées", f"{data['total_especes']:,} {devise}")
-        _ligne_rapport(self._rapport_layout, "Mobile Money", f"{data['total_mobile']:,} {devise}")
-        if data['total_credit']:
-            _ligne_rapport(self._rapport_layout, "Crédit (ardoise)", f"{data['total_credit']:,} {devise}")
+        modes = [
+            ("Espèces",       data.get('total_especes', 0)),
+            ("Mobile Money",  data.get('total_mobile', 0)),
+            ("Virement",      data.get('total_virement', 0)),
+            ("Chèque",        data.get('total_cheque', 0)),
+            ("Carte",         data.get('total_carte', 0)),
+            ("Autre",         data.get('total_autre', 0)),
+            ("Crédit (ardoise)", data.get('total_credit', 0)),
+        ]
+        for label, montant in modes:
+            if montant:
+                _ligne_rapport(self._rapport_layout, label, f"{montant:,} {devise}")
 
         sep3 = QFrame()
         sep3.setFrameShape(QFrame.HLine)
@@ -305,11 +313,24 @@ class ClotureZDialog(QDialog):
             printer.text(f"Caisse : {rapport['id_caisse']}\n")
             printer.text("-" * largeur + "\n")
             total_general = rapport.get('total_general') or (
-                rapport.get('total_especes', 0) + rapport.get('total_mobile', 0)
+                rapport.get('total_especes', 0) + rapport.get('total_mobile', 0) +
+                rapport.get('total_virement', 0) + rapport.get('total_cheque', 0) +
+                rapport.get('total_carte', 0) + rapport.get('total_autre', 0)
             )
             printer.text(f"Nb ventes    : {rapport.get('nb_ventes', 0)}\n")
-            printer.text(f"Especes      : {rapport.get('total_especes', 0):,} F\n")
-            printer.text(f"Mobile Money : {rapport.get('total_mobile', 0):,} F\n")
+            modes_ticket = [
+                ("Especes     ", 'total_especes'),
+                ("Mobile Money", 'total_mobile'),
+                ("Virement    ", 'total_virement'),
+                ("Cheque      ", 'total_cheque'),
+                ("Carte       ", 'total_carte'),
+                ("Autre       ", 'total_autre'),
+                ("Credit      ", 'total_credit'),
+            ]
+            for label, key in modes_ticket:
+                val = rapport.get(key, 0) or 0
+                if val:
+                    printer.text(f"{label} : {val:,} F\n")
             printer.text(f"Annulees     : {rapport.get('total_annule', 0):,} F\n")
             printer.text("-" * largeur + "\n")
             printer.set(bold=True)
@@ -383,13 +404,26 @@ class ClotureZDialog(QDialog):
             total_general = rapport.get('total_general') or (
                 rapport.get('total_especes', 0) + rapport.get('total_mobile', 0)
             )
+            modes_data = []
+            for label, key in [
+                ('Espèces', 'total_especes'),
+                ('Mobile Money', 'total_mobile'),
+                ('Virement', 'total_virement'),
+                ('Chèque', 'total_cheque'),
+                ('Carte', 'total_carte'),
+                ('Autre', 'total_autre'),
+                ('Crédit (ardoise)', 'total_credit'),
+            ]:
+                val = rapport.get(key, 0) or 0
+                if val:
+                    modes_data.append([label, f"{val:,} {devise}"])
+
             data = [
                 ['Date clôture', date_affichage],
                 ['Caisse', rapport['id_caisse']],
                 ['Nombre de ventes', str(rapport.get('nb_ventes', 0))],
                 ['', ''],
-                ['Espèces encaissées', f"{rapport.get('total_especes', 0):,} {devise}"],
-                ['Mobile Money', f"{rapport.get('total_mobile', 0):,} {devise}"],
+                *modes_data,
                 ['Ventes annulées', f"{rapport.get('total_annule', 0):,} {devise}"],
                 ['', ''],
                 ['TOTAL GÉNÉRAL', f"{total_general:,} {devise}"],
@@ -402,16 +436,20 @@ class ClotureZDialog(QDialog):
                 ['Hash Z', rapport['hash_cloture']],
             ]
 
+            # Indices dynamiques
+            idx_total = data.index(['TOTAL GÉNÉRAL', f"{total_general:,} {devise}"])
+            idx_ecart = data.index(['ÉCART', f"{rapport.get('ecart', 0):+,} {devise}"])
+
             table = Table(data, colWidths=[7*cm, 8*cm])
             table.setStyle(TableStyle([
                 ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
-                ('FONTNAME', (0, 8), (-1, 8), 'Helvetica-Bold'),
-                ('FONTNAME', (0, 13), (-1, 13), 'Helvetica-Bold'),
-                ('BACKGROUND', (0, 8), (-1, 8), colors.HexColor('#3B82F6')),
-                ('TEXTCOLOR', (0, 8), (-1, 8), colors.white),
-                ('BACKGROUND', (0, 13), (-1, 13),
-                 colors.HexColor('#10B981') if rapport['ecart'] == 0 else colors.HexColor('#EF4444')),
-                ('TEXTCOLOR', (0, 13), (-1, 13), colors.white),
+                ('FONTNAME', (0, idx_total), (-1, idx_total), 'Helvetica-Bold'),
+                ('FONTNAME', (0, idx_ecart), (-1, idx_ecart), 'Helvetica-Bold'),
+                ('BACKGROUND', (0, idx_total), (-1, idx_total), colors.HexColor('#3B82F6')),
+                ('TEXTCOLOR', (0, idx_total), (-1, idx_total), colors.white),
+                ('BACKGROUND', (0, idx_ecart), (-1, idx_ecart),
+                 colors.HexColor('#10B981') if rapport.get('ecart', 0) == 0 else colors.HexColor('#EF4444')),
+                ('TEXTCOLOR', (0, idx_ecart), (-1, idx_ecart), colors.white),
                 ('BOX', (0, 0), (-1, -1), 0.5, colors.grey),
                 ('INNERGRID', (0, 0), (-1, -1), 0.3, colors.lightgrey),
                 ('TOPPADDING', (0, 0), (-1, -1), 6),

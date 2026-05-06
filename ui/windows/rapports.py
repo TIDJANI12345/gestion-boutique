@@ -228,11 +228,12 @@ class RapportsWindow(QDialog):
         self._caisse_cards = {}
 
         modes = [
-            ("especes", "Espèces", Theme.c('success')),
-            ("mobile_money", "Mobile Money", "#FF6600"),
-            ("virement", "Virement bancaire", Theme.c('primary')),
-            ("cheque", "Chèque", Theme.c('info')),
-            ("mixte", "Paiement mixte", Theme.c('purple')),
+            ("especes",      "Espèces",          Theme.c('success')),
+            ("mobile_money", "Mobile Money",      "#FF6600"),
+            ("virement",     "Virement bancaire", Theme.c('primary')),
+            ("cheque",       "Chèque",            Theme.c('info')),
+            ("mixte",        "Paiement mixte",    Theme.c('purple')),
+            ("autre",        "Autres",            Theme.c('text_secondary')),
         ]
         for key, label, color in modes:
             card = self._creer_stat_card(label, f"0 {get_devise()}", color)
@@ -456,9 +457,19 @@ class RapportsWindow(QDialog):
             rapport = Paiement.rapport_caisse_jour(date)
 
             # Update cards
-            for key in ["especes", "mobile_money", "virement", "cheque", "mixte"]:
-                val = rapport.get(f"total_{key}", 0)
+            mapping = {
+                "especes":      "total_especes",
+                "mobile_money": "total_mobile_money",
+                "virement":     "total_virement",
+                "cheque":       "total_cheque",
+                "mixte":        "total_mixte",
+                "autre":        "total_autre",
+            }
+            for key, rapport_key in mapping.items():
+                val = rapport.get(rapport_key, 0)
                 self._maj_card(self._caisse_cards[key], f"{val:,.0f} {get_devise()}")
+                if key == "autre":
+                    self._caisse_cards[key].setVisible(val > 0)
 
             # Table
             lignes = []

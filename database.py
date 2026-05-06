@@ -355,6 +355,15 @@ class Database:
             self.cursor.execute("ALTER TABLE ventes ADD COLUMN motif_annulation TEXT NULL")
             self.conn.commit()
 
+        # Migration : colonnes de paiement détaillées dans sessions_caisse
+        for col in ('total_virement', 'total_cheque', 'total_carte', 'total_autre'):
+            try:
+                self.cursor.execute(f"SELECT {col} FROM sessions_caisse LIMIT 1")
+            except sqlite3.OperationalError:
+                logger.info(f"Migration: Ajout colonne {col} à sessions_caisse")
+                self.cursor.execute(f"ALTER TABLE sessions_caisse ADD COLUMN {col} INTEGER DEFAULT 0")
+                self.conn.commit()
+
         self.conn.commit()
         logger.info("Tables creees/verifiees avec succes")
 

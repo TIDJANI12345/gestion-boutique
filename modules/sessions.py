@@ -60,8 +60,29 @@ def _calculer_totaux(session_id: int) -> dict:
     # Totaux par mode de paiement
     total_especes = 0
     total_mobile = 0
-    modes_mobile = ('orange_money', 'mtn_momo', 'moov_money', 'wave',
-                    'mobile_money', 'virement', 'carte', 'cheque')
+    total_virement = 0
+    total_cheque = 0
+    total_carte = 0
+    total_autre = 0
+
+    # Charger les types depuis la config des modes de paiement
+    try:
+        from ui.windows.parametres_paiement import charger_config_paiement
+        config_modes = charger_config_paiement()
+        type_map = {k: v.get('type', 'autre') for k, v in config_modes.items()}
+    except Exception:
+        type_map = {}
+
+    # Fallback pour modes natifs non configurés
+    type_map.setdefault('especes', 'especes')
+    type_map.setdefault('mobile_money', 'mobile_money')
+    type_map.setdefault('orange_money', 'mobile_money')
+    type_map.setdefault('mtn_momo', 'mobile_money')
+    type_map.setdefault('moov_money', 'mobile_money')
+    type_map.setdefault('wave', 'mobile_money')
+    type_map.setdefault('virement', 'virement')
+    type_map.setdefault('cheque', 'cheque')
+    type_map.setdefault('carte', 'carte')
 
     if vente_ids:
         placeholders = ','.join('?' * len(vente_ids))
@@ -71,18 +92,32 @@ def _calculer_totaux(session_id: int) -> dict:
             vente_ids
         )
         for p in paiements:
-            if p['mode'] == 'especes':
-                total_especes += int(p['s'])
-            elif p['mode'] in modes_mobile:
-                total_mobile += int(p['s'])
-            # mixte : déjà décomposé par ligne
+            mode = p['mode']
+            montant = int(p['s'])
+            type_mode = type_map.get(mode, 'autre')
+            if type_mode == 'especes':
+                total_especes += montant
+            elif type_mode == 'mobile_money':
+                total_mobile += montant
+            elif type_mode == 'virement':
+                total_virement += montant
+            elif type_mode == 'cheque':
+                total_cheque += montant
+            elif type_mode == 'carte':
+                total_carte += montant
+            elif type_mode not in ('credit', 'mixte'):
+                total_autre += montant
 
     return {
         'nb_ventes': nb_ventes,
         'total_general': int(total_general),
         'total_especes': total_especes,
         'total_mobile': total_mobile,
-        'total_credit': 0,   # ardoise — implémenté en Phase J5
+        'total_virement': total_virement,
+        'total_cheque': total_cheque,
+        'total_carte': total_carte,
+        'total_autre': total_autre,
+        'total_credit': 0,
         'total_annule': total_annule,
     }
 
@@ -145,6 +180,10 @@ def cloturer_session(fond_declare: int) -> tuple[bool, str, dict | None]:
                ecart = ?,
                total_especes = ?,
                total_mobile = ?,
+               total_virement = ?,
+               total_cheque = ?,
+               total_carte = ?,
+               total_autre = ?,
                total_credit = ?,
                total_annule = ?,
                nb_ventes = ?,
@@ -153,6 +192,8 @@ def cloturer_session(fond_declare: int) -> tuple[bool, str, dict | None]:
            WHERE id = ?""",
         (now, fond_declare, fond_calcule, ecart,
          totaux['total_especes'], totaux['total_mobile'],
+         totaux['total_virement'], totaux['total_cheque'],
+         totaux['total_carte'], totaux['total_autre'],
          totaux['total_credit'], totaux['total_annule'],
          totaux['nb_ventes'], hash_z, session_id)
     )

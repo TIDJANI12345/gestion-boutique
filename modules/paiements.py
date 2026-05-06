@@ -6,22 +6,60 @@ from modules.logger import get_logger
 
 logger = get_logger('paiements')
 
-# Labels d'affichage pour les modes de paiement
+# Labels natifs (fallback si config non chargeable)
 MODE_LABELS = {
     'especes':      'Espèces',
     'mobile_money': 'Mobile Money',
     'virement':     'Virement bancaire',
     'cheque':       'Chèque',
     'mixte':        'Paiement mixte',
-    # Anciens modes (rétrocompatibilité DB existante)
     'orange_money': 'Orange Money',
     'mtn_momo':     'MTN MoMo',
     'moov_money':   'Moov Money',
     'wave':         'Wave',
 }
 
-# Modes considérés comme "Mobile Money" pour le regroupement
-MODES_MOBILE = {'mobile_money', 'orange_money', 'mtn_momo', 'moov_money'}
+# Modes Mobile Money natifs (fallback)
+MODES_MOBILE_NATIFS = {'mobile_money', 'orange_money', 'mtn_momo', 'moov_money', 'wave'}
+
+
+def _charger_type_map() -> dict:
+    """Retourne {mode_key: type} depuis la config des modes de paiement."""
+    try:
+        from ui.windows.parametres_paiement import charger_config_paiement
+        config = charger_config_paiement()
+        return {k: v.get('type', 'autre') for k, v in config.items()}
+    except Exception:
+        return {}
+
+
+def _get_label(mode: str) -> str:
+    """Retourne le label d'affichage pour un mode, config ou fallback."""
+    try:
+        from ui.windows.parametres_paiement import charger_config_paiement
+        config = charger_config_paiement()
+        if mode in config:
+            return config[mode]['label']
+    except Exception:
+        pass
+    return MODE_LABELS.get(mode, mode)
+
+
+def _get_type(mode: str, type_map: dict) -> str:
+    """Retourne le type d'un mode avec fallback sur les natifs."""
+    if mode in type_map:
+        return type_map[mode]
+    if mode in MODES_MOBILE_NATIFS:
+        return 'mobile_money'
+    if mode == 'especes':
+        return 'especes'
+    if mode == 'virement':
+        return 'virement'
+    if mode == 'cheque':
+        return 'cheque'
+    if mode == 'carte':
+        return 'carte'
+    return 'autre'
 
 
 class Paiement:
@@ -99,31 +137,36 @@ class Paiement:
             'total_virement': 0,
             'total_cheque': 0,
             'total_mixte': 0,
+            'total_autre': 0,
             'total_general': 0,
             'nb_transactions': 0,
             'details_par_mode': [],
         }
 
+        type_map = _charger_type_map()
         totaux = Paiement.total_par_mode_jour(date)
         for mode, total, nb in totaux:
             rapport['details_par_mode'].append({
                 'mode': mode,
-                'label': MODE_LABELS.get(mode, mode),
+                'label': _get_label(mode),
                 'total': total,
                 'nb': nb,
             })
             rapport['total_general'] += total
             rapport['nb_transactions'] += nb
 
-            if mode == 'especes':
-                rapport['total_especes'] = total
-            elif mode in MODES_MOBILE:
+            t = _get_type(mode, type_map)
+            if t == 'especes':
+                rapport['total_especes'] += total
+            elif t == 'mobile_money':
                 rapport['total_mobile_money'] += total
-            elif mode == 'virement':
-                rapport['total_virement'] = total
-            elif mode == 'cheque':
-                rapport['total_cheque'] = total
+            elif t == 'virement':
+                rapport['total_virement'] += total
+            elif t == 'cheque':
+                rapport['total_cheque'] += total
             elif mode == 'mixte':
-                rapport['total_mixte'] = total
+                rapport['total_mixte'] += total
+            elif t not in ('credit', 'mixte'):
+                rapport['total_autre'] += total
 
         return rapport
