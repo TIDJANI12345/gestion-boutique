@@ -1,17 +1,15 @@
 """
-Fenetre de confirmation de vente - PySide6
-Dialogue modal affiche apres une vente reussie.
+Confirmation de vente — écran rapide pour le caissier.
 """
+import os
+
 from PySide6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QFrame, QMessageBox, QScrollArea, QWidget
+    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QFrame
 )
-from PySide6.QtCore import Qt, Signal, QUrl
+from PySide6.QtCore import Qt, Signal, QTimer, QUrl
 from PySide6.QtGui import QFont, QDesktopServices
 
 from ui.theme import Theme
-
-import os
 
 
 def _supprimer_fichier(chemin: str):
@@ -23,7 +21,7 @@ def _supprimer_fichier(chemin: str):
 
 
 class ConfirmationVenteWindow(QDialog):
-    """Dialogue de confirmation apres une vente reussie."""
+    """Dialogue de confirmation rapide après vente."""
 
     nouvelle_vente = Signal()
 
@@ -31,266 +29,105 @@ class ConfirmationVenteWindow(QDialog):
         super().__init__(parent)
         self.vente_info = vente_info
         self.chemin_recu = chemin_recu
-
-        self.setWindowTitle("Vente enregistree !")
-        self.setFixedSize(600, 700)
+        self.setWindowTitle("Vente enregistrée !")
+        self.setFixedSize(420, 320)
         self.setModal(True)
-
         self._setup_ui()
+        self._auto_imprimer_ticket()
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        # === EN-TETE VERT ===
+        # En-tête vert
         header = QFrame()
-        header.setFixedHeight(180)
+        header.setFixedHeight(140)
         header.setStyleSheet(f"background-color: {Theme.c('success')};")
-        header_layout = QVBoxLayout(header)
-        header_layout.setAlignment(Qt.AlignCenter)
+        h_layout = QVBoxLayout(header)
+        h_layout.setAlignment(Qt.AlignCenter)
 
-        # Cercle avec checkmark
-        circle = QLabel("✓")
-        circle.setFixedSize(70, 70)
-        circle.setAlignment(Qt.AlignCenter)
-        circle.setFont(QFont("Segoe UI", 32, QFont.Bold))
-        circle.setStyleSheet(
-            f"background-color: white; color: {Theme.c('success')}; "
-            f"border-radius: 35px;"
+        check = QLabel("✓")
+        check.setFixedSize(60, 60)
+        check.setAlignment(Qt.AlignCenter)
+        check.setFont(QFont("Segoe UI", 28, QFont.Bold))
+        check.setStyleSheet(
+            f"background-color: white; color: {Theme.c('success')}; border-radius: 30px;"
         )
-        header_layout.addWidget(circle, 0, Qt.AlignCenter)
+        h_layout.addWidget(check, 0, Qt.AlignCenter)
 
-        lbl_titre = QLabel("Vente enregistree !")
-        lbl_titre.setFont(QFont("Segoe UI", 22, QFont.Bold))
-        lbl_titre.setStyleSheet("color: white; background: transparent;")
-        lbl_titre.setAlignment(Qt.AlignCenter)
-        header_layout.addWidget(lbl_titre)
-
-        lbl_numero = QLabel(f"Recu N° {self.vente_info['numero']}")
-        lbl_numero.setFont(QFont("Segoe UI", 13))
-        lbl_numero.setStyleSheet("color: white; background: transparent;")
-        lbl_numero.setAlignment(Qt.AlignCenter)
-        header_layout.addWidget(lbl_numero)
+        lbl_ok = QLabel("Vente enregistrée !")
+        lbl_ok.setFont(QFont("Segoe UI", 16, QFont.Bold))
+        lbl_ok.setStyleSheet("color: white; background: transparent;")
+        lbl_ok.setAlignment(Qt.AlignCenter)
+        h_layout.addWidget(lbl_ok)
 
         layout.addWidget(header)
 
-        # === CONTENU ===
-        content = QWidget()
-        content_layout = QVBoxLayout(content)
-        content_layout.setContentsMargins(40, 30, 40, 20)
-        content_layout.setSpacing(0)
-
-        # Carte info (date + total + client)
-        info_frame = QFrame()
-        info_frame.setStyleSheet(
-            f"background-color: {Theme.c('light')}; border-radius: 8px;"
-        )
-        info_layout = QVBoxLayout(info_frame)
-        info_layout.setContentsMargins(20, 20, 20, 20)
-        info_layout.setAlignment(Qt.AlignCenter)
-
-        lbl_date = QLabel(self.vente_info['date'])
-        lbl_date.setFont(QFont("Segoe UI", 11))
-        lbl_date.setAlignment(Qt.AlignCenter)
-        info_layout.addWidget(lbl_date)
+        # Corps
+        body = QFrame()
+        body_layout = QVBoxLayout(body)
+        body_layout.setContentsMargins(30, 20, 30, 20)
+        body_layout.setSpacing(12)
 
         from modules.fiscalite import get_devise
-        lbl_total = QLabel(f"{self.vente_info['total']:,.0f} {get_devise()}")
-        lbl_total.setFont(QFont("Segoe UI", 32, QFont.Bold))
+        devise = get_devise()
+
+        lbl_total = QLabel(f"{self.vente_info['total']:,.0f} {devise}")
+        lbl_total.setFont(QFont("Segoe UI", 30, QFont.Bold))
         lbl_total.setStyleSheet(f"color: {Theme.c('success')};")
         lbl_total.setAlignment(Qt.AlignCenter)
-        info_layout.addWidget(lbl_total)
+        body_layout.addWidget(lbl_total)
 
-        if self.vente_info.get('client'):
-            lbl_client = QLabel(self.vente_info['client'])
-            lbl_client.setFont(QFont("Segoe UI", 10))
-            lbl_client.setStyleSheet(f"color: {Theme.c('gray')};")
-            lbl_client.setAlignment(Qt.AlignCenter)
-            info_layout.addWidget(lbl_client)
+        lbl_num = QLabel(f"N° {self.vente_info['numero']}")
+        lbl_num.setFont(QFont("Segoe UI", 10))
+        lbl_num.setStyleSheet(f"color: {Theme.c('text_secondary')};")
+        lbl_num.setAlignment(Qt.AlignCenter)
+        body_layout.addWidget(lbl_num)
 
-        content_layout.addWidget(info_frame)
-        content_layout.addSpacing(15)
+        body_layout.addStretch()
 
-        # Resume articles
-        nb_articles = sum(item['quantite'] for item in self.vente_info['items'])
-        nb_lignes = len(self.vente_info['items'])
-        lbl_articles = QLabel(
-            f"{nb_articles} article{'s' if nb_articles > 1 else ''} "
-            f"({nb_lignes} ligne{'s' if nb_lignes > 1 else ''})"
+        # Boutons
+        btn_row = QHBoxLayout()
+
+        btn_fermer = QPushButton("Fermer")
+        btn_fermer.setMinimumHeight(44)
+        btn_fermer.setFont(QFont("Segoe UI", 11))
+        btn_fermer.clicked.connect(self.reject)
+        btn_row.addWidget(btn_fermer)
+
+        btn_nouvelle = QPushButton("Nouvelle vente →")
+        btn_nouvelle.setMinimumHeight(44)
+        btn_nouvelle.setFont(QFont("Segoe UI", 12, QFont.Bold))
+        btn_nouvelle.setStyleSheet(
+            f"background: {Theme.c('success')}; color: white; border: none; border-radius: 6px;"
         )
-        lbl_articles.setFont(QFont("Segoe UI", 11))
-        lbl_articles.setStyleSheet(f"color: {Theme.c('gray')};")
-        lbl_articles.setAlignment(Qt.AlignCenter)
-        content_layout.addWidget(lbl_articles)
-        content_layout.addSpacing(20)
+        btn_nouvelle.setCursor(Qt.PointingHandCursor)
+        btn_nouvelle.clicked.connect(self._nouvelle_vente)
+        btn_row.addWidget(btn_nouvelle)
 
-        # === BOUTONS D'ACTION ===
-        buttons = [
-            ("Ouvrir le recu PDF", 'danger', self._ouvrir_pdf),
-            ("Imprimer PDF", 'primary', self._imprimer),
-            ("Imprimer ticket", 'warning', self._imprimer_ticket),
-            ("Nouvelle vente", 'success', self._nouvelle_vente),
-        ]
+        body_layout.addLayout(btn_row)
+        layout.addWidget(body, 1)
 
-        for text, color_key, slot in buttons:
-            btn = QPushButton(text)
-            btn.setFont(QFont("Segoe UI", 13, QFont.Bold))
-            btn.setMinimumHeight(50)
-            btn.setCursor(Qt.PointingHandCursor)
-            couleur = Theme.c(color_key)
-            btn.setStyleSheet(f"""
-                QPushButton {{
-                    background-color: {couleur};
-                    color: white; border: none; border-radius: 6px;
-                }}
-                QPushButton:hover {{
-                    background-color: {_darken(couleur)};
-                }}
-            """)
-            btn.clicked.connect(slot)
-            content_layout.addWidget(btn)
-            content_layout.addSpacing(8)
+        # Focus sur "Nouvelle vente" pour appui Entrée
+        btn_nouvelle.setDefault(True)
+        btn_nouvelle.setFocus()
 
-        content_layout.addSpacing(8)
-
-        # Lien retour dashboard
-        link = QLabel("← Retour au tableau de bord")
-        link.setFont(QFont("Segoe UI", 11))
-        link.setStyleSheet(
-            f"color: {Theme.c('primary')}; text-decoration: underline;"
-        )
-        link.setCursor(Qt.PointingHandCursor)
-        link.setAlignment(Qt.AlignCenter)
-        link.mousePressEvent = lambda e: self.reject()
-        content_layout.addWidget(link)
-
-        content_layout.addSpacing(12)
-
-        # Lien voir details
-        lbl_details = QLabel("Voir les details")
-        lbl_details.setFont(QFont("Segoe UI", 9))
-        lbl_details.setStyleSheet(f"color: {Theme.c('gray')};")
-        lbl_details.setCursor(Qt.PointingHandCursor)
-        lbl_details.setAlignment(Qt.AlignCenter)
-        lbl_details.mousePressEvent = lambda e: self._afficher_details()
-        content_layout.addWidget(lbl_details)
-
-        content_layout.addStretch()
-        layout.addWidget(content, 1)
-
-    def _ouvrir_pdf(self):
-        """Générer le PDF à la demande et l'ouvrir."""
+    def _auto_imprimer_ticket(self):
+        """Imprimer le ticket thermique automatiquement si la préférence est activée."""
+        from database import db
+        if db.get_parametre('ticket_auto_impression', '1') != '1':
+            return
         vente_id = self.vente_info.get('vente_id')
         if not vente_id:
-            QMessageBox.critical(self, "Erreur", "ID de vente introuvable.")
             return
         try:
-            from modules.recus import generer_recu_pdf
-            from PySide6.QtCore import QTimer
-            chemin = generer_recu_pdf(vente_id)
-            if chemin and os.path.exists(chemin):
-                url = QUrl.fromLocalFile(chemin)
-                if not QDesktopServices.openUrl(url):
-                    QMessageBox.critical(self, "Erreur", "Impossible d'ouvrir le PDF.")
-                else:
-                    QTimer.singleShot(30000, lambda: _supprimer_fichier(chemin))
-            else:
-                QMessageBox.critical(self, "Erreur", "Le reçu PDF n'a pas pu être généré.")
-        except Exception as e:
-            QMessageBox.critical(self, "Erreur", f"Erreur génération PDF :\n{e}")
-
-    def _imprimer(self):
-        """Générer le PDF et l'ouvrir pour impression manuelle (Ctrl+P)."""
-        self._ouvrir_pdf()
-
-    def _imprimer_ticket(self):
-        """Imprimer sur imprimante thermique."""
-        vente_id = self.vente_info.get('vente_id')
-        if not vente_id:
-            QMessageBox.critical(self, "Erreur", "ID de vente non disponible")
-            return
-
-        from modules.imprimante import ImprimanteThermique
-
-        if not ImprimanteThermique.est_disponible():
-            QMessageBox.warning(
-                self, "Imprimante",
-                "L'impression thermique n'est pas disponible.\n\n"
-                "Verifiez que python-escpos est installe\n"
-                "et que l'imprimante est configuree."
-            )
-            return
-
-        succes, message = ImprimanteThermique.imprimer_recu(vente_id)
-        if succes:
-            QMessageBox.information(self, "Impression", "Ticket imprime avec succes!")
-        else:
-            QMessageBox.critical(self, "Erreur", f"Echec de l'impression:\n{message}")
+            from modules.imprimante import ImprimanteThermique
+            if ImprimanteThermique.est_disponible():
+                ImprimanteThermique.imprimer_recu(vente_id)
+        except Exception:
+            pass
 
     def _nouvelle_vente(self):
-        """Emettre le signal et fermer."""
         self.nouvelle_vente.emit()
         self.accept()
-
-    def _afficher_details(self):
-        """Afficher les details de la vente dans un sous-dialogue."""
-        dlg = QDialog(self)
-        dlg.setWindowTitle(f"Details - {self.vente_info['numero']}")
-        dlg.setFixedSize(500, 400)
-        dlg.setModal(True)
-
-        layout = QVBoxLayout(dlg)
-        layout.setContentsMargins(0, 0, 0, 0)
-
-        # Titre
-        titre = QLabel(f"Details - {self.vente_info['numero']}")
-        titre.setFont(QFont("Segoe UI", 14, QFont.Bold))
-        titre.setAlignment(Qt.AlignCenter)
-        titre.setContentsMargins(0, 20, 0, 15)
-        layout.addWidget(titre)
-
-        # Zone scrollable
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setStyleSheet("border: none;")
-
-        scroll_content = QWidget()
-        scroll_layout = QVBoxLayout(scroll_content)
-        scroll_layout.setContentsMargins(20, 0, 20, 20)
-        scroll_layout.setSpacing(8)
-
-        for item in self.vente_info['items']:
-            item_frame = QFrame()
-            item_frame.setStyleSheet(
-                f"background-color: {Theme.c('light')}; border-radius: 6px;"
-            )
-            item_layout = QVBoxLayout(item_frame)
-            item_layout.setContentsMargins(15, 12, 15, 12)
-
-            lbl_nom = QLabel(item['nom'])
-            lbl_nom.setFont(QFont("Segoe UI", 11, QFont.Bold))
-            item_layout.addWidget(lbl_nom)
-
-            lbl_detail = QLabel(
-                f"{item['quantite']} x {item['prix_vente']:,.0f} F = "
-                f"{item['sous_total']:,.0f} F"
-            )
-            lbl_detail.setFont(QFont("Segoe UI", 10))
-            lbl_detail.setStyleSheet(f"color: {Theme.c('gray')};")
-            item_layout.addWidget(lbl_detail)
-
-            scroll_layout.addWidget(item_frame)
-
-        scroll_layout.addStretch()
-        scroll.setWidget(scroll_content)
-        layout.addWidget(scroll)
-
-        dlg.exec()
-
-
-def _darken(hex_color: str) -> str:
-    """Assombrir une couleur hex."""
-    h = hex_color.lstrip('#')
-    r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
-    return f'#{max(0,r-25):02x}{max(0,g-25):02x}{max(0,b-25):02x}'

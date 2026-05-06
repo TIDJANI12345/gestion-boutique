@@ -454,6 +454,9 @@ class PreferencesCaisseWindow(QDialog):
         mode_row.addWidget(self.combo_imp_mode, 1)
         imp_layout.addLayout(mode_row)
 
+        self.chk_ticket_auto = self._chk("Imprimer le ticket automatiquement après chaque vente")
+        imp_layout.addWidget(self.chk_ticket_auto)
+
         btn_test_imp = QPushButton("Imprimer ticket de test")
         btn_test_imp.setProperty("class", "secondary")
         btn_test_imp.setCursor(Qt.PointingHandCursor)
@@ -710,6 +713,7 @@ class PreferencesCaisseWindow(QDialog):
         mode_imp = db.get_parametre('imprimante_mode', 'usb')
         mode_map = {'usb': 0, 'reseau': 1, 'serie': 2}
         self.combo_imp_mode.setCurrentIndex(mode_map.get(mode_imp, 0))
+        self.chk_ticket_auto.setChecked(db.get_parametre('ticket_auto_impression', '1') == '1')
 
         # Infos boutique
         from config import BOUTIQUE_NOM, BOUTIQUE_ADRESSE, BOUTIQUE_TELEPHONE, BOUTIQUE_EMAIL
@@ -784,6 +788,7 @@ class PreferencesCaisseWindow(QDialog):
         # Mode imprimante
         mode_imp_map = ['usb', 'reseau', 'serie']
         db.set_parametre('imprimante_mode', mode_imp_map[self.combo_imp_mode.currentIndex()])
+        db.set_parametre('ticket_auto_impression', '1' if self.chk_ticket_auto.isChecked() else '0')
 
         # Infos boutique
         nom = self.input_nom_boutique.text().strip()
