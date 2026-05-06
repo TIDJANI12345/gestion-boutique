@@ -5,7 +5,7 @@ import os
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QFrame, QLabel,
     QPushButton, QRadioButton, QButtonGroup, QCheckBox, QScrollArea, QLineEdit,
-    QComboBox, QFileDialog, QColorDialog
+    QComboBox, QFileDialog, QColorDialog, QSpinBox
 )
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QPixmap
@@ -16,13 +16,112 @@ from database import db
 
 
 class PreferencesCaisseWindow(QDialog):
+
+    def _chk(self, texte: str, bold: bool = True) -> QCheckBox:
+        """Crée une QCheckBox thémée qui fonctionne en clair ET en sombre."""
+        cb = QCheckBox(texte)
+        weight = "bold" if bold else "normal"
+        cb.setStyleSheet(f"""
+            QCheckBox {{
+                color: {Theme.c('text')};
+                font-size: 11pt;
+                font-weight: {weight};
+                spacing: 8px;
+            }}
+            QCheckBox::indicator {{
+                width: 18px; height: 18px;
+                border-radius: 4px;
+                border: 2px solid {Theme.c('input_border')};
+                background: {Theme.c('input_bg')};
+            }}
+            QCheckBox::indicator:hover {{
+                border-color: {Theme.c('primary')};
+            }}
+            QCheckBox::indicator:checked {{
+                background: {Theme.c('primary')};
+                border-color: {Theme.c('primary')};
+            }}
+            QCheckBox::indicator:checked:disabled {{
+                background: {Theme.c('gray')};
+                border-color: {Theme.c('gray')};
+            }}
+            QCheckBox:disabled {{ color: {Theme.c('gray')}; }}
+        """)
+        cb.stateChanged.connect(self._marquer_modifie)
+        return cb
+
+    def _radio(self, texte: str, bold: bool = True) -> QRadioButton:
+        """QRadioButton thémé."""
+        rb = QRadioButton(texte)
+        weight = "bold" if bold else "normal"
+        rb.setStyleSheet(f"""
+            QRadioButton {{
+                color: {Theme.c('text')};
+                font-size: 11pt;
+                font-weight: {weight};
+                spacing: 8px;
+            }}
+            QRadioButton::indicator {{
+                width: 18px; height: 18px;
+                border-radius: 9px;
+                border: 2px solid {Theme.c('input_border')};
+                background: {Theme.c('input_bg')};
+            }}
+            QRadioButton::indicator:hover {{
+                border-color: {Theme.c('primary')};
+            }}
+            QRadioButton::indicator:checked {{
+                background: {Theme.c('primary')};
+                border-color: {Theme.c('primary')};
+            }}
+        """)
+        rb.toggled.connect(self._marquer_modifie)
+        return rb
+
+    def _section(self, titre: str, desc: str = '') -> QLabel:
+        """Titre de section."""
+        lbl = QLabel(titre)
+        lbl.setStyleSheet(f"font-size: 13pt; font-weight: bold; color: {Theme.c('text')};")
+        return lbl
+
+    def _marquer_modifie(self, *_):
+        self._modifie = True
+        if hasattr(self, '_btn_enregistrer'):
+            self._btn_enregistrer.setStyleSheet(self._style_save_actif())
+
+    def _style_save_actif(self):
+        return f"""
+            QPushButton {{
+                background: {Theme.c('success')}; color: white;
+                padding: 12px 30px; font-size: 11pt; font-weight: bold;
+                border-radius: 6px; border: none;
+            }}
+            QPushButton:hover {{ background: {Theme.c('success_hover')}; }}
+        """
+
+    def _style_save_neutre(self):
+        return f"""
+            QPushButton {{
+                background: {Theme.c('card_border')}; color: {Theme.c('text_secondary')};
+                padding: 12px 30px; font-size: 11pt; font-weight: bold;
+                border-radius: 6px; border: none;
+            }}
+        """
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Paramètres Caisse")
-        self.setMinimumSize(650, 550)
+        self.setMinimumSize(700, 600)
+        self._modifie = False
 
         self._setup_ui()
         self._charger_parametres()
+
+        # Connecter les champs texte au marqueur de modification
+        for w in self.findChildren(QLineEdit):
+            w.textChanged.connect(self._marquer_modifie)
+        for w in self.findChildren(QComboBox):
+            w.currentIndexChanged.connect(self._marquer_modifie)
 
         # Centrer la fenêtre sur le parent
         if self.parent():
@@ -59,15 +158,13 @@ class PreferencesCaisseWindow(QDialog):
         content_layout.setContentsMargins(30, 30, 30, 30)
         content_layout.setSpacing(20)
 
-        # === MODE SCAN ===
-        mode_label = QLabel("Mode de scan")
-        mode_label.setStyleSheet(f"font-size: 14pt; font-weight: bold; color: {Theme.c('dark')};")
+        # === COMPORTEMENT AU SCAN ===
+        mode_label = QLabel("Comportement au scan")
+        mode_label.setStyleSheet(f"font-size: 13pt; font-weight: bold; color: {Theme.c('text')};")
         content_layout.addWidget(mode_label)
 
-        desc_label = QLabel(
-            "Choisissez comment les produits sont ajoutés au panier lors du scan."
-        )
-        desc_label.setStyleSheet(f"color: {Theme.c('gray')}; font-size: 10pt;")
+        desc_label = QLabel("Comportement après la détection d'un code-barres.")
+        desc_label.setStyleSheet(f"color: {Theme.c('text_secondary')}; font-size: 10pt;")
         desc_label.setWordWrap(True)
         content_layout.addWidget(desc_label)
 
@@ -79,36 +176,20 @@ class PreferencesCaisseWindow(QDialog):
 
         self.radio_group = QButtonGroup(self)
 
-        # Mode AUTO
-        self.radio_auto = QRadioButton("🏪 Mode AUTOMATIQUE (supermarché)")
-        self.radio_auto.setStyleSheet("font-size: 11pt; font-weight: bold;")
+        self.radio_auto = self._radio("🏪 Automatique — ajouter directement avec quantité 1")
         self.radio_group.addButton(self.radio_auto, 1)
         mode_layout.addWidget(self.radio_auto)
-
-        auto_desc = QLabel(
-            "• Ajout direct avec quantité 1 au scan\n"
-            "• Pas de popup de confirmation\n"
-            "• Re-scan du même produit → quantité s'incrémente\n"
-            "• Idéal pour flux rapide comme en supermarché"
-        )
-        auto_desc.setStyleSheet(f"color: {Theme.c('gray')}; font-size: 9pt; margin-left: 25px;")
+        auto_desc = QLabel("Re-scan du même article → quantité s'incrémente. Idéal pour supermarché / flux rapide.")
+        auto_desc.setStyleSheet(f"color: {Theme.c('text_secondary')}; font-size: 9pt; margin-left: 26px;")
         mode_layout.addWidget(auto_desc)
 
-        mode_layout.addSpacing(10)
+        mode_layout.addSpacing(8)
 
-        # Mode MANUEL
-        self.radio_manuel = QRadioButton("✍️ Mode MANUEL (avec quantité)")
-        self.radio_manuel.setStyleSheet("font-size: 11pt; font-weight: bold;")
+        self.radio_manuel = self._radio("✍️ Manuel — demander la quantité à chaque scan")
         self.radio_group.addButton(self.radio_manuel, 0)
         mode_layout.addWidget(self.radio_manuel)
-
-        manuel_desc = QLabel(
-            "• Demande la quantité à chaque scan\n"
-            "• Popup de confirmation systématique\n"
-            "• Plus sûr pour éviter les erreurs\n"
-            "• Idéal pour produits avec quantités variables"
-        )
-        manuel_desc.setStyleSheet(f"color: {Theme.c('gray')}; font-size: 9pt; margin-left: 25px;")
+        manuel_desc = QLabel("Une popup s'ouvre à chaque scan. Plus sûr pour les quantités variables.")
+        manuel_desc.setStyleSheet(f"color: {Theme.c('text_secondary')}; font-size: 9pt; margin-left: 26px;")
         mode_layout.addWidget(manuel_desc)
 
         content_layout.addWidget(mode_frame)
@@ -122,31 +203,18 @@ class PreferencesCaisseWindow(QDialog):
 
         # === SON DE SCAN ===
         son_label = QLabel("Son de confirmation")
-        son_label.setStyleSheet(f"font-size: 14pt; font-weight: bold; color: {Theme.c('dark')};")
+        son_label.setStyleSheet(f"font-size: 13pt; font-weight: bold; color: {Theme.c('text')};")
         content_layout.addWidget(son_label)
 
-        son_desc = QLabel(
-            "Jouer un son à chaque produit scanné et ajouté au panier."
-        )
-        son_desc.setStyleSheet(f"color: {Theme.c('gray')}; font-size: 10pt;")
-        son_desc.setWordWrap(True)
-        content_layout.addWidget(son_desc)
-
-        # Checkbox son
         son_frame = QFrame()
-        son_frame.setStyleSheet(f"background-color: {Theme.c('light')}; border-radius: 8px; padding: 20px;")
+        son_frame.setStyleSheet(f"background-color: {Theme.c('light')}; border-radius: 8px; padding: 16px;")
         son_layout = QVBoxLayout(son_frame)
-        son_layout.setSpacing(10)
+        son_layout.setSpacing(6)
 
-        self.checkbox_son = QCheckBox("🔊 Activer le son de scan")
-        self.checkbox_son.setStyleSheet("font-size: 11pt; font-weight: bold;")
+        self.checkbox_son = self._chk("🔊 Activer le son de scan")
         son_layout.addWidget(self.checkbox_son)
-
-        son_info = QLabel(
-            "Un bip court sera joué à chaque ajout au panier.\n"
-            "Utile pour confirmer que le scan a bien été pris en compte."
-        )
-        son_info.setStyleSheet(f"color: {Theme.c('gray')}; font-size: 9pt; margin-left: 25px;")
+        son_info = QLabel("Un bip court est joué à chaque ajout au panier.")
+        son_info.setStyleSheet(f"color: {Theme.c('text_secondary')}; font-size: 9pt; margin-left: 26px;")
         son_layout.addWidget(son_info)
 
         content_layout.addWidget(son_frame)
@@ -154,12 +222,13 @@ class PreferencesCaisseWindow(QDialog):
         content_layout.addSpacing(20)
 
         # === CAMÉRA ===
-        camera_label = QLabel("Caméra de scan")
+        camera_label = QLabel("Scanner caméra")
         camera_label.setStyleSheet(f"font-size: 14pt; font-weight: bold; color: {Theme.c('dark')};")
         content_layout.addWidget(camera_label)
 
         camera_desc = QLabel(
-            "Configuration de la caméra intégrée pour scanner les codes-barres."
+            "Activez uniquement si vous n'avez pas de lecteur de codes-barres USB. "
+            "La plupart des boutiques n'ont pas besoin de cette option."
         )
         camera_desc.setStyleSheet(f"color: {Theme.c('gray')}; font-size: 10pt;")
         camera_desc.setWordWrap(True)
@@ -170,27 +239,35 @@ class PreferencesCaisseWindow(QDialog):
         camera_layout = QVBoxLayout(camera_frame)
         camera_layout.setSpacing(10)
 
-        self.checkbox_camera_auto = QCheckBox("📷 Activer la caméra automatiquement")
-        self.checkbox_camera_auto.setStyleSheet("font-size: 11pt; font-weight: bold;")
-        camera_layout.addWidget(self.checkbox_camera_auto)
+        # Toggle maître
+        self.checkbox_camera_actif = self._chk("📷 Activer le scanner caméra")
+        camera_layout.addWidget(self.checkbox_camera_actif)
 
-        camera_info = QLabel(
-            "Si activé, la caméra démarre automatiquement à l'ouverture de la fenêtre Ventes.\n"
-            "Sinon, vous devez cliquer sur le bouton 'Afficher caméra' pour l'activer."
+        camera_main_info = QLabel(
+            "Affiche le bouton caméra dans la fenêtre Ventes.\n"
+            "Désactivé par défaut — utilisez un lecteur USB pour de meilleures performances."
         )
-        camera_info.setStyleSheet(f"color: {Theme.c('gray')}; font-size: 9pt; margin-left: 25px;")
-        camera_layout.addWidget(camera_info)
+        camera_main_info.setStyleSheet(f"color: {Theme.c('gray')}; font-size: 9pt; margin-left: 25px;")
+        camera_layout.addWidget(camera_main_info)
 
-        camera_layout.addSpacing(15)
+        camera_layout.addSpacing(8)
 
-        # Source caméra
-        source_label = QLabel("📹 Source caméra")
+        # Sous-options (grises si caméra désactivée)
+        self._camera_suboptions = QFrame()
+        sub_layout = QVBoxLayout(self._camera_suboptions)
+        sub_layout.setContentsMargins(20, 0, 0, 0)
+        sub_layout.setSpacing(8)
+
+        self.checkbox_camera_auto = self._chk("Ouvrir la caméra automatiquement à l'ouverture des Ventes", bold=False)
+        sub_layout.addWidget(self.checkbox_camera_auto)
+
+        source_label = QLabel("Source caméra :")
         source_label.setStyleSheet("font-size: 10pt; font-weight: bold;")
-        camera_layout.addWidget(source_label)
+        sub_layout.addWidget(source_label)
 
         source_layout = QHBoxLayout()
         self.input_camera_source = QLineEdit()
-        self.input_camera_source.setPlaceholderText("0 (webcam PC) ou http://IP:PORT/video (téléphone)")
+        self.input_camera_source.setPlaceholderText("0 (webcam PC)  ou  http://IP:PORT/video (téléphone)")
         self.input_camera_source.setStyleSheet(f"""
             QLineEdit {{
                 padding: 8px;
@@ -205,89 +282,158 @@ class PreferencesCaisseWindow(QDialog):
         test_btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: {Theme.c('info')};
-                color: white;
-                padding: 8px 15px;
-                border-radius: 4px;
-                font-weight: bold;
+                color: white; padding: 8px 15px;
+                border-radius: 4px; font-weight: bold;
             }}
-            QPushButton:hover {{
-                background-color: #0284C7;
-            }}
+            QPushButton:hover {{ background-color: #0284C7; }}
         """)
         test_btn.clicked.connect(self._tester_camera)
         source_layout.addWidget(test_btn)
-
-        camera_layout.addLayout(source_layout)
+        sub_layout.addLayout(source_layout)
 
         source_info = QLabel(
-            "Entrez 0 pour la webcam par défaut, 1 pour une 2ème webcam USB.\n"
-            "Pour utiliser votre téléphone : installez DroidCam/IP Webcam et entrez l'URL affichée.\n"
-            "Exemple : http://192.168.1.100:8080/video"
+            "0 = webcam intégrée · 1 = 2ème webcam USB\n"
+            "Téléphone : installez IP Webcam (Android) et entrez l'URL — ex: http://192.168.1.5:8080/video"
         )
-        source_info.setStyleSheet(f"color: {Theme.c('gray')}; font-size: 9pt; margin-left: 0px;")
-        camera_layout.addWidget(source_info)
+        source_info.setStyleSheet(f"color: {Theme.c('gray')}; font-size: 9pt;")
+        sub_layout.addWidget(source_info)
 
+        camera_layout.addWidget(self._camera_suboptions)
         content_layout.addWidget(camera_frame)
+
+        # Lier le toggle maître aux sous-options
+        self.checkbox_camera_actif.toggled.connect(self._camera_suboptions.setEnabled)
 
         content_layout.addSpacing(20)
 
         # === REMISE PAR DÉFAUT ===
         remise_label = QLabel("Remise par défaut")
-        remise_label.setStyleSheet(f"font-size: 14pt; font-weight: bold; color: {Theme.c('dark')};")
+        remise_label.setStyleSheet(f"font-size: 13pt; font-weight: bold; color: {Theme.c('text')};")
         content_layout.addWidget(remise_label)
-
         remise_desc = QLabel("Mode de remise affiché par défaut dans la fenêtre Nouvelle Vente.")
-        remise_desc.setStyleSheet(f"color: {Theme.c('gray')}; font-size: 10pt;")
+        remise_desc.setStyleSheet(f"color: {Theme.c('text_secondary')}; font-size: 10pt;")
         content_layout.addWidget(remise_desc)
 
         remise_frame = QFrame()
-        remise_frame.setStyleSheet(f"background-color: {Theme.c('light')}; border-radius: 8px; padding: 20px;")
+        remise_frame.setStyleSheet(f"background-color: {Theme.c('light')}; border-radius: 8px; padding: 16px;")
         remise_frame_layout = QVBoxLayout(remise_frame)
-        remise_frame_layout.setSpacing(10)
+        remise_frame_layout.setSpacing(8)
 
         self.radio_remise_group = QButtonGroup(self)
-        self.radio_remise_pct = QRadioButton("% Pourcentage  (ex: 10%)")
-        self.radio_remise_pct.setStyleSheet("font-size: 11pt; font-weight: bold;")
-        self.radio_remise_montant = QRadioButton("FCFA Montant fixe  (ex: 500 FCFA)")
-        self.radio_remise_montant.setStyleSheet("font-size: 11pt; font-weight: bold;")
+        self.radio_remise_pct = self._radio("% Pourcentage  (ex: 10%)")
+        self.radio_remise_montant = self._radio("FCFA Montant fixe  (ex: 500 FCFA)")
         self.radio_remise_group.addButton(self.radio_remise_pct, 0)
         self.radio_remise_group.addButton(self.radio_remise_montant, 1)
         remise_frame_layout.addWidget(self.radio_remise_pct)
         remise_frame_layout.addWidget(self.radio_remise_montant)
-
         content_layout.addWidget(remise_frame)
 
         content_layout.addSpacing(20)
 
         # === CODE-BARRES PAR DÉFAUT ===
         cb_label = QLabel("Code-barres produit par défaut")
-        cb_label.setStyleSheet(f"font-size: 14pt; font-weight: bold; color: {Theme.c('dark')};")
+        cb_label.setStyleSheet(f"font-size: 13pt; font-weight: bold; color: {Theme.c('text')};")
         content_layout.addWidget(cb_label)
-
         cb_desc = QLabel("Mode par défaut lors de l'ajout d'un nouveau produit.")
-        cb_desc.setStyleSheet(f"color: {Theme.c('gray')}; font-size: 10pt;")
+        cb_desc.setStyleSheet(f"color: {Theme.c('text_secondary')}; font-size: 10pt;")
         content_layout.addWidget(cb_desc)
 
         cb_frame = QFrame()
-        cb_frame.setStyleSheet(f"background-color: {Theme.c('light')}; border-radius: 8px; padding: 20px;")
+        cb_frame.setStyleSheet(f"background-color: {Theme.c('light')}; border-radius: 8px; padding: 16px;")
         cb_frame_layout = QVBoxLayout(cb_frame)
-        cb_frame_layout.setSpacing(10)
+        cb_frame_layout.setSpacing(8)
 
         self.radio_cb_group = QButtonGroup(self)
-        self.radio_cb_auto = QRadioButton("Automatique — générer un code (produits sans étiquette)")
-        self.radio_cb_auto.setStyleSheet("font-size: 11pt; font-weight: bold;")
-        self.radio_cb_manuel = QRadioButton("Manuel — saisir ou scanner le code existant (produits importés EAN-13)")
-        self.radio_cb_manuel.setStyleSheet("font-size: 11pt; font-weight: bold;")
+        self.radio_cb_auto = self._radio("Automatique — générer un code (produits sans étiquette)")
+        self.radio_cb_manuel = self._radio("Manuel — saisir ou scanner le code existant (EAN-13 importé)")
         self.radio_cb_group.addButton(self.radio_cb_auto, 0)
         self.radio_cb_group.addButton(self.radio_cb_manuel, 1)
         cb_frame_layout.addWidget(self.radio_cb_auto)
         cb_frame_layout.addWidget(self.radio_cb_manuel)
-
         cb_hint = QLabel("💡 En mode Manuel, un lecteur USB scanne directement dans le champ Code.")
-        cb_hint.setStyleSheet(f"color: {Theme.c('info')}; font-size: 9pt; font-style: italic;")
+        cb_hint.setStyleSheet(f"color: {Theme.c('info')}; font-size: 9pt;")
         cb_frame_layout.addWidget(cb_hint)
-
         content_layout.addWidget(cb_frame)
+
+        content_layout.addSpacing(20)
+
+        # === VENTES & STOCK ===
+        vs_label = QLabel("Ventes & Stock")
+        vs_label.setStyleSheet(f"font-size: 13pt; font-weight: bold; color: {Theme.c('text')};")
+        content_layout.addWidget(vs_label)
+        vs_desc = QLabel("Paramètres par défaut pour les ventes et la gestion des stocks.")
+        vs_desc.setStyleSheet(f"color: {Theme.c('text_secondary')}; font-size: 10pt;")
+        content_layout.addWidget(vs_desc)
+
+        vs_frame = QFrame()
+        vs_frame.setStyleSheet(f"background-color: {Theme.c('light')}; border-radius: 8px; padding: 20px;")
+        vs_layout = QVBoxLayout(vs_frame)
+        vs_layout.setSpacing(10)
+
+        # TVA par défaut
+        tva_row = QHBoxLayout()
+        tva_lbl = QLabel("TVA par défaut :")
+        tva_lbl.setFixedWidth(160)
+        tva_lbl.setStyleSheet("font-size: 10pt;")
+        tva_row.addWidget(tva_lbl)
+        self._combo_tva = QComboBox()
+        for tva_label, tva_val in [("Pas de TVA (0 %)", "0"), ("TVA 10 %", "10"), ("TVA 18 % — Bénin", "18")]:
+            self._combo_tva.addItem(tva_label, tva_val)
+        tva_row.addWidget(self._combo_tva)
+        tva_row.addStretch()
+        vs_layout.addLayout(tva_row)
+
+        tva_info = QLabel("Appliquée sur les reçus lorsque la TVA est activée sur la vente.")
+        tva_info.setStyleSheet(f"color: {Theme.c('text_secondary')}; font-size: 9pt;")
+        vs_layout.addWidget(tva_info)
+
+        vs_layout.addSpacing(8)
+
+        # Seuil alerte stock
+        alerte_row = QHBoxLayout()
+        alerte_lbl = QLabel("Alerte stock faible :")
+        alerte_lbl.setFixedWidth(160)
+        alerte_lbl.setStyleSheet("font-size: 10pt;")
+        alerte_row.addWidget(alerte_lbl)
+        self._spin_alerte_stock = QSpinBox()
+        self._spin_alerte_stock.setRange(0, 9999)
+        self._spin_alerte_stock.setSuffix(" unités")
+        self._spin_alerte_stock.setFixedWidth(130)
+        self._spin_alerte_stock.setStyleSheet(f"padding: 4px; border: 1px solid {Theme.c('gray')}; border-radius: 4px;")
+        self._spin_alerte_stock.valueChanged.connect(self._marquer_modifie)
+        alerte_row.addWidget(self._spin_alerte_stock)
+        alerte_row.addStretch()
+        vs_layout.addLayout(alerte_row)
+
+        alerte_info = QLabel("Les produits sous ce seuil s'affichent en rouge dans l'inventaire et les rapports.")
+        alerte_info.setStyleSheet(f"color: {Theme.c('text_secondary')}; font-size: 9pt;")
+        vs_layout.addWidget(alerte_info)
+
+        vs_layout.addSpacing(8)
+
+        # Déconnexion automatique
+        session_row = QHBoxLayout()
+        session_lbl = QLabel("Déconnexion auto :")
+        session_lbl.setFixedWidth(160)
+        session_lbl.setStyleSheet("font-size: 10pt;")
+        session_row.addWidget(session_lbl)
+        self._combo_session = QComboBox()
+        for s_label, s_val in [
+            ("Jamais", "0"), ("15 minutes", "900"), ("30 minutes", "1800"),
+            ("1 heure", "3600"), ("2 heures", "7200"),
+        ]:
+            self._combo_session.addItem(s_label, s_val)
+        session_row.addWidget(self._combo_session)
+        session_row.addStretch()
+        vs_layout.addLayout(session_row)
+
+        session_info = QLabel("Déconnecte l'utilisateur automatiquement après cette durée d'inactivité. "
+                              "Recommandé si plusieurs personnes partagent le poste.")
+        session_info.setStyleSheet(f"color: {Theme.c('text_secondary')}; font-size: 9pt;")
+        session_info.setWordWrap(True)
+        vs_layout.addWidget(session_info)
+
+        content_layout.addWidget(vs_frame)
 
         content_layout.addSpacing(20)
 
@@ -434,8 +580,9 @@ class PreferencesCaisseWindow(QDialog):
         app_label.setStyleSheet(f"font-size: 14pt; font-weight: bold; color: {Theme.c('dark')};")
         content_layout.addWidget(app_label)
 
-        app_desc = QLabel("Personnalisez la couleur principale de l'interface.")
+        app_desc = QLabel("Personnalisez la couleur principale de l'interface. Le changement s'applique immédiatement, sans redémarrage.")
         app_desc.setStyleSheet(f"color: {Theme.c('gray')}; font-size: 10pt;")
+        app_desc.setWordWrap(True)
         content_layout.addWidget(app_desc)
 
         app_frame = QFrame()
@@ -468,6 +615,36 @@ class PreferencesCaisseWindow(QDialog):
 
         content_layout.addWidget(app_frame)
 
+        content_layout.addSpacing(20)
+
+        # === CACHETS PDF ===
+        cachet_label = QLabel("Cachets sur le reçu PDF")
+        cachet_label.setStyleSheet(f"font-size: 13pt; font-weight: bold; color: {Theme.c('text')};")
+        content_layout.addWidget(cachet_label)
+        cachet_desc = QLabel(
+            "Affiche un tampon diagonal (PAYÉ / À CRÉDIT) sur les reçus PDF générés. "
+            "Désactivez si vous préférez un reçu sans mention de statut."
+        )
+        cachet_desc.setStyleSheet(f"color: {Theme.c('text_secondary')}; font-size: 10pt;")
+        cachet_desc.setWordWrap(True)
+        content_layout.addWidget(cachet_desc)
+
+        cachet_frame = QFrame()
+        cachet_frame.setStyleSheet(f"background-color: {Theme.c('light')}; border-radius: 8px; padding: 16px;")
+        cachet_frame_layout = QVBoxLayout(cachet_frame)
+        cachet_frame_layout.setSpacing(8)
+
+        self.checkbox_cachet_vente = self._chk("Afficher 'PAYÉ' sur les reçus de vente normale")
+        cachet_frame_layout.addWidget(self.checkbox_cachet_vente)
+
+        self.checkbox_cachet_credit = self._chk("Afficher 'À CRÉDIT' sur les reçus de vente à crédit")
+        cachet_frame_layout.addWidget(self.checkbox_cachet_credit)
+
+        self.checkbox_cachet_encaissement = self._chk("Afficher 'SOLDÉ' / 'À CRÉDIT' sur les reçus de remboursement ardoise")
+        cachet_frame_layout.addWidget(self.checkbox_cachet_encaissement)
+
+        content_layout.addWidget(cachet_frame)
+
         content_layout.addStretch()
 
         # Buttons
@@ -475,28 +652,30 @@ class PreferencesCaisseWindow(QDialog):
         btn_layout.addStretch()
 
         close_btn = QPushButton("Fermer")
-        close_btn.setObjectName("secondaryButton")
+        close_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: {Theme.c('light')}; color: {Theme.c('text')};
+                padding: 12px 24px; font-size: 11pt;
+                border-radius: 6px; border: 1px solid {Theme.c('card_border')};
+            }}
+            QPushButton:hover {{ background: {Theme.c('card_border')}; }}
+        """)
+        close_btn.setCursor(Qt.PointingHandCursor)
         close_btn.clicked.connect(self.reject)
         btn_layout.addWidget(close_btn)
 
-        save_btn = QPushButton("Enregistrer")
-        save_btn.setObjectName("primaryButton")
-        save_btn.setStyleSheet(f"""
-            QPushButton#primaryButton {{
-                background-color: {Theme.c('success')};
-                padding: 12px 30px;
-                font-size: 11pt;
-                font-weight: bold;
-            }}
-        """)
-        save_btn.clicked.connect(self._enregistrer)
-        btn_layout.addWidget(save_btn)
+        self._btn_enregistrer = QPushButton("Enregistrer")
+        self._btn_enregistrer.setCursor(Qt.PointingHandCursor)
+        self._btn_enregistrer.setStyleSheet(self._style_save_neutre())
+        self._btn_enregistrer.clicked.connect(self._enregistrer)
+        btn_layout.addWidget(self._btn_enregistrer)
 
         content_layout.addLayout(btn_layout)
 
-        # Envelopper content dans QScrollArea
+        # QScrollArea sans scroll horizontal
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         scroll.setStyleSheet("QScrollArea { border: none; }")
         scroll.setWidget(content)
         layout.addWidget(scroll)
@@ -514,7 +693,12 @@ class PreferencesCaisseWindow(QDialog):
         son_actif = db.get_parametre('son_scan_actif', '1') == '1'
         self.checkbox_son.setChecked(son_actif)
 
-        # Caméra auto
+        # Scanner caméra — toggle maître (désactivé par défaut)
+        camera_actif = db.get_parametre('scanner_camera_actif', '0') == '1'
+        self.checkbox_camera_actif.setChecked(camera_actif)
+        self._camera_suboptions.setEnabled(camera_actif)
+
+        # Caméra auto-start
         camera_auto = db.get_parametre('camera_auto_start', '0') == '1'
         self.checkbox_camera_auto.setChecked(camera_auto)
 
@@ -551,6 +735,32 @@ class PreferencesCaisseWindow(QDialog):
         self.radio_cb_auto.setChecked(cb_auto)
         self.radio_cb_manuel.setChecked(not cb_auto)
 
+        # TVA par défaut
+        tva_val = db.get_parametre('tva_taux_defaut', '18')
+        for i in range(self._combo_tva.count()):
+            if self._combo_tva.itemData(i) == tva_val:
+                self._combo_tva.setCurrentIndex(i)
+                break
+
+        # Seuil alerte stock
+        try:
+            alerte_val = int(db.get_parametre('stock_alerte_seuil_defaut', '5'))
+        except ValueError:
+            alerte_val = 5
+        self._spin_alerte_stock.setValue(alerte_val)
+
+        # Durée de session (session_timeout est en secondes, 0 = jamais)
+        session_val = db.get_parametre('session_timeout', '0')
+        for i in range(self._combo_session.count()):
+            if self._combo_session.itemData(i) == session_val:
+                self._combo_session.setCurrentIndex(i)
+                break
+
+        # Cachets PDF
+        self.checkbox_cachet_vente.setChecked(db.get_parametre('cachet_recu_vente', '1') == '1')
+        self.checkbox_cachet_credit.setChecked(db.get_parametre('cachet_recu_credit', '1') == '1')
+        self.checkbox_cachet_encaissement.setChecked(db.get_parametre('cachet_recu_encaissement', '1') == '1')
+
         # Couleur primaire
         couleur = db.get_parametre('theme_couleur_primaire', Theme.c('primary'))
         self._actualiser_btn_couleur(couleur)
@@ -566,13 +776,10 @@ class PreferencesCaisseWindow(QDialog):
         db.set_parametre('son_scan_actif', son_actif)
         db.set_parametre('son_scan_type', 'beep')
 
-        # Caméra auto
-        camera_auto = '1' if self.checkbox_camera_auto.isChecked() else '0'
-        db.set_parametre('camera_auto_start', camera_auto)
-
-        # Source caméra
-        camera_source = self.input_camera_source.text().strip() or '0'
-        db.set_parametre('camera_source', camera_source)
+        # Scanner caméra
+        db.set_parametre('scanner_camera_actif', '1' if self.checkbox_camera_actif.isChecked() else '0')
+        db.set_parametre('camera_auto_start', '1' if self.checkbox_camera_auto.isChecked() else '0')
+        db.set_parametre('camera_source', self.input_camera_source.text().strip() or '0')
 
         # Mode imprimante
         mode_imp_map = ['usb', 'reseau', 'serie']
@@ -604,8 +811,59 @@ class PreferencesCaisseWindow(QDialog):
         # Code-barres par défaut
         db.set_parametre('barcode_mode_defaut', 'auto' if self.radio_cb_auto.isChecked() else 'manuel')
 
+        # TVA par défaut
+        db.set_parametre('tva_taux_defaut', self._combo_tva.currentData())
+
+        # Seuil alerte stock
+        db.set_parametre('stock_alerte_seuil_defaut', str(self._spin_alerte_stock.value()))
+
+        # Durée de session (en secondes, 0 = jamais)
+        db.set_parametre('session_timeout', self._combo_session.currentData())
+
+        # Cachets PDF
+        db.set_parametre('cachet_recu_vente',        '1' if self.checkbox_cachet_vente.isChecked()         else '0')
+        db.set_parametre('cachet_recu_credit',       '1' if self.checkbox_cachet_credit.isChecked()        else '0')
+        db.set_parametre('cachet_recu_encaissement', '1' if self.checkbox_cachet_encaissement.isChecked()  else '0')
+
+        self._modifie = False
+        self._btn_enregistrer.setStyleSheet(self._style_save_neutre())
         information(self, "Paramètres sauvegardés", "Paramètres enregistrés avec succès.")
         self.accept()
+
+    def reject(self):
+        if self._modifie:
+            from PySide6.QtWidgets import QMessageBox
+            rep = QMessageBox.question(
+                self, "Modifications non sauvegardées",
+                "Vous avez des modifications non enregistrées.\n\nVoulez-vous les enregistrer avant de fermer ?",
+                QMessageBox.Save | QMessageBox.Discard | QMessageBox.Cancel,
+                QMessageBox.Save
+            )
+            if rep == QMessageBox.Save:
+                self._enregistrer()
+                return
+            elif rep == QMessageBox.Cancel:
+                return
+        super().reject()
+
+    def closeEvent(self, event):
+        if self._modifie:
+            from PySide6.QtWidgets import QMessageBox
+            rep = QMessageBox.question(
+                self, "Modifications non sauvegardées",
+                "Vous avez des modifications non enregistrées.\n\nVoulez-vous les enregistrer avant de fermer ?",
+                QMessageBox.Save | QMessageBox.Discard | QMessageBox.Cancel,
+                QMessageBox.Save
+            )
+            if rep == QMessageBox.Save:
+                self._enregistrer()
+                event.accept()
+            elif rep == QMessageBox.Discard:
+                event.accept()
+            else:
+                event.ignore()
+        else:
+            event.accept()
 
     def _choisir_logo(self):
         chemin, _ = QFileDialog.getOpenFileName(

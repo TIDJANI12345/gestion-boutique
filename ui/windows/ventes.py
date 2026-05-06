@@ -7,7 +7,7 @@ from datetime import datetime
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
     QPushButton, QFrame, QMessageBox, QWidget, QListWidget,
-    QListWidgetItem, QScrollArea, QSizePolicy
+    QListWidgetItem, QScrollArea, QSizePolicy, QFormLayout
 )
 from PySide6.QtCore import Qt, Signal, QTimer
 from PySide6.QtGui import QFont, QShortcut, QKeySequence
@@ -49,7 +49,7 @@ class VentesWindow(QDialog):
 
             self._setup_raccourcis()
             self._actualiser_panier()
-            self._check_camera_auto()
+            self._appliquer_preference_camera()
 
             QTimer.singleShot(0, self._entry_scan.setFocus)
         except Exception as e:
@@ -293,10 +293,10 @@ class VentesWindow(QDialog):
         resume_layout.addLayout(row_total)
 
         # Separateur camera
-        sep_camera = QFrame()
-        sep_camera.setFrameShape(QFrame.HLine)
-        sep_camera.setStyleSheet(f"color: {Theme.c('separator')};")
-        resume_layout.addWidget(sep_camera)
+        self._sep_camera = QFrame()
+        self._sep_camera.setFrameShape(QFrame.HLine)
+        self._sep_camera.setStyleSheet(f"color: {Theme.c('separator')};")
+        resume_layout.addWidget(self._sep_camera)
 
         # Bouton toggle camera
         self.btn_toggle_camera = QPushButton("📷 Afficher caméra")
@@ -345,9 +345,22 @@ class VentesWindow(QDialog):
         actions_layout.addWidget(btn_valider)
 
         # Client
+        client_header_row = QHBoxLayout()
         lbl_client = QLabel("Client (optionnel)")
         lbl_client.setFont(QFont("Segoe UI", 10, QFont.Bold))
-        actions_layout.addWidget(lbl_client)
+        client_header_row.addWidget(lbl_client)
+        client_header_row.addStretch()
+        btn_nouveau_client = QPushButton("+ Nouveau")
+        btn_nouveau_client.setFixedHeight(24)
+        btn_nouveau_client.setStyleSheet(
+            f"QPushButton {{ background: {Theme.c('success')}; color: white; "
+            f"border: none; border-radius: 4px; padding: 0 8px; font-size: 9pt; }}"
+            f"QPushButton:hover {{ background: {Theme.c('success_hover')}; }}"
+        )
+        btn_nouveau_client.setCursor(Qt.PointingHandCursor)
+        btn_nouveau_client.clicked.connect(self._nouveau_client_rapide)
+        client_header_row.addWidget(btn_nouveau_client)
+        actions_layout.addLayout(client_header_row)
 
         client_row = QHBoxLayout()
         self._entry_client = QLineEdit()
@@ -584,14 +597,28 @@ class VentesWindow(QDialog):
         dlg = ScannerCameraDialog(on_code_scanne, parent=self)
         dlg.exec()
 
+    def _appliquer_preference_camera(self):
+        """Affiche ou masque tous les éléments caméra selon la préférence."""
+        from database import db as _db
+        camera_actif = _db.get_parametre('scanner_camera_actif', '0') == '1'
+
+        # Bouton caméra dans la barre de scan
+        self._btn_camera.setVisible(camera_actif)
+
+        # Séparateur + bouton toggle + widget intégré
+        self._sep_camera.setVisible(camera_actif)
+        self.btn_toggle_camera.setVisible(camera_actif)
+        self._camera_widget.setVisible(False)  # toujours masqué à l'ouverture
+
+        if camera_actif:
+            auto_start = _db.get_parametre('camera_auto_start', '0') == '1'
+            if auto_start:
+                self._camera_widget.show()
+                self.btn_toggle_camera.setChecked(True)
+                self.btn_toggle_camera.setText("📷 Masquer caméra")
+
     def _check_camera_auto(self):
-        """Vérifier si la caméra doit être affichée automatiquement"""
-        from database import db
-        camera_auto = db.get_parametre('camera_auto_start', '0') == '1'
-        if camera_auto:
-            self._camera_widget.show()
-            self.btn_toggle_camera.setChecked(True)
-            self.btn_toggle_camera.setText("📷 Masquer caméra")
+        pass  # remplacé par _appliquer_preference_camera
 
     def _toggle_camera_widget(self):
         """Afficher/masquer le widget camera"""
@@ -936,6 +963,82 @@ class VentesWindow(QDialog):
         self._list_clients.setVisible(False)
         self._label_fidelite.setText("")
 
+    def _nouveau_client_rapide(self):
+        """Mini-formulaire pour créer un client sans quitter les ventes."""
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Nouveau client")
+        dlg.setMinimumWidth(340)
+        dlg.setModal(True)
+
+        layout = QVBoxLayout(dlg)
+        layout.setSpacing(12)
+
+        titre = QLabel("Nouveau client")
+        titre.setFont(QFont("Segoe UI", 13, QFont.Bold))
+        layout.addWidget(titre)
+
+        form = QFormLayout()
+        form.setSpacing(8)
+
+        entry_nom = QLineEdit()
+        entry_nom.setPlaceholderText("Nom complet *")
+        entry_nom.setStyleSheet(f"padding: 7px; border: 1px solid {Theme.c('input_border')}; border-radius: 4px;")
+        form.addRow("Nom :", entry_nom)
+
+        entry_tel = QLineEdit()
+        entry_tel.setPlaceholderText("+229 XX XX XX XX")
+        entry_tel.setStyleSheet(f"padding: 7px; border: 1px solid {Theme.c('input_border')}; border-radius: 4px;")
+        form.addRow("Téléphone :", entry_tel)
+
+        layout.addLayout(form)
+
+        lbl_err = QLabel("")
+        lbl_err.setStyleSheet(f"color: {Theme.c('danger')}; font-size: 9pt;")
+        layout.addWidget(lbl_err)
+
+        btn_row = QHBoxLayout()
+        btn_annuler = QPushButton("Annuler")
+        btn_annuler.setProperty("class", "secondary")
+        btn_annuler.clicked.connect(dlg.reject)
+        btn_row.addWidget(btn_annuler)
+
+        btn_creer = QPushButton("Créer et sélectionner")
+        btn_creer.setStyleSheet(
+            f"QPushButton {{ background: {Theme.c('success')}; color: white; padding: 8px 16px; "
+            f"border: none; border-radius: 4px; font-weight: bold; }}"
+            f"QPushButton:hover {{ background: {Theme.c('success_hover')}; }}"
+        )
+        btn_row.addWidget(btn_creer)
+        layout.addLayout(btn_row)
+
+        def _creer():
+            nom = entry_nom.text().strip()
+            if not nom:
+                lbl_err.setText("Le nom est obligatoire.")
+                entry_nom.setFocus()
+                return
+            tel = entry_tel.text().strip()
+            from modules.clients import Client
+            new_id = Client.ajouter(nom=nom, telephone=tel)
+            if not new_id:
+                lbl_err.setText("Erreur lors de la création du client.")
+                return
+            client = Client.obtenir_par_id(new_id)
+            if client:
+                self.client_id = new_id
+                self.client_selectionne = client
+                self._entry_client.blockSignals(True)
+                self._entry_client.setText(client['nom'])
+                self._entry_client.blockSignals(False)
+                self._list_clients.setVisible(False)
+                self._label_fidelite.setText("Points fidelite: 0")
+            dlg.accept()
+
+        btn_creer.clicked.connect(_creer)
+        entry_nom.returnPressed.connect(_creer)
+        entry_nom.setFocus()
+        dlg.exec()
+
     # === VALIDATION ===
 
     def _verifier_session(self):
@@ -1154,19 +1257,6 @@ class VentesWindow(QDialog):
             except Exception:
                 pass
 
-            # Generer le recu PDF
-            chemin_recu = ""
-            try:
-                from modules.recus import generer_recu_pdf
-                chemin_recu = generer_recu_pdf(vente_id) or ""
-            except Exception as e_pdf:
-                import traceback
-                traceback.print_exc()
-                QMessageBox.warning(
-                    self, "PDF",
-                    f"La vente est enregistrée mais le reçu PDF n'a pas pu être généré :\n{e_pdf}"
-                )
-
             # Preparer les infos pour la confirmation
             vente_info = {
                 'numero': numero_vente,
@@ -1181,9 +1271,7 @@ class VentesWindow(QDialog):
 
             # Afficher la confirmation
             from ui.windows.confirmation_vente import ConfirmationVenteWindow
-            dlg_confirm = ConfirmationVenteWindow(
-                vente_info, chemin_recu or "", parent=self
-            )
+            dlg_confirm = ConfirmationVenteWindow(vente_info, parent=self)
             dlg_confirm.nouvelle_vente.connect(self._reset_pour_nouvelle_vente)
 
             self.vente_terminee.emit()

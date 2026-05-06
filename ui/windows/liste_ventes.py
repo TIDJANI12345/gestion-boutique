@@ -2,12 +2,22 @@
 Fenetre Liste des Ventes - PySide6
 Historique des ventes avec recherche, filtres par date, details et reimpression.
 """
+import os
+
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
     QPushButton, QFrame, QWidget, QDateEdit, QMenu
 )
 from PySide6.QtCore import Qt, QDate
 from PySide6.QtGui import QFont, QDesktopServices, QAction
+
+
+def _supprimer_fichier(chemin: str):
+    try:
+        if os.path.exists(chemin):
+            os.remove(chemin)
+    except Exception:
+        pass
 
 from ui.theme import Theme
 from modules.fiscalite import get_devise
@@ -372,11 +382,13 @@ class ListeVentesWindow(QDialog):
 
     def _reimprimer_recu_par_id(self, vente_id):
         from modules.recus import generer_recu_pdf
-        from PySide6.QtCore import QUrl
+        from PySide6.QtCore import QUrl, QTimer
         try:
             chemin = generer_recu_pdf(vente_id)
             if chemin:
                 QDesktopServices.openUrl(QUrl.fromLocalFile(chemin))
+                # Supprimer après 30s (le temps que le viewer l'ouvre)
+                QTimer.singleShot(30000, lambda: _supprimer_fichier(chemin))
             else:
                 erreur(self, "Erreur", "Impossible de generer le recu.")
         except Exception as e:

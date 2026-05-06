@@ -136,6 +136,14 @@ class PaiementWindow(QDialog):
             item = self._zone_saisie.takeAt(0)
             if item.widget():
                 item.widget().deleteLater()
+        # Nullifier toutes les références aux widgets dynamiques
+        for attr in (
+            '_entry_montant', '_entry_reference', '_entry_acompte', '_entry_echeance',
+            '_entry_mixte_especes', '_entry_mixte_mobile', '_entry_mixte_ref',
+            '_combo_operateur', '_combo_mixte_operateur',
+            '_lbl_monnaie', '_lbl_credit_restant', '_lbl_acompte_err',
+        ):
+            setattr(self, attr, None)
 
     def _mode_actuel(self) -> str:
         btn = self._mode_group.checkedButton()
@@ -246,6 +254,11 @@ class PaiementWindow(QDialog):
         self._entry_acompte.textChanged.connect(self._maj_credit)
         self._zone_saisie.addWidget(self._entry_acompte)
 
+        self._lbl_acompte_err = QLabel("")
+        self._lbl_acompte_err.setStyleSheet(f"color: {Theme.c('danger')}; font-size: 9pt;")
+        self._lbl_acompte_err.setAlignment(Qt.AlignCenter)
+        self._zone_saisie.addWidget(self._lbl_acompte_err)
+
         self._lbl_credit_restant = QLabel(f"À mettre en ardoise : {self.total:,.0f} {self._devise}")
         self._lbl_credit_restant.setFont(QFont("Segoe UI", 13, QFont.Bold))
         self._lbl_credit_restant.setStyleSheet(f"color: {Theme.c('danger')};")
@@ -264,12 +277,20 @@ class PaiementWindow(QDialog):
 
     def _maj_credit(self):
         try:
-            acompte = float(self._entry_acompte.text().replace(',', '').replace(' ', '') or 0)
-            acompte = min(acompte, self.total)
-            restant = self.total - acompte
-            self._lbl_credit_restant.setText(f"À mettre en ardoise : {restant:,.0f} {self._devise}")
+            valeur = float(self._entry_acompte.text().replace(',', '').replace(' ', '') or 0)
         except ValueError:
-            pass
+            return
+        if valeur > self.total:
+            self._lbl_acompte_err.setText(f"Max : {self.total:,.0f} {self._devise}")
+            # Corriger le champ immédiatement
+            self._entry_acompte.blockSignals(True)
+            self._entry_acompte.setText(str(int(self.total)))
+            self._entry_acompte.blockSignals(False)
+            valeur = self.total
+        else:
+            self._lbl_acompte_err.setText("")
+        restant = self.total - valeur
+        self._lbl_credit_restant.setText(f"À mettre en ardoise : {restant:,.0f} {self._devise}")
 
     def _champs_reference(self):
         """Virement bancaire, Chèque, modes personnalisés : référence optionnelle."""
@@ -392,8 +413,8 @@ class PaiementWindow(QDialog):
                     'monnaie_rendue': None,
                 }]
 
-            elif mode not in ('especes', 'mixte', 'mobile_money'):
-                reference = self._entry_reference.text().strip() if hasattr(self, '_entry_reference') else None
+            elif mode not in ('especes', 'mixte', 'mobile_money', 'credit'):
+                reference = self._entry_reference.text().strip() if self._entry_reference is not None else None
                 self._result = [{
                     'mode': mode, 'montant': self.total,
                     'reference': reference, 'montant_recu': None,
@@ -444,6 +465,11 @@ class PaiementWindow(QDialog):
                     acompte = 0
 
                 credit = self.total - acompte
+                if credit <= 0:
+                    QMessageBox.warning(self, "Acompte invalide",
+                        "L'acompte couvre déjà le montant total.\n\n"
+                        "Utilisez le mode Espèces ou Mobile Money à la place.")
+                    return
                 self._result = []
                 if acompte > 0:
                     self._result.append({
@@ -455,7 +481,7 @@ class PaiementWindow(QDialog):
                     'mode': 'credit', 'montant': credit,
                     'reference': None, 'montant_recu': None,
                     'monnaie_rendue': None,
-                    'echeance': self._entry_echeance.text().strip() if hasattr(self, '_entry_echeance') else None,
+                    'echeance': self._entry_echeance.text().strip() if self._entry_echeance is not None else None,
                 })
 
             self.paiement_confirme.emit(self._result)

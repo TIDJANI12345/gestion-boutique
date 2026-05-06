@@ -190,6 +190,21 @@ def preview_ticket(vente_id=None):
     except Exception as e:
         ticket.append("│" + f"[paiements: {e}]".ljust(largeur) + "│")
 
+    # ARDOISE (crédit)
+    try:
+        ardoise_info = db.fetch_one(
+            "SELECT montant_initial, montant_restant FROM ardoise WHERE vente_id = ? AND statut != 'solde'",
+            (vente_id,)
+        )
+        if ardoise_info:
+            ticket.append("│" + ligne('-', largeur) + "│")
+            acompte = float(ardoise_info['montant_initial']) - float(ardoise_info['montant_restant'])
+            if acompte > 0:
+                ticket.append("│" + f"Acompte verse: {acompte:,.0f} FCFA".ljust(largeur) + "│")
+            ticket.append("│" + f"** Restant a payer: {float(ardoise_info['montant_restant']):,.0f} FCFA **".ljust(largeur) + "│")
+    except Exception:
+        pass
+
     # FOOTER
     ticket.append("│" + ligne(' ', largeur) + "│")
     ticket.append("│" + centrer("[QR CODE]", largeur) + "│")

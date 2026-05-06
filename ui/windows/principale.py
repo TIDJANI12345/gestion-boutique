@@ -130,6 +130,13 @@ class PrincipaleWindow(QMainWindow):
         self._setup_raccourcis()
         self._setup_session_timeout()
 
+        # Nettoyage des anciens reçus PDF de vente (génération à la demande)
+        try:
+            from modules.recus import nettoyer_recus_vente
+            nettoyer_recus_vente()
+        except Exception:
+            pass
+
         # Premier chargement
         self.actualiser_stats()
 
@@ -222,6 +229,10 @@ class PrincipaleWindow(QMainWindow):
         action_verifier_maj = QAction("🔄 Vérifier les mises à jour", self)
         action_verifier_maj.triggered.connect(self.verifier_mises_a_jour_manuel)
         menu_aide.addAction(action_verifier_maj)
+
+        action_plans = QAction("📋 Comparer les plans (Standard / Pro / White Label)", self)
+        action_plans.triggered.connect(self.ouvrir_plans)
+        menu_aide.addAction(action_plans)
 
         menu_aide.addSeparator()
 
@@ -686,7 +697,7 @@ class PrincipaleWindow(QMainWindow):
                     "background-color: #3B82F6; color: white; padding: 6px;"
                 )
                 bl = QHBoxLayout(bandeau)
-                bl.setContentsMargins(20, 0, 20, 0)
+                bl.setContentsMargins(20, 0, 12, 0)
                 lbl = QLabel(
                     f"🔵  Mode DÉMONSTRATION — "
                     f"{infos['ventes_utilisees']}/{infos['ventes_max']} ventes utilisées — "
@@ -695,6 +706,16 @@ class PrincipaleWindow(QMainWindow):
                 )
                 lbl.setStyleSheet("color: white; font-size: 10pt;")
                 bl.addWidget(lbl)
+                bl.addStretch()
+                btn_plans = QPushButton("📋 Voir les plans")
+                btn_plans.setStyleSheet(
+                    "QPushButton { background: white; color: #3B82F6; border: none;"
+                    " border-radius: 4px; padding: 4px 14px; font-weight: bold; font-size: 10pt; }"
+                    "QPushButton:hover { background: #F3F4F6; }"
+                )
+                btn_plans.setCursor(Qt.PointingHandCursor)
+                btn_plans.clicked.connect(self.ouvrir_plans)
+                bl.addWidget(btn_plans)
 
             if bandeau is not None:
                 central = self.centralWidget()
@@ -709,17 +730,18 @@ class PrincipaleWindow(QMainWindow):
 
     def _setup_session_timeout(self):
         from database import db
-        timeout_str = db.get_parametre('session_timeout', '900')
+        timeout_str = db.get_parametre('session_timeout', '0')
         try:
             timeout_ms = int(timeout_str) * 1000
         except ValueError:
-            timeout_ms = 900000
+            timeout_ms = 0
 
         self._session_timer = QTimer(self)
-        self._session_timer.setInterval(timeout_ms)
         self._session_timer.setSingleShot(True)
         self._session_timer.timeout.connect(self._on_session_expired)
-        self._session_timer.start()
+        if timeout_ms > 0:
+            self._session_timer.setInterval(timeout_ms)
+            self._session_timer.start()
 
     def _reset_session_timer(self):
         if hasattr(self, '_session_timer'):
@@ -816,6 +838,11 @@ class PrincipaleWindow(QMainWindow):
     #     if dlg.exec():
     #         self.actualiser_stats()
 
+    def ouvrir_plans(self):
+        from ui.windows.plans import PlansWindow
+        dlg = PlansWindow(parent=self)
+        dlg.exec()
+
     def ouvrir_a_propos(self):
         from ui.windows.a_propos import AProposWindow
         dlg = AProposWindow(parent=self)
@@ -845,16 +872,18 @@ class PrincipaleWindow(QMainWindow):
         from config import APP_VERSION
         from PySide6.QtWidgets import QMessageBox
 
-        # Fermer dialog de chargement
-        if hasattr(self, 'progress_dialog'):
+        if hasattr(self, 'progress_dialog') and self.progress_dialog is not None:
             self.progress_dialog.close()
+            self.progress_dialog.deleteLater()
+            self.progress_dialog = None
+            from PySide6.QtWidgets import QApplication
+            QApplication.processEvents()
 
-        if nouvelle_dispo and infos:
-            # Afficher le dialog de notification (même si version ignorée)
+        if nouvelle_dispo is True and infos:
             dialog = UpdateNotificationDialog(infos, self)
             dialog.exec()
-        else:
-            # Aucune mise à jour disponible
+        elif nouvelle_dispo is False:
+            # Explicitement à jour (réponse 200 reçue)
             QMessageBox.information(
                 self, "À jour ✅",
                 f"<h3>Vous utilisez la dernière version !</h3>"
@@ -862,6 +891,16 @@ class PrincipaleWindow(QMainWindow):
                 f"<br>"
                 f"<p>Aucune mise à jour disponible pour le moment.</p>"
             )
+        else:
+            # None = erreur réseau ou pas de release publiée
+            erreur = infos or "erreur inconnue"
+            if erreur in ("no_internet", "timeout"):
+                msg = "Impossible de contacter le serveur de mises à jour.\n\nVérifiez votre connexion internet et réessayez."
+            elif erreur == "no_release":
+                msg = "Aucune version publiée pour le moment.\n\nVous utilisez la version la plus récente disponible."
+            else:
+                msg = f"Erreur lors de la vérification ({erreur}).\n\nRéessayez plus tard."
+            QMessageBox.warning(self, "Vérification impossible", msg)
 
     def ouvrir_utilisateurs(self):
         from ui.windows.utilisateurs import UtilisateursWindow
@@ -934,42 +973,8 @@ class PrincipaleWindow(QMainWindow):
 
     def historique_clotures(self):
         try:
-            from modules.sessions import historique_clotures
-            from PySide6.QtWidgets import QDialog, QTableWidget, QTableWidgetItem, QHeaderView, QVBoxLayout
-            clotures = historique_clotures()
-            dlg = QDialog(self)
-            dlg.setWindowTitle("Historique des clôtures Z")
-            dlg.resize(800, 400)
-            layout = QVBoxLayout(dlg)
-            table = QTableWidget(len(clotures), 7)
-            table.setHorizontalHeaderLabels(
-                ["Date clôture", "Caisse", "Caissier", "Nb ventes",
-                 "Total", "Écart", "Hash Z"]
-            )
-            table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-            table.setEditTriggers(QTableWidget.NoEditTriggers)
-            devise = 'FCFA'
-            try:
-                from modules.fiscalite import get_devise
-                devise = get_devise()
-            except Exception:
-                pass
-            for i, c in enumerate(clotures):
-                table.setItem(i, 0, QTableWidgetItem(c.get('date_cloture', '')))
-                table.setItem(i, 1, QTableWidgetItem(c.get('id_caisse', '')))
-                table.setItem(i, 2, QTableWidgetItem(c.get('caissier_nom', '')))
-                table.setItem(i, 3, QTableWidgetItem(str(c.get('nb_ventes', 0))))
-                table.setItem(i, 4, QTableWidgetItem(f"{c.get('total_general', 0):,} {devise}"))
-                ecart = c.get('ecart', 0)
-                item_ecart = QTableWidgetItem(f"{ecart:+,} {devise}")
-                item_ecart.setForeground(
-                    __import__('PySide6.QtGui', fromlist=['QColor']).QColor(
-                        '#10B981' if ecart == 0 else '#EF4444'
-                    )
-                )
-                table.setItem(i, 5, item_ecart)
-                table.setItem(i, 6, QTableWidgetItem(c.get('hash_cloture', '')))
-            layout.addWidget(table)
+            from ui.windows.historique_clotures import HistoriqueCloturesWindow
+            dlg = HistoriqueCloturesWindow(self)
             dlg.exec()
         except Exception as e:
             QMessageBox.critical(self, "Erreur", str(e))

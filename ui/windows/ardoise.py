@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor, QFont
+from datetime import datetime
 from modules.ardoise import (
     liste_debiteurs, liste_ardoise_client, encaissements_ardoise,
     encaisser, stats_ardoise, solde_client
@@ -40,9 +41,15 @@ class EncaisserDialog(QDialog):
         form = QFormLayout()
         form.setSpacing(8)
 
+        self._max_montant = float(self.ardoise['montant_restant'])
         self._montant = QLineEdit()
-        self._montant.setPlaceholderText(f"Max {self.ardoise['montant_restant']:,.0f}")
+        self._montant.setPlaceholderText(f"Max {self._max_montant:,.0f}")
+        self._montant.textChanged.connect(self._valider_montant_live)
         form.addRow("Montant (FCFA) :", self._montant)
+
+        self._lbl_montant_err = QLabel("")
+        self._lbl_montant_err.setStyleSheet("color: #EF4444; font-size: 9pt;")
+        form.addRow("", self._lbl_montant_err)
 
         self._mode = QComboBox()
         self._mode.addItems(["especes", "mobile_money", "virement", "autre"])
@@ -64,6 +71,19 @@ class EncaisserDialog(QDialog):
         btns.rejected.connect(self.reject)
         layout.addWidget(btns)
 
+    def _valider_montant_live(self):
+        try:
+            valeur = float(self._montant.text().replace(' ', '').replace(',', '.'))
+            if valeur > self._max_montant:
+                self._lbl_montant_err.setText(f"Max autorisé : {self._max_montant:,.0f} FCFA")
+                self._montant.blockSignals(True)
+                self._montant.setText(str(int(self._max_montant)))
+                self._montant.blockSignals(False)
+            else:
+                self._lbl_montant_err.setText("")
+        except ValueError:
+            self._lbl_montant_err.setText("")
+
     def _valider(self):
         try:
             montant = float(self._montant.text().replace(' ', '').replace(',', '.'))
@@ -73,18 +93,48 @@ class EncaisserDialog(QDialog):
         if montant <= 0:
             QMessageBox.warning(self, "Erreur", "Montant doit être positif.")
             return
+        if montant > self._max_montant:
+            QMessageBox.warning(self, "Erreur", f"Le montant dépasse le solde dû ({self._max_montant:,.0f} FCFA).")
+            return
 
-        ok, msg = encaisser(
+        ok, msg, enc_id = encaisser(
             self.ardoise['id'], montant,
             mode=self._mode.currentText(),
             reference=self._reference.text().strip() or None,
             notes=self._notes.text().strip() or None,
         )
         if ok:
-            QMessageBox.information(self, "Succès", msg)
+            self._enc_data = {
+                'id': enc_id,
+                'montant': montant,
+                'mode_paiement': self._mode.currentText(),
+                'reference': self._reference.text().strip() or None,
+                'date_encaissement': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            }
+            rep = QMessageBox.question(
+                self, "Succès", f"{msg}\n\nImprimer le reçu de paiement ?",
+                QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes
+            )
+            if rep == QMessageBox.Yes:
+                self._imprimer_recu()
             self.accept()
         else:
             QMessageBox.critical(self, "Erreur", msg)
+
+    def _imprimer_recu(self):
+        try:
+            from modules.recus import generer_recu_encaissement
+            import os, subprocess, sys
+            chemin = generer_recu_encaissement(self.ardoise['id'], self._enc_data)
+            if chemin and os.path.exists(chemin):
+                if sys.platform == 'win32':
+                    os.startfile(chemin)
+                elif sys.platform == 'darwin':
+                    subprocess.Popen(['open', chemin])
+                else:
+                    subprocess.Popen(['xdg-open', chemin])
+        except Exception as e:
+            QMessageBox.warning(self, "Impression", f"Impossible d'ouvrir le reçu : {e}")
 
 
 class DetailClientDialog(QDialog):

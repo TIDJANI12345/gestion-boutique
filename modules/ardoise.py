@@ -34,25 +34,24 @@ def creer_ardoise(client_id: int, montant: float, vente_id: int = None,
 
 def encaisser(ardoise_id: int, montant: float, mode: str = 'especes',
               reference: str = None, notes: str = None,
-              session_id: int = None) -> tuple[bool, str]:
+              session_id: int = None) -> tuple[bool, str, int | None]:
     """
     Encaisser un paiement sur une ardoise (partiel ou total).
-    Returns: (succes, message)
+    Returns: (succes, message, encaissement_id)
     """
     ardoise = db.fetch_one("SELECT * FROM ardoise WHERE id = ?", (ardoise_id,))
     if not ardoise:
-        return False, "Ardoise introuvable."
+        return False, "Ardoise introuvable.", None
     if ardoise['statut'] == 'solde':
-        return False, "Cette ardoise est déjà soldée."
+        return False, "Cette ardoise est déjà soldée.", None
 
     restant = ardoise['montant_restant']
     if montant <= 0:
-        return False, "Montant invalide."
+        return False, "Montant invalide.", None
     if montant > restant:
-        montant = restant  # ne pas encaisser plus que le dû
+        montant = restant
 
-    # Enregistrer l'encaissement
-    db.execute_query(
+    enc_id = db.execute_query(
         """INSERT INTO encaissements_ardoise
            (ardoise_id, montant, mode_paiement, reference, notes, id_session)
            VALUES (?, ?, ?, ?, ?, ?)""",
@@ -69,8 +68,8 @@ def encaisser(ardoise_id: int, montant: float, mode: str = 'especes',
 
     logger.info(f"Encaissement ardoise {ardoise_id}: {montant}, restant={nouveau_restant}")
     if nouveau_statut == 'solde':
-        return True, "Ardoise soldée."
-    return True, f"Paiement enregistré. Reste : {nouveau_restant:,.0f} FCFA"
+        return True, "Ardoise soldée.", enc_id
+    return True, f"Paiement enregistré. Reste : {nouveau_restant:,.0f} FCFA", enc_id
 
 
 def solde_client(client_id: int) -> float:

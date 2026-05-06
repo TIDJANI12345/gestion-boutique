@@ -229,7 +229,9 @@ class ProduitsWindow(QDialog):
         col_sa.addWidget(QLabel("Seuil alerte"))
         self._spin_alerte = QSpinBox()
         self._spin_alerte.setRange(0, 999999)
-        self._spin_alerte.setValue(5)
+        from database import db as _db_prefs
+        self._seuil_defaut = int(_db_prefs.get_parametre('stock_alerte_seuil_defaut', '5') or '5')
+        self._spin_alerte.setValue(self._seuil_defaut)
         col_sa.addWidget(self._spin_alerte)
         stock_row.addLayout(col_sa)
 
@@ -808,7 +810,7 @@ class ProduitsWindow(QDialog):
         self._entry_prix_gros.clear()
         self._spin_seuil_gros.setValue(0)
         self._spin_stock.setValue(0)
-        self._spin_alerte.setValue(5)
+        self._spin_alerte.setValue(self._seuil_defaut)
         self._entry_code.clear()
         from database import db as _db
         if _db.get_parametre('barcode_mode_defaut', 'auto') == 'manuel':

@@ -14,12 +14,20 @@ from ui.theme import Theme
 import os
 
 
+def _supprimer_fichier(chemin: str):
+    try:
+        if os.path.exists(chemin):
+            os.remove(chemin)
+    except Exception:
+        pass
+
+
 class ConfirmationVenteWindow(QDialog):
     """Dialogue de confirmation apres une vente reussie."""
 
     nouvelle_vente = Signal()
 
-    def __init__(self, vente_info: dict, chemin_recu: str, parent=None):
+    def __init__(self, vente_info: dict, chemin_recu: str = "", parent=None):
         super().__init__(parent)
         self.vente_info = vente_info
         self.chemin_recu = chemin_recu
@@ -172,21 +180,29 @@ class ConfirmationVenteWindow(QDialog):
         layout.addWidget(content, 1)
 
     def _ouvrir_pdf(self):
-        """Ouvrir le PDF avec l'application par defaut du systeme."""
-        if self.chemin_recu and os.path.exists(self.chemin_recu):
-            url = QUrl.fromLocalFile(self.chemin_recu)
-            if not QDesktopServices.openUrl(url):
-                QMessageBox.critical(self, "Erreur", "Impossible d'ouvrir le PDF")
-        else:
-            QMessageBox.critical(self, "Erreur", "Fichier PDF introuvable")
+        """Générer le PDF à la demande et l'ouvrir."""
+        vente_id = self.vente_info.get('vente_id')
+        if not vente_id:
+            QMessageBox.critical(self, "Erreur", "ID de vente introuvable.")
+            return
+        try:
+            from modules.recus import generer_recu_pdf
+            from PySide6.QtCore import QTimer
+            chemin = generer_recu_pdf(vente_id)
+            if chemin and os.path.exists(chemin):
+                url = QUrl.fromLocalFile(chemin)
+                if not QDesktopServices.openUrl(url):
+                    QMessageBox.critical(self, "Erreur", "Impossible d'ouvrir le PDF.")
+                else:
+                    QTimer.singleShot(30000, lambda: _supprimer_fichier(chemin))
+            else:
+                QMessageBox.critical(self, "Erreur", "Le reçu PDF n'a pas pu être généré.")
+        except Exception as e:
+            QMessageBox.critical(self, "Erreur", f"Erreur génération PDF :\n{e}")
 
     def _imprimer(self):
-        """Ouvrir le PDF pour impression manuelle."""
+        """Générer le PDF et l'ouvrir pour impression manuelle (Ctrl+P)."""
         self._ouvrir_pdf()
-        QMessageBox.information(
-            self, "Impression",
-            "Le PDF s'est ouvert.\nUtilisez Ctrl+P pour imprimer."
-        )
 
     def _imprimer_ticket(self):
         """Imprimer sur imprimante thermique."""

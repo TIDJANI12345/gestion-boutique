@@ -343,6 +343,8 @@ class PrincipaleGestionnaireWindow(QMainWindow):
 
         # Menu Aide
         help_menu = menubar.addMenu("Aide")
+        help_menu.addAction("📋 Comparer les plans (Standard / Pro / White Label)", self.ouvrir_plans)
+        help_menu.addSeparator()
         help_menu.addAction("À Propos", self.ouvrir_a_propos)
 
 
@@ -446,6 +448,11 @@ class PrincipaleGestionnaireWindow(QMainWindow):
         dlg = ArdoiseWindow(self)
         dlg.exec()
 
+    def ouvrir_plans(self):
+        from ui.windows.plans import PlansWindow
+        dlg = PlansWindow(parent=self)
+        dlg.exec()
+
     def ouvrir_a_propos(self):
         from ui.windows.a_propos import AProposWindow
         dlg = AProposWindow(parent=self)
@@ -469,17 +476,18 @@ class PrincipaleGestionnaireWindow(QMainWindow):
     # === SESSION TIMEOUT ===
 
     def _setup_session_timeout(self):
-        timeout_str = db.get_parametre('session_timeout', '900')
+        timeout_str = db.get_parametre('session_timeout', '0')
         try:
             timeout_ms = int(timeout_str) * 1000
         except ValueError:
-            timeout_ms = 900000
+            timeout_ms = 0
 
         self._session_timer = QTimer(self)
-        self._session_timer.setInterval(timeout_ms)
         self._session_timer.setSingleShot(True)
         self._session_timer.timeout.connect(self._on_session_expired)
-        self._session_timer.start()
+        if timeout_ms > 0:
+            self._session_timer.setInterval(timeout_ms)
+            self._session_timer.start()
 
     def _reset_session_timer(self):
         if hasattr(self, '_session_timer'):
@@ -544,7 +552,7 @@ class PrincipaleGestionnaireWindow(QMainWindow):
                 bandeau = QFrame()
                 bandeau.setStyleSheet("background-color: #3B82F6; color: white; padding: 6px;")
                 bl = QHBoxLayout(bandeau)
-                bl.setContentsMargins(20, 0, 20, 0)
+                bl.setContentsMargins(20, 0, 12, 0)
                 lbl = QLabel(
                     f"🔵  Mode DÉMONSTRATION — "
                     f"{infos['ventes_utilisees']}/{infos['ventes_max']} ventes utilisées — "
@@ -553,6 +561,16 @@ class PrincipaleGestionnaireWindow(QMainWindow):
                 )
                 lbl.setStyleSheet("color: white; font-size: 10pt;")
                 bl.addWidget(lbl)
+                bl.addStretch()
+                btn_plans = QPushButton("📋 Voir les plans")
+                btn_plans.setStyleSheet(
+                    "QPushButton { background: white; color: #3B82F6; border: none;"
+                    " border-radius: 4px; padding: 4px 14px; font-weight: bold; font-size: 10pt; }"
+                    "QPushButton:hover { background: #F3F4F6; }"
+                )
+                btn_plans.setCursor(Qt.PointingHandCursor)
+                btn_plans.clicked.connect(self.ouvrir_plans)
+                bl.addWidget(btn_plans)
                 central = self.centralWidget()
                 if central and central.layout():
                     central.layout().insertWidget(0, bandeau)

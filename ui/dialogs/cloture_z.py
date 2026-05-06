@@ -69,7 +69,7 @@ class ClotureZDialog(QDialog):
         # Séparateur
         sep = QFrame()
         sep.setFrameShape(QFrame.HLine)
-        sep.setStyleSheet(f"color: {Theme.c('border')};")
+        sep.setStyleSheet(f"color: {Theme.c('card_border')};")
         layout.addWidget(sep)
 
         # Fond compté réel
@@ -155,7 +155,7 @@ class ClotureZDialog(QDialog):
 
         sep = QFrame()
         sep.setFrameShape(QFrame.HLine)
-        sep.setStyleSheet(f"color: {Theme.c('border')};")
+        sep.setStyleSheet(f"color: {Theme.c('card_border')};")
         self._rapport_layout.addWidget(sep)
 
         _ligne_rapport(self._rapport_layout, "Nombre de ventes", str(data['nb_ventes']))
@@ -163,7 +163,7 @@ class ClotureZDialog(QDialog):
 
         sep2 = QFrame()
         sep2.setFrameShape(QFrame.HLine)
-        sep2.setStyleSheet(f"color: {Theme.c('border')};")
+        sep2.setStyleSheet(f"color: {Theme.c('card_border')};")
         self._rapport_layout.addWidget(sep2)
 
         _ligne_rapport(self._rapport_layout, "Espèces encaissées", f"{data['total_especes']:,} {devise}")
@@ -173,7 +173,7 @@ class ClotureZDialog(QDialog):
 
         sep3 = QFrame()
         sep3.setFrameShape(QFrame.HLine)
-        sep3.setStyleSheet(f"color: {Theme.c('border')};")
+        sep3.setStyleSheet(f"color: {Theme.c('card_border')};")
         self._rapport_layout.addWidget(sep3)
 
         _ligne_rapport(self._rapport_layout,
@@ -213,10 +213,17 @@ class ClotureZDialog(QDialog):
             return
 
         texte = self._input_fond.text().strip()
+        if not texte:
+            QMessageBox.warning(self, "Champ requis",
+                "Veuillez saisir le montant compté en caisse avant de clôturer.")
+            self._input_fond.setFocus()
+            return
         try:
-            fond_declare = int(texte) if texte else 0
+            fond_declare = int(texte)
         except ValueError:
-            fond_declare = 0
+            QMessageBox.warning(self, "Valeur invalide", "Le montant saisi est invalide.")
+            self._input_fond.setFocus()
+            return
 
         rep = QMessageBox.question(
             self, "Confirmer la clôture Z",
@@ -235,22 +242,37 @@ class ClotureZDialog(QDialog):
             QMessageBox.critical(self, "Erreur", message)
             return
 
-        # Impression thermique si disponible
-        self._imprimer_rapport_z(rapport)
-
-        # PDF
-        self._generer_pdf_z(rapport)
+        # PDF (archivé, jamais supprimé)
+        pdf_path = ClotureZDialog._generer_pdf_z_static(rapport)
 
         self.cloture_effectuee.emit(rapport)
-        QMessageBox.information(
-            self, "Clôture Z effectuée",
-            f"Session clôturée.\n"
+
+        msg = (
+            f"Session clôturée avec succès.\n\n"
             f"Hash Z : {rapport['hash_cloture']}\n"
             f"Écart : {rapport['ecart']:+,} FCFA"
         )
+        if pdf_path:
+            msg += "\n\nOuvrir le rapport PDF maintenant ?"
+            rep = QMessageBox.question(self, "Clôture Z effectuée", msg,
+                QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
+            if rep == QMessageBox.Yes:
+                import os, sys, subprocess
+                try:
+                    if sys.platform == 'win32':
+                        os.startfile(pdf_path)
+                    elif sys.platform == 'darwin':
+                        subprocess.Popen(['open', pdf_path])
+                    else:
+                        subprocess.Popen(['xdg-open', pdf_path])
+                except Exception as e:
+                    QMessageBox.warning(self, "Erreur", f"Impossible d'ouvrir le PDF : {e}")
+        else:
+            QMessageBox.information(self, "Clôture Z effectuée", msg)
         self.accept()
 
-    def _imprimer_rapport_z(self, rapport: dict):
+    @staticmethod
+    def _imprimer_rapport_z_static(rapport: dict):
         try:
             from modules.imprimante import ImprimanteThermique
             if not ImprimanteThermique.est_disponible():
@@ -282,19 +304,22 @@ class ClotureZDialog(QDialog):
 
             printer.text(f"Caisse : {rapport['id_caisse']}\n")
             printer.text("-" * largeur + "\n")
-            printer.text(f"Nb ventes    : {rapport['nb_ventes']}\n")
-            printer.text(f"Especes      : {rapport['total_especes']:,} F\n")
-            printer.text(f"Mobile Money : {rapport['total_mobile']:,} F\n")
-            printer.text(f"Annulees     : {rapport['total_annule']:,} F\n")
+            total_general = rapport.get('total_general') or (
+                rapport.get('total_especes', 0) + rapport.get('total_mobile', 0)
+            )
+            printer.text(f"Nb ventes    : {rapport.get('nb_ventes', 0)}\n")
+            printer.text(f"Especes      : {rapport.get('total_especes', 0):,} F\n")
+            printer.text(f"Mobile Money : {rapport.get('total_mobile', 0):,} F\n")
+            printer.text(f"Annulees     : {rapport.get('total_annule', 0):,} F\n")
             printer.text("-" * largeur + "\n")
             printer.set(bold=True)
-            printer.text(f"TOTAL        : {rapport['total_general']:,} F\n")
+            printer.text(f"TOTAL        : {total_general:,} F\n")
             printer.set(bold=False)
-            printer.text(f"Fond ouvert  : {rapport['fond_ouverture']:,} F\n")
-            printer.text(f"Fond theoriq : {rapport['fond_cloture_calcule']:,} F\n")
-            printer.text(f"Fond compte  : {rapport['fond_cloture_declare']:,} F\n")
+            printer.text(f"Fond ouvert  : {rapport.get('fond_ouverture', 0):,} F\n")
+            printer.text(f"Fond theoriq : {rapport.get('fond_cloture_calcule', 0):,} F\n")
+            printer.text(f"Fond compte  : {rapport.get('fond_cloture_declare', 0):,} F\n")
             printer.set(bold=True)
-            ecart = rapport['ecart']
+            ecart = rapport.get('ecart', 0)
             printer.text(f"ECART        : {ecart:+,} F\n")
             printer.set(bold=False)
             printer.text("=" * largeur + "\n")
@@ -309,7 +334,8 @@ class ClotureZDialog(QDialog):
             from modules.logger import get_logger
             get_logger('sessions').warning(f"Impression Z échouée : {e}")
 
-    def _generer_pdf_z(self, rapport: dict):
+    @staticmethod
+    def _generer_pdf_z_static(rapport: dict) -> str | None:
         try:
             import os
             import config
@@ -354,21 +380,24 @@ class ClotureZDialog(QDialog):
             except Exception:
                 date_affichage = rapport['date_cloture']
 
+            total_general = rapport.get('total_general') or (
+                rapport.get('total_especes', 0) + rapport.get('total_mobile', 0)
+            )
             data = [
                 ['Date clôture', date_affichage],
                 ['Caisse', rapport['id_caisse']],
-                ['Nombre de ventes', str(rapport['nb_ventes'])],
+                ['Nombre de ventes', str(rapport.get('nb_ventes', 0))],
                 ['', ''],
-                ['Espèces encaissées', f"{rapport['total_especes']:,} {devise}"],
-                ['Mobile Money', f"{rapport['total_mobile']:,} {devise}"],
-                ['Ventes annulées', f"{rapport['total_annule']:,} {devise}"],
+                ['Espèces encaissées', f"{rapport.get('total_especes', 0):,} {devise}"],
+                ['Mobile Money', f"{rapport.get('total_mobile', 0):,} {devise}"],
+                ['Ventes annulées', f"{rapport.get('total_annule', 0):,} {devise}"],
                 ['', ''],
-                ['TOTAL GÉNÉRAL', f"{rapport['total_general']:,} {devise}"],
+                ['TOTAL GÉNÉRAL', f"{total_general:,} {devise}"],
                 ['', ''],
-                ['Fond d\'ouverture', f"{rapport['fond_ouverture']:,} {devise}"],
-                ['Fond théorique', f"{rapport['fond_cloture_calcule']:,} {devise}"],
-                ['Fond compté', f"{rapport['fond_cloture_declare']:,} {devise}"],
-                ['ÉCART', f"{rapport['ecart']:+,} {devise}"],
+                ['Fond d\'ouverture', f"{rapport.get('fond_ouverture', 0):,} {devise}"],
+                ['Fond théorique', f"{rapport.get('fond_cloture_calcule', 0):,} {devise}"],
+                ['Fond compté', f"{rapport.get('fond_cloture_declare', 0):,} {devise}"],
+                ['ÉCART', f"{rapport.get('ecart', 0):+,} {devise}"],
                 ['', ''],
                 ['Hash Z', rapport['hash_cloture']],
             ]
@@ -392,6 +421,10 @@ class ClotureZDialog(QDialog):
             elements.append(table)
 
             doc.build(elements)
+            return pdf_path
         except Exception as e:
             from modules.logger import get_logger
             get_logger('sessions').warning(f"PDF Z échoué : {e}")
+            import traceback
+            get_logger('sessions').warning(traceback.format_exc())
+            return None

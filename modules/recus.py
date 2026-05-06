@@ -53,6 +53,49 @@ def generer_qr_code_image(contenu, taille=4*cm):
         return None
 
 
+def _dessiner_cachet(canvas, statut: str):
+    """
+    Dessine un tampon diagonal style Odoo dans le coin haut-droit.
+    Positionné dans la zone d'en-tête (fond transparent) pour rester visible.
+    """
+    configs = {
+        'paye':   ('PAYE',     (0.06, 0.56, 0.31)),
+        'credit': ('A CREDIT', (0.93, 0.40, 0.00)),
+        'solde':  ('SOLDE',    (0.06, 0.56, 0.31)),
+    }
+    if statut not in configs:
+        return
+    texte, (r, g, b) = configs[statut]
+    page_width, page_height = A4
+    canvas.saveState()
+    # Coin haut-droit — zone d'en-tête sans fond de tableau
+    canvas.translate(page_width - 3 * cm, page_height - 3 * cm)
+    canvas.rotate(20)
+    font_size = 30
+    canvas.setFont("Helvetica-Bold", font_size)
+    padding_x, padding_y = 14, 8
+    text_w = canvas.stringWidth(texte, "Helvetica-Bold", font_size)
+    rect_w = text_w + 2 * padding_x
+    rect_h = font_size + 2 * padding_y
+    # Bordure colorée (pas de fond pour ne pas masquer le contenu)
+    canvas.setStrokeColorRGB(r, g, b)
+    canvas.setLineWidth(2.0)
+    canvas.roundRect(-rect_w / 2, -rect_h / 2, rect_w, rect_h, 6, fill=0, stroke=1)
+    # Texte
+    canvas.setFillColorRGB(r, g, b)
+    canvas.drawCentredString(0, -font_size * 0.30, texte)
+    canvas.restoreState()
+
+
+def _make_page_callback(cachet=None):
+    """Retourne un callback onFirstPage/onLaterPages avec cachet optionnel."""
+    def _cb(canvas, doc):
+        ajouter_filigrane_footer(canvas, doc)
+        if cachet:
+            _dessiner_cachet(canvas, cachet)
+    return _cb
+
+
 def ajouter_filigrane_footer(canvas, doc):
     """Ajoute le logo en filigrane et le footer sur chaque page"""
     canvas.saveState()
@@ -61,14 +104,13 @@ def ajouter_filigrane_footer(canvas, doc):
     try:
         logo_path = db.get_parametre('boutique_logo_path', '')
         if logo_path and os.path.exists(logo_path):
-            canvas.setFillAlpha(0.1)  # Transparence très faible (10%)
-            # Centrer l'image (calcul approximatif pour A4)
+            canvas.setFillAlpha(0.1)
             page_width, page_height = A4
             img_size = 10 * cm
             x_pos = (page_width - img_size) / 2
             y_pos = (page_height - img_size) / 2
             canvas.drawImage(logo_path, x_pos, y_pos, width=img_size, height=img_size, mask='auto', preserveAspectRatio=True)
-            canvas.setFillAlpha(1)  # Rétablir l'opacité
+            canvas.setFillAlpha(1)
     except Exception as e:
         logger.warning(f"Erreur watermark: {e}")
 
@@ -82,7 +124,7 @@ def ajouter_filigrane_footer(canvas, doc):
             canvas.setFillColorRGB(0.85, 0.85, 0.85)
             canvas.translate(page_width / 2, page_height / 2)
             canvas.rotate(45)
-            canvas.drawCentredString(0, 0, "DÉMONSTRATION")
+            canvas.drawCentredString(0, 0, "DEMONSTRATION")
             canvas.restoreState()
     except Exception:
         pass
@@ -545,6 +587,37 @@ def generer_recu_pdf(vente_id):
                 ]))
                 elements.append(p_table)
 
+        # Infos ardoise (crédit avec acompte)
+        ardoise_info = db.fetch_one(
+            "SELECT montant_initial, montant_restant FROM ardoise WHERE vente_id = ? AND statut != 'solde'",
+            (vente_id,)
+        )
+        if ardoise_info:
+            ardoise_info = dict(ardoise_info)
+            acompte = ardoise_info['montant_initial'] - ardoise_info['montant_restant']
+            elements.append(Spacer(1, 0.4*cm))
+            credit_data = []
+            if acompte > 0:
+                credit_data.append(["Acompte versé :", f"{acompte:,.0f} {devise}"])
+            credit_data.append(["Montant en ardoise :", f"{ardoise_info['montant_restant']:,.0f} {devise}"])
+            c_table = Table(credit_data, colWidths=[5*cm, 11*cm])
+            c_table.setStyle(TableStyle([
+                ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#FCD34D')),
+                ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#FCD34D')),
+                ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#FFFBEB')),
+                ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+                ('FONTNAME', (1, 0), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 0), (-1, -1), 11),
+                ('TEXTCOLOR', (1, len(credit_data)-1), (1, len(credit_data)-1), colors.HexColor('#B45309')),
+                ('ALIGN', (0, 0), (0, -1), 'RIGHT'),
+                ('ALIGN', (1, 0), (-1, -1), 'LEFT'),
+                ('LEFTPADDING', (0, 0), (-1, -1), 10),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 10),
+                ('TOPPADDING', (0, 0), (-1, -1), 6),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+            ]))
+            elements.append(c_table)
+
         # ==========================================
         # QR CODE
         # ==========================================
@@ -629,10 +702,21 @@ def generer_recu_pdf(vente_id):
         # CONSTRUIRE LE PDF
         # ==========================================
 
+        # Cachet statut paiement
+        has_credit = bool(db.fetch_one(
+            "SELECT 1 FROM ardoise WHERE vente_id = ? AND statut != 'solde'", (vente_id,)
+        ))
+        if has_credit and db.get_parametre('cachet_recu_credit', '1') == '1':
+            cachet = 'credit'
+        elif not has_credit and db.get_parametre('cachet_recu_vente', '1') == '1':
+            cachet = 'paye'
+        else:
+            cachet = None
+
         doc.build(
             elements,
-            onFirstPage=ajouter_filigrane_footer,
-            onLaterPages=ajouter_filigrane_footer
+            onFirstPage=_make_page_callback(cachet),
+            onLaterPages=_make_page_callback(cachet),
         )
 
         logger.info(f"Recu PDF genere: {filepath}")
@@ -643,3 +727,200 @@ def generer_recu_pdf(vente_id):
         import traceback
         traceback.print_exc()
         return None
+
+
+def generer_recu_encaissement(ardoise_id: int, encaissement: dict) -> str | None:
+    """
+    Génère un reçu PDF de paiement sur ardoise.
+    encaissement : dict avec montant, mode_paiement, reference, date_encaissement
+    """
+    try:
+        ardoise = db.fetch_one(
+            """SELECT a.*, c.nom as client_nom, c.telephone as client_tel,
+                      v.numero_vente
+               FROM ardoise a
+               JOIN clients c ON a.client_id = c.id
+               LEFT JOIN ventes v ON a.vente_id = v.id
+               WHERE a.id = ?""",
+            (ardoise_id,)
+        )
+        if not ardoise:
+            return None
+        ardoise = dict(ardoise)
+
+        from modules.fiscalite import get_devise
+        devise = get_devise()
+        nom_boutique = db.get_parametre('boutique_nom', BOUTIQUE_NOM)
+        adresse      = db.get_parametre('boutique_adresse', BOUTIQUE_ADRESSE)
+        telephone    = db.get_parametre('boutique_telephone', BOUTIQUE_TELEPHONE)
+
+        filename = f"encaissement_ardoise_{ardoise_id}_{encaissement.get('id', 'x')}.pdf"
+        filepath = os.path.join(RECUS_DIR, filename)
+
+        doc = SimpleDocTemplate(
+            filepath, pagesize=A4,
+            rightMargin=2*cm, leftMargin=2*cm,
+            topMargin=1.5*cm, bottomMargin=1.5*cm
+        )
+        styles = getSampleStyleSheet()
+        elements = []
+
+        def _st(name, **kw):
+            return ParagraphStyle(name, parent=styles['Normal'], **kw)
+
+        # En-tête boutique
+        s_titre = _st('BT', fontSize=18, fontName='Helvetica-Bold',
+                      alignment=TA_CENTER, textColor=colors.HexColor('#1F2937'), spaceAfter=4)
+        s_info  = _st('BI', fontSize=10, alignment=TA_CENTER,
+                      textColor=colors.HexColor('#6B7280'), spaceAfter=2)
+        elements.append(Paragraph(nom_boutique.upper(), s_titre))
+        elements.append(Paragraph(adresse, s_info))
+        elements.append(Paragraph(f"Tél : {telephone}", s_info))
+        elements.append(Spacer(1, 0.5*cm))
+
+        # Titre document
+        s_doc = _st('DOC', fontSize=16, fontName='Helvetica-Bold',
+                    alignment=TA_CENTER, textColor=colors.HexColor('#1F2937'), spaceAfter=4)
+        elements.append(Paragraph("REÇU DE PAIEMENT", s_doc))
+
+        sep = Table([['']], colWidths=[16*cm])
+        sep.setStyle(TableStyle([('LINEBELOW', (0,0),(-1,0), 2, colors.HexColor('#E5E7EB'))]))
+        elements.append(sep)
+        elements.append(Spacer(1, 0.5*cm))
+
+        # Infos
+        try:
+            dt = datetime.strptime(str(encaissement.get('date_encaissement', '')), "%Y-%m-%d %H:%M:%S")
+            date_fmt = dt.strftime("%d/%m/%Y %H:%M")
+        except Exception:
+            date_fmt = str(encaissement.get('date_encaissement', ''))
+
+        mode_labels = {
+            'especes': 'Espèces', 'mobile_money': 'Mobile Money',
+            'virement': 'Virement', 'autre': 'Autre',
+        }
+        mode_affiche = mode_labels.get(encaissement.get('mode_paiement', ''), encaissement.get('mode_paiement', ''))
+
+        montant_paye  = float(encaissement.get('montant', 0))
+        montant_restant = float(ardoise['montant_restant'])
+        montant_initial = float(ardoise['montant_initial'])
+
+        info_rows = [
+            ['Client :', ardoise['client_nom']],
+            ['Téléphone :', ardoise['client_tel'] or '—'],
+            ['Date :', date_fmt],
+            ['Mode :', mode_affiche],
+        ]
+        if encaissement.get('reference'):
+            info_rows.append(['Référence :', encaissement['reference']])
+        if ardoise.get('numero_vente'):
+            info_rows.append(['Vente N° :', ardoise['numero_vente']])
+
+        info_table = Table(info_rows, colWidths=[4*cm, 12*cm])
+        info_table.setStyle(TableStyle([
+            ('BOX', (0,0),(-1,-1), 1, colors.HexColor('#E5E7EB')),
+            ('INNERGRID', (0,0),(-1,-1), 0.5, colors.HexColor('#E5E7EB')),
+            ('FONTNAME', (0,0),(0,-1), 'Helvetica-Bold'),
+            ('LEFTPADDING', (0,0),(-1,-1), 10),
+            ('RIGHTPADDING', (0,0),(-1,-1), 10),
+            ('TOPPADDING', (0,0),(-1,-1), 7),
+            ('BOTTOMPADDING', (0,0),(-1,-1), 7),
+            ('BACKGROUND', (0,0),(-1,-1), colors.HexColor('#F9FAFB')),
+        ]))
+        elements.append(info_table)
+        elements.append(Spacer(1, 0.6*cm))
+
+        # Tableau montants
+        montant_rows = [
+            ['Montant total de l\'ardoise :', f"{montant_initial:,.0f} {devise}"],
+            ['Montant payé ce jour :', f"{montant_paye:,.0f} {devise}"],
+            ['Solde restant :', f"{montant_restant:,.0f} {devise}"],
+        ]
+        bg_restant = colors.HexColor('#D1FAE5') if montant_restant <= 0.01 else colors.HexColor('#FEF3C7')
+
+        m_table = Table(montant_rows, colWidths=[10*cm, 6*cm])
+        m_table.setStyle(TableStyle([
+            ('BOX', (0,0),(-1,-1), 1, colors.black),
+            ('INNERGRID', (0,0),(-1,-1), 0.5, colors.black),
+            ('FONTNAME', (0,0),(0,-1), 'Helvetica-Bold'),
+            ('FONTNAME', (1,0),(-1,-1), 'Helvetica-Bold'),
+            ('ALIGN', (1,0),(-1,-1), 'RIGHT'),
+            ('LEFTPADDING', (0,0),(-1,-1), 12),
+            ('RIGHTPADDING', (0,0),(-1,-1), 12),
+            ('TOPPADDING', (0,0),(-1,-1), 10),
+            ('BOTTOMPADDING', (0,0),(-1,-1), 10),
+            ('FONTSIZE', (0,0),(-1,-1), 11),
+            # Ligne du solde colorée
+            ('BACKGROUND', (0,2),(-1,2), bg_restant),
+            ('TEXTCOLOR', (1,1),(1,1), colors.HexColor('#059669')),
+        ]))
+        elements.append(m_table)
+        elements.append(Spacer(1, 0.6*cm))
+
+        # Message de solde
+        s_msg = _st('MSG', fontSize=11, alignment=TA_CENTER, spaceAfter=4, fontName='Helvetica-Bold')
+        if montant_restant <= 0.01:
+            s_msg_c = _st('MSG2', fontSize=11, alignment=TA_CENTER, fontName='Helvetica-Bold',
+                          textColor=colors.HexColor('#059669'))
+            elements.append(Paragraph("✓ Ardoise entièrement soldée", s_msg_c))
+        else:
+            s_msg_w = _st('MSG3', fontSize=10, alignment=TA_CENTER,
+                          textColor=colors.HexColor('#B45309'))
+            elements.append(Paragraph(
+                f"Il reste {montant_restant:,.0f} {devise} à régler.", s_msg_w
+            ))
+
+        elements.append(Spacer(1, 1*cm))
+
+        # Signatures
+        sig_data = [['Signature client', 'Signature vendeur']]
+        sig_table = Table(sig_data, colWidths=[8*cm, 8*cm])
+        sig_table.setStyle(TableStyle([
+            ('ALIGN', (0,0),(-1,-1), 'CENTER'),
+            ('FONTNAME', (0,0),(-1,-1), 'Helvetica-Bold'),
+            ('FONTSIZE', (0,0),(-1,-1), 10),
+            ('TOPPADDING', (0,0),(-1,-1), 40),
+            ('BOX', (0,0),(0,-1), 0.5, colors.HexColor('#9CA3AF')),
+            ('BOX', (1,0),(1,-1), 0.5, colors.HexColor('#9CA3AF')),
+        ]))
+        elements.append(sig_table)
+
+        # Statut cachet (selon préférence)
+        if db.get_parametre('cachet_recu_encaissement', '1') == '1':
+            cachet = 'solde' if montant_restant <= 0.01 else 'credit'
+        else:
+            cachet = None
+
+        doc.build(
+            elements,
+            onFirstPage=_make_page_callback(cachet),
+            onLaterPages=_make_page_callback(cachet),
+        )
+
+        logger.info(f"Reçu encaissement généré : {filepath}")
+        return filepath
+
+    except Exception as e:
+        logger.error(f"Erreur reçu encaissement : {e}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+
+def nettoyer_recus_vente():
+    """
+    Supprime les PDFs de reçus de vente dans RECUS_DIR.
+    Garde uniquement les rapports Z (rapport_z_*.pdf) et encaissements ardoise.
+    """
+    if not os.path.isdir(RECUS_DIR):
+        return 0
+    supprimes = 0
+    for f in os.listdir(RECUS_DIR):
+        if f.startswith('recu_') and f.endswith('.pdf'):
+            try:
+                os.remove(os.path.join(RECUS_DIR, f))
+                supprimes += 1
+            except Exception:
+                pass
+    logger.info(f"Nettoyage RECUS_DIR : {supprimes} reçu(s) de vente supprimé(s)")
+    return supprimes

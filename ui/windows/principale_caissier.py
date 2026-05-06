@@ -31,6 +31,7 @@ class PrincipaleCaissierWindow(QMainWindow):
         self.resize(900, 700)
 
         self._setup_ui()
+        self._setup_menubar()
         self._afficher_bandeau_statut()
         self._setup_raccourcis()
         self._setup_session_timeout()
@@ -280,6 +281,19 @@ class PrincipaleCaissierWindow(QMainWindow):
         footer_layout.addWidget(footer_label)
         main_layout.addWidget(footer)
 
+    def _setup_menubar(self):
+        from PySide6.QtGui import QAction
+        menubar = self.menuBar()
+        menu_aide = menubar.addMenu("Aide")
+        action_plans = QAction("📋 Comparer les plans (Standard / Pro / White Label)", self)
+        action_plans.triggered.connect(self.ouvrir_plans)
+        menu_aide.addAction(action_plans)
+
+    def ouvrir_plans(self):
+        from ui.windows.plans import PlansWindow
+        dlg = PlansWindow(parent=self)
+        dlg.exec()
+
     def _setup_raccourcis(self):
         for key, slot in [
             ("F1", self.ouvrir_ventes),
@@ -375,17 +389,18 @@ class PrincipaleCaissierWindow(QMainWindow):
 
     def _setup_session_timeout(self):
         from database import db
-        timeout_str = db.get_parametre('session_timeout', '900')
+        timeout_str = db.get_parametre('session_timeout', '0')
         try:
             timeout_ms = int(timeout_str) * 1000
         except ValueError:
-            timeout_ms = 900000
+            timeout_ms = 0
 
         self._session_timer = QTimer(self)
-        self._session_timer.setInterval(timeout_ms)
         self._session_timer.setSingleShot(True)
         self._session_timer.timeout.connect(self._on_session_expired)
-        self._session_timer.start()
+        if timeout_ms > 0:
+            self._session_timer.setInterval(timeout_ms)
+            self._session_timer.start()
 
     def _reset_session_timer(self):
         if hasattr(self, '_session_timer'):
@@ -458,7 +473,7 @@ class PrincipaleCaissierWindow(QMainWindow):
                 bandeau = QFrame()
                 bandeau.setStyleSheet("background-color: #3B82F6; color: white; padding: 6px;")
                 bl = QHBoxLayout(bandeau)
-                bl.setContentsMargins(20, 0, 20, 0)
+                bl.setContentsMargins(20, 0, 12, 0)
                 lbl = QLabel(
                     f"🔵  Mode DÉMONSTRATION — "
                     f"{infos['ventes_utilisees']}/{infos['ventes_max']} ventes utilisées — "
@@ -466,6 +481,16 @@ class PrincipaleCaissierWindow(QMainWindow):
                 )
                 lbl.setStyleSheet("color: white; font-size: 10pt;")
                 bl.addWidget(lbl)
+                bl.addStretch()
+                btn_plans = QPushButton("📋 Voir les plans")
+                btn_plans.setStyleSheet(
+                    "QPushButton { background: white; color: #3B82F6; border: none;"
+                    " border-radius: 4px; padding: 4px 14px; font-weight: bold; font-size: 10pt; }"
+                    "QPushButton:hover { background: #F3F4F6; }"
+                )
+                btn_plans.setCursor(Qt.PointingHandCursor)
+                btn_plans.clicked.connect(self.ouvrir_plans)
+                bl.addWidget(btn_plans)
 
             if bandeau is not None:
                 central = self.centralWidget()

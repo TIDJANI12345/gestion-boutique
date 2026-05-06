@@ -271,6 +271,23 @@ class ImprimanteThermique:
             except Exception:
                 pass  # Table paiements n'existe peut-etre pas encore
 
+            # === ARDOISE (crédit) ===
+            try:
+                ardoise_info = db.fetch_one(
+                    "SELECT montant_initial, montant_restant FROM ardoise WHERE vente_id = ? AND statut != 'solde'",
+                    (vente_id,)
+                )
+                if ardoise_info:
+                    printer.text(ImprimanteThermique._ligne('-', largeur) + "\n")
+                    acompte = float(ardoise_info['montant_initial']) - float(ardoise_info['montant_restant'])
+                    if acompte > 0:
+                        printer.text(f"Acompte verse: {acompte:,.0f} FCFA\n")
+                    printer.set(bold=True)
+                    printer.text(f"Restant a payer: {float(ardoise_info['montant_restant']):,.0f} FCFA\n")
+                    printer.set(bold=False)
+            except Exception:
+                pass
+
             # === QR CODE ===
             if QRCODE_DISPONIBLE:
                 printer.text("\n")
