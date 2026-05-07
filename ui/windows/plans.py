@@ -21,40 +21,46 @@ SHOP_URL = "https://hishamdigital.com"
 
 _FEATURES_BASE = [
     ("Ventes + Reçu PDF 80mm", True, True, True),
-    ("Gestion Stock + Alertes", True, True, True),
-    ("Import CSV produits", True, True, True),
-    ("Scanner code-barres (caméra)", True, True, True),
+    ("Gestion Stock + Alertes seuil bas", True, True, True),
+    ("Import CSV produits (en masse)", True, True, True),
+    ("Gestion Fournisseurs", True, True, True),
+    ("Scanner code-barres (caméra PC)", True, True, True),
     ("Codes-barres EAN-13, EAN-8, Code 128", True, True, True),
     ("Prix de gros + Remises", True, True, True),
-    ("Impression thermique ESC/POS", True, True, True),
-    ("Rapports de base", True, True, True),
+    ("Impression thermique ESC/POS 80mm", True, True, True),
+    ("IFU / RCCM sur les reçus", True, True, True),
+    ("Rapports journaliers & mensuels", True, True, True),
+    ("Thème clair / sombre", True, True, True),
 ]
 
 _FEATURES_PRO = [
-    ("Multi-utilisateurs : Caissiers + Gestionnaires", False, True, True),
-    ("Clôture Z + Session caisse", False, True, True),
+    ("Multi-terminaux réseau local (jusqu'à 3 PCs)", False, True, True),
+    ("Multi-utilisateurs : Caissiers + Gestionnaires illimités", False, True, True),
+    ("Session caisse par rôle (timeout configurable)", False, True, True),
     ("Crédit Client — Ardoise", False, True, True),
     ("Gestion Clients & Fidélité", False, True, True),
-    ("Rapports Marge + TVA", False, True, True),
-    ("Exports Excel / PDF", False, True, True),
-    ("Sauvegarde automatique", False, True, True),
-    ("Scanner mobile (réseau local)", False, True, True),
+    ("Rapports Marge + TVA détaillés", False, True, True),
+    ("Exports Excel / CSV", False, True, True),
+    ("Sauvegarde automatique quotidienne", False, True, True),
+    ("Scanner mobile via téléphone (réseau local)", False, True, True),
+    ("Audit log — traçabilité caisse par terminal", False, True, True),
 ]
 
 _FEATURES_WL = [
-    ("Votre Nom + Logo dans l'interface", False, False, True),
-    ("Reçus PDF à votre marque", False, False, True),
-    ("Titre de fenêtre personnalisé", False, False, True),
-    ("Revendre à vos clients", False, False, True),
+    ("Terminaux réseau illimités", False, False, True),
+    ("Votre Nom + Logo dans toute l'interface", False, False, True),
+    ("Reçus PDF à votre marque (aucune mention HishamPOS)", False, False, True),
+    ("Revendre à vos clients sous votre marque", False, False, True),
+    ("Support prioritaire 12 mois", False, False, True),
 ]
 
 _POUR_QUI = [
-    ("#3B82F6", "Standard — 35 000 F",
-     "Vous travaillez SEUL dans votre boutique. 1 seul compte (le patron). Idéal pour une boutique solo."),
-    ("#10B981", "Pro — 60 000 F",
-     "Vous avez des employés. Créez des comptes Caissiers et Gestionnaires sur le même PC. Ardoise client et rapports avancés."),
+    ("#3B82F6", "Standard — 40 000 F",
+     "Vous gérez votre boutique seul ou avec votre famille. 1 poste de caisse, toutes les fonctions essentielles. Idéal pour démarrer."),
+    ("#10B981", "Pro — 85 000 F",
+     "Vous avez des employés et/ou plusieurs caisses. Multi-terminaux sur votre réseau local, comptes Caissiers/Gestionnaires, ardoise client et rapports avancés."),
     ("#8B5CF6", "White Label — 200 000 F",
-     "Vous êtes informaticien/revendeur. Livrez le logiciel sous votre propre marque à vos clients (1 licence = 1 déploiement client)."),
+     "Vous êtes informaticien ou revendeur. Livrez le logiciel sous votre propre marque. Terminaux illimités, support 12 mois, 1 licence = 1 déploiement client."),
 ]
 
 
@@ -145,7 +151,7 @@ class PlansWindow(QDialog):
         lay.addWidget(title)
         lay.addStretch()
 
-        sub = QLabel("Licences perpétuelles · 1 paiement · 1 PC")
+        sub = QLabel("Licence perpétuelle · 1 paiement · Mises à jour v2.x incluses")
         sub.setFont(QFont("Segoe UI", 10))
         sub.setStyleSheet("color: rgba(255,255,255,0.75);")
         lay.addWidget(sub)
@@ -174,8 +180,8 @@ class PlansWindow(QDialog):
         # --- En-tête colonnes ---
         headers = [
             ("Fonctionnalité", None, Qt.AlignLeft),
-            ("Standard\n35 000 F", "#3B82F6", Qt.AlignCenter),
-            ("Pro\n60 000 F", "#10B981", Qt.AlignCenter),
+            ("Standard\n40 000 F/an", "#3B82F6", Qt.AlignCenter),
+            ("Pro\n85 000 F/an", "#10B981", Qt.AlignCenter),
             ("White Label\n200 000 F", "#8B5CF6", Qt.AlignCenter),
         ]
         for col, (txt, color, align) in enumerate(headers):
@@ -301,10 +307,11 @@ class PlansWindow(QDialog):
         lay.setSpacing(4)
 
         notes = [
-            "🔑  LICENCE PERPÉTUELLE : Payez 1 fois, utilisez à vie sur 1 PC.",
+            "🔑  LICENCE PERPÉTUELLE : Payez 1 fois, utilisez à vie. Aucun abonnement mensuel.",
             "💬  Support WhatsApp inclus : 3 mois (Standard) · 6 mois (Pro) · 12 mois (White Label).",
             "📦  Mises à jour v2.x incluses sans supplément.",
-            "🔄  Upgrade possible à tout moment : achetez le plan supérieur et activez la nouvelle clé.",
+            "🔄  Upgrade à tout moment : activez simplement la nouvelle clé, vos données sont conservées.",
+            "🌐  Multi-terminaux Pro : serveur sur 1 PC, caisses sur les autres — réseau local uniquement.",
         ]
         for note in notes:
             lbl = QLabel(note)

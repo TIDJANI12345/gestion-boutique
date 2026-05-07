@@ -26,24 +26,24 @@ PLANS: dict[str, list[str]] = {
     'standard': [
         'ventes', 'stock', 'recus_pdf', 'impression_thermique',
         'rapports_base', 'prix_gros', 'remises', 'scanner_camera',
-        'parametres', 'import_csv',
+        'parametres', 'import_csv', 'fournisseurs',
     ],
     'pro': [
         'ventes', 'stock', 'recus_pdf', 'impression_thermique',
         'rapports_base', 'prix_gros', 'remises', 'scanner_camera',
-        'parametres', 'import_csv',
+        'parametres', 'import_csv', 'fournisseurs',
         # Pro uniquement
-        'multi_caissiers', 'clients_fidelite', 'exports',
+        'multi_caissiers', 'reseau_local', 'clients_fidelite', 'exports',
         'scanner_mobile', 'rapports_avances', 'sauvegarde_auto',
-        'fiscalite_tva', 'session_caisse', 'credit_client',
+        'fiscalite_tva', 'session_caisse', 'credit_client', 'audit_logs',
     ],
     'white_label': [
         'ventes', 'stock', 'recus_pdf', 'impression_thermique',
         'rapports_base', 'prix_gros', 'remises', 'scanner_camera',
-        'parametres', 'import_csv',
-        'multi_caissiers', 'clients_fidelite', 'exports',
+        'parametres', 'import_csv', 'fournisseurs',
+        'multi_caissiers', 'reseau_local', 'clients_fidelite', 'exports',
         'scanner_mobile', 'rapports_avances', 'sauvegarde_auto',
-        'fiscalite_tva', 'session_caisse', 'credit_client',
+        'fiscalite_tva', 'session_caisse', 'credit_client', 'audit_logs',
         'white_label',
     ],
 }

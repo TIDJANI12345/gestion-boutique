@@ -41,43 +41,53 @@ Offline → le plan local fait foi jusqu'à expiration + grace period.
 
 ## Les plans
 
-### Standard — 35 000 F/an
+### Standard — 40 000 F (perpétuel)
 
 | Feature key | Description |
 |---|---|
 | `ventes` | Fenêtre de vente, panier, paiement |
 | `stock` | Gestion des produits et du stock |
-| `recus_pdf` | Génération et impression reçus PDF |
-| `impression_thermique` | Ticket ESC/POS |
+| `recus_pdf` | Génération et impression reçus PDF (IFU/RCCM inclus) |
+| `impression_thermique` | Ticket ESC/POS 80mm |
 | `rapports_base` | Rapport du jour, du mois, top produits |
 | `prix_gros` | Prix dégressif par quantité |
 | `remises` | Remises sur panier (% ou montant) |
 | `scanner_camera` | Scan par webcam intégrée |
-| `parametres` | Paramètres caisse, logo, boutique |
+| `parametres` | Paramètres caisse + boutique (logo, IFU, cachets) |
+| `import_csv` | Import produits en masse par fichier CSV |
+| `fournisseurs` | Gestion des fournisseurs et contacts |
 
-Limite : **1 compte caissier** (le patron + 1 caissier max).
+Limite : **1 compte caissier** (le patron + 1 caissier max). **1 terminal**.
 
-### Pro — 60 000 F/an
+### Pro — 85 000 F (perpétuel)
 
 Tout Standard, plus :
 
 | Feature key | Description |
 |---|---|
 | `multi_caissiers` | Comptes gestionnaire + caissier illimités |
+| `reseau_local` | Multi-terminaux réseau local (jusqu'à 3 PCs) |
+| `session_caisse` | Timeout de session configurable par rôle |
 | `clients_fidelite` | Base clients, points de fidélité |
+| `credit_client` | Ardoise client (vente à crédit) |
 | `exports` | Export Excel/CSV des ventes et stocks |
-| `scanner_mobile` | Scan via téléphone (HTTP) |
-| `rapports_avances` | Rapports détaillés, historique long |
+| `scanner_mobile` | Scan via téléphone (HTTP réseau local) |
+| `rapports_avances` | Rapports détaillés, marges, TVA, historique long |
 | `sauvegarde_auto` | Sauvegarde automatique quotidienne |
 | `fiscalite_tva` | Paramétrage TVA sur les reçus |
+| `audit_logs` | Traçabilité caisse : connexions terminaux, actions |
 
-### White Label — 90 000 F/an (sur devis)
+Limite : **3 terminaux** réseau local.
+
+### White Label — 200 000 F (perpétuel, sur devis)
 
 Tout Pro, plus :
 
 | Feature key | Description |
 |---|---|
-| `white_label` | Titre fenêtre = nom boutique, aucune mention HishiPOS |
+| `white_label` | Titre fenêtre = nom boutique, aucune mention HishamPOS |
+
+Limite : terminaux **illimités**.
 
 ### Démo (aucune licence)
 
