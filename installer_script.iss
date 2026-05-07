@@ -1,14 +1,14 @@
 [Setup]
 AppId={{B3F7A2E1-5C4D-4E8F-9A1B-2D3E4F5A6B7C}
-AppName=Gestion Boutique
+AppName=HishamPOS
 AppVersion=2.5.0
-AppVerName=Gestion Boutique 2.5.0
+AppVerName=HishamPOS 2.5.0
 AppPublisher=TIDJANI
 AppPublisherURL=https://github.com/TIDJANI12345/gestion-boutique
-DefaultDirName={autopf}\GestionBoutique
-DefaultGroupName=Gestion Boutique
+DefaultDirName={autopf}\HishamPOS
+DefaultGroupName=HishamPOS
 OutputDir=output
-OutputBaseFilename=GestionBoutique_Setup_v2.5.0
+OutputBaseFilename=HishamPOS_Setup_v2.5.0
 Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
@@ -28,7 +28,7 @@ Name: "desktopicon"; Description: "Créer un raccourci sur le bureau"; GroupDesc
 
 [Files]
 ; Fichier exécutable principal et dépendances
-Source: "dist\GestionBoutique\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "dist\HishamPOS\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 ; NE PAS copier data/ - l'application cree la base de donnees au premier lancement
 ; NE PAS copier recus/ exports/ - crees automatiquement dans %APPDATA%
@@ -37,12 +37,12 @@ Source: "dist\GestionBoutique\*"; DestDir: "{app}"; Flags: ignoreversion recurse
 Source: "images\*"; DestDir: "{app}\images"; Flags: ignoreversion recursesubdirs createallsubdirs skipifsourcedoesntexist
 
 [Icons]
-Name: "{group}\Gestion Boutique"; Filename: "{app}\GestionBoutique.exe"; IconFilename: "{app}\logo.ico"
-Name: "{autodesktop}\Gestion Boutique"; Filename: "{app}\GestionBoutique.exe"; Tasks: desktopicon; IconFilename: "{app}\logo.ico"
-Name: "{group}\Désinstaller Gestion Boutique"; Filename: "{uninstallexe}"; IconFilename: "{app}\logo.ico"
+Name: "{group}\HishamPOS"; Filename: "{app}\HishamPOS.exe"; IconFilename: "{app}\logo.ico"
+Name: "{autodesktop}\HishamPOS"; Filename: "{app}\HishamPOS.exe"; Tasks: desktopicon; IconFilename: "{app}\logo.ico"
+Name: "{group}\Désinstaller HishamPOS"; Filename: "{uninstallexe}"; IconFilename: "{app}\logo.ico"
 
 [Run]
-Filename: "{app}\GestionBoutique.exe"; Description: "Lancer Gestion Boutique"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\HishamPOS.exe"; Description: "Lancer HishamPOS"; Flags: nowait postinstall skipifsilent
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{app}\data"

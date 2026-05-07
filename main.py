@@ -305,7 +305,10 @@ def main():
     if not connecter_reseau_client(app):
         sys.exit(0)
 
-    if not verifier_licence():
+    # En mode client, la licence est celle du serveur — pas de vérif locale
+    from database import db as _db
+    _mode_reseau = _db.get_parametre('reseau_mode', 'standalone')
+    if _mode_reseau != 'client' and not verifier_licence():
         sys.exit(0)
 
     # 2. Verifier premier lancement
