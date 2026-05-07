@@ -165,7 +165,8 @@ class PrincipaleWindow(QMainWindow):
 
             for label, slot in [
                 ("Gestion utilisateurs", self.ouvrir_utilisateurs),
-                ("Parametres caisse", self.ouvrir_preferences_caisse),
+                ("Parametres boutique", self.ouvrir_parametres_boutique),
+                ("Preferences caisse", self.ouvrir_preferences_caisse),
                 ("Modes de paiement", self.ouvrir_parametres_paiement),
                 ("Categories produits", self.ouvrir_categories),
                 ("Parametres fiscaux", self.ouvrir_parametres_fiscaux),
@@ -925,6 +926,11 @@ class PrincipaleWindow(QMainWindow):
     def ouvrir_fournisseurs(self):
         from ui.windows.fournisseurs import FournisseursWindow
         dlg = FournisseursWindow(parent=self)
+        dlg.exec()
+
+    def ouvrir_parametres_boutique(self):
+        from ui.windows.parametres_boutique import ParametresBoutiqueWindow
+        dlg = ParametresBoutiqueWindow(parent=self)
         dlg.exec()
 
     def ouvrir_preferences_caisse(self):

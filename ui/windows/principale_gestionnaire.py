@@ -315,6 +315,8 @@ class PrincipaleGestionnaireWindow(QMainWindow):
             gestion_menu.addAction("Clients", self.ouvrir_clients)
         if Permissions.peut(self.utilisateur, 'gerer_produits'):
             gestion_menu.addAction("Fournisseurs", self.ouvrir_fournisseurs)
+        gestion_menu.addSeparator()
+        gestion_menu.addAction("Préférences caisse", self.ouvrir_preferences_caisse)
         if Permissions.peut(self.utilisateur, 'effectuer_ventes'):
             gestion_menu.addAction("Nouvelle Vente", self.ouvrir_ventes)
         if Permissions.peut(self.utilisateur, 'voir_mes_ventes'):
@@ -415,6 +417,11 @@ class PrincipaleGestionnaireWindow(QMainWindow):
         else:
             QMessageBox.warning(self, "Accès refusé", "Vous n'avez pas la permission de gérer les clients.")
 
+    def ouvrir_preferences_caisse(self):
+        from ui.windows.preferences_caisse import PreferencesCaisseWindow
+        dlg = PreferencesCaisseWindow(parent=self)
+        dlg.exec()
+
     def ouvrir_fournisseurs(self):
         from ui.windows.fournisseurs import FournisseursWindow
         if Permissions.peut(self.utilisateur, 'gerer_produits'):
@@ -486,7 +493,7 @@ class PrincipaleGestionnaireWindow(QMainWindow):
     # === SESSION TIMEOUT ===
 
     def _setup_session_timeout(self):
-        timeout_str = db.get_parametre('session_timeout', '0')
+        timeout_str = db.get_parametre('session_timeout_gestionnaire', '3600')
         try:
             timeout_ms = int(timeout_str) * 1000
         except ValueError:
