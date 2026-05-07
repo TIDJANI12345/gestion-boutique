@@ -119,10 +119,19 @@ class LoginWindow(QDialog):
             return
 
         import modules.reseau as reseau
+        user = None
         if reseau.actif():
-            user = reseau.get_client().login(email, password)
-            if user:
-                user.setdefault('super_admin', 0)
+            try:
+                user = reseau.get_client().login(email, password)
+                if user:
+                    user.setdefault('super_admin', 0)
+            except ConnectionError:
+                QMessageBox.critical(
+                    self, "Serveur inaccessible",
+                    "Impossible de joindre le serveur.\n"
+                    "Vérifiez que le PC serveur est allumé et connecté au même réseau."
+                )
+                return
         else:
             user = Utilisateur.authentifier(email, password)
 

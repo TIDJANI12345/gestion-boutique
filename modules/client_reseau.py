@@ -136,11 +136,23 @@ class ClientReseau:
         return _rows(self._get('/utilisateurs'))
 
     def login(self, email: str, mot_de_passe: str):
-        """Authentifie via le serveur. Retourne le dict utilisateur ou None."""
-        resp = self._post('/login', {'email': email, 'mot_de_passe': mot_de_passe})
-        if resp and resp.get('succes'):
-            return resp.get('utilisateur')
-        return None
+        """Authentifie via le serveur. Retourne le dict utilisateur ou None (mauvais identifiants).
+        Lève ConnectionError si le serveur est inaccessible."""
+        try:
+            r = requests.post(
+                f"{self._url}/login",
+                headers=self._headers,
+                json={'email': email, 'mot_de_passe': mot_de_passe},
+                timeout=_TIMEOUT
+            )
+            if r.status_code == 200:
+                data = r.json()
+                if data.get('succes'):
+                    return data.get('utilisateur')
+            return None  # 401 = mauvais identifiants
+        except requests.RequestException as e:
+            logger.error(f"login réseau échoué : {e}")
+            raise ConnectionError(f"Serveur inaccessible : {e}") from e
 
     def get_produits(self):
         return _rows(self._get('/produits'))
