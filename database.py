@@ -19,7 +19,7 @@ class Database:
     def connect(self):
         """Connexion a la base de donnees"""
         try:
-            self.conn = sqlite3.connect(DB_PATH)
+            self.conn = sqlite3.connect(DB_PATH, check_same_thread=False)
             self.conn.row_factory = sqlite3.Row  # Activer Row Factory pour accès par clé
             self.cursor = self.conn.cursor()
             logger.info("Connexion a la base de donnees reussie")
