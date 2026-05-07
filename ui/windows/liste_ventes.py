@@ -126,10 +126,9 @@ class ListeVentesWindow(QDialog):
 
         # Table (colonnes selon rôle)
         if self.utilisateur and self.utilisateur.get('role') == 'caissier':
-            colonnes = ["ID", "Numero", "Date", "Heure", "Client", "Total ({get_devise()})", "Paiement", "Nb Articles"]
+            colonnes = ["ID", "Numero", "Date", "Heure", "Client", f"Total ({get_devise()})", "Paiement", "Nb Articles"]
         else:
-            # Admin/Gérant : ajouter colonne Vendeur
-            colonnes = ["ID", "Numero", "Date", "Heure", "Vendeur", "Client", "Total ({get_devise()})", "Paiement", "Nb Articles"]
+            colonnes = ["ID", "Numero", "Date", "Heure", "Vendeur", "Caisse", "Client", f"Total ({get_devise()})", "Paiement", "Nb Articles"]
         self.model = BoutiqueTableModel(colonnes)
         self.table = BoutiqueTableView()
         self.table.setModel(self.model)
@@ -152,9 +151,8 @@ class ListeVentesWindow(QDialog):
         est_caissier = self.utilisateur and self.utilisateur.get('role') == 'caissier'
 
         if est_caissier:
-            # Caissier : uniquement ses ventes
             query = """
-                SELECT v.id, v.numero_vente, v.date_vente, v.total, v.client
+                SELECT v.id, v.numero_vente, v.date_vente, v.total, v.client, v.nom_caisse
                 FROM ventes v
                 WHERE v.date_vente BETWEEN ? AND ?
                 AND v.utilisateur_id = ?
@@ -162,10 +160,9 @@ class ListeVentesWindow(QDialog):
             """
             ventes = db.fetch_all(query, (d1, d2, self.utilisateur['id']))
         else:
-            # Admin : toutes les ventes + nom vendeur
             query = """
                 SELECT v.id, v.numero_vente, v.date_vente, v.total, v.client,
-                       u.prenom, u.nom
+                       u.prenom, u.nom, v.nom_caisse
                 FROM ventes v
                 LEFT JOIN utilisateurs u ON v.utilisateur_id = u.id
                 WHERE v.date_vente BETWEEN ? AND ?
@@ -185,11 +182,13 @@ class ListeVentesWindow(QDialog):
             total = v[3] or 0
             total_ca += total
 
-            # Nom vendeur (seulement pour admin)
-            if not est_caissier:
+            if est_caissier:
+                nom_caisse = v[5] or "-"
+            else:
                 vendeur_prenom = v[5] or ""
                 vendeur_nom = v[6] or ""
                 vendeur = f"{vendeur_prenom} {vendeur_nom}".strip() if vendeur_prenom or vendeur_nom else "-"
+                nom_caisse = v[7] or "-"
 
             # Nombre d'articles
             details = Vente.obtenir_details_vente(vente_id)
@@ -203,7 +202,6 @@ class ListeVentesWindow(QDialog):
             else:
                 mode_str = "-"
 
-            # Ligne selon rôle
             if est_caissier:
                 lignes.append([
                     vente_id, numero, date_str, heure_str, client,
@@ -211,7 +209,7 @@ class ListeVentesWindow(QDialog):
                 ])
             else:
                 lignes.append([
-                    vente_id, numero, date_str, heure_str, vendeur, client,
+                    vente_id, numero, date_str, heure_str, vendeur, nom_caisse, client,
                     f"{total:,.0f}", mode_str, nb_articles
                 ])
 

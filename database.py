@@ -93,6 +93,14 @@ class Database:
             self.cursor.execute("ALTER TABLE ventes ADD COLUMN remise REAL DEFAULT 0")
             self.conn.commit()
 
+        # Migration : Ajouter colonne nom_caisse si absente
+        try:
+            self.cursor.execute("SELECT nom_caisse FROM ventes LIMIT 1")
+        except sqlite3.OperationalError:
+            logger.info("Migration: Ajout colonne nom_caisse à table ventes")
+            self.cursor.execute("ALTER TABLE ventes ADD COLUMN nom_caisse TEXT DEFAULT NULL")
+            self.conn.commit()
+
         # Migration : Ajouter colonnes prix_gros / seuil_gros à produits
         try:
             self.cursor.execute("SELECT prix_gros FROM produits LIMIT 1")

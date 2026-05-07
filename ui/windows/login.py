@@ -22,7 +22,8 @@ class LoginWindow(QDialog):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Connexion - Gestion Boutique")
+        from config import APP_NAME
+        self.setWindowTitle(f"Connexion — {APP_NAME}")
         self.setFixedSize(450, 480)
         self.setModal(True)
 
@@ -117,7 +118,13 @@ class LoginWindow(QDialog):
                                 "Veuillez remplir tous les champs")
             return
 
-        user = Utilisateur.authentifier(email, password)
+        import modules.reseau as reseau
+        if reseau.actif():
+            user = reseau.get_client().login(email, password)
+            if user:
+                user.setdefault('super_admin', 0)
+        else:
+            user = Utilisateur.authentifier(email, password)
 
         if user:
             self._tentatives = 0
@@ -129,7 +136,8 @@ class LoginWindow(QDialog):
                 'role': user['role'],
                 'super_admin': user['super_admin'] if 'super_admin' in user.keys() else 0
             }
-            Utilisateur.logger_action(user['id'], 'connexion', "Connexion reussie")
+            if not reseau.actif():
+                Utilisateur.logger_action(user['id'], 'connexion', "Connexion reussie")
             self.login_success.emit(infos_user)
             self.accept()
         else:

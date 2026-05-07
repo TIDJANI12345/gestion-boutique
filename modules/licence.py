@@ -104,11 +104,12 @@ class GestionLicence:
                 data = response.json()
                 if data.get('succes'):
                     # Sauvegarde locale cryptee
+                    expiration = data.get('expiration') or '2099-12-31'
                     donnees_locales = {
                         'cle': cle,
                         'machine_id': machine_id,
-                        'expiration': data['expiration'][:10],
-                        'type': data['type'],
+                        'expiration': expiration[:10],
+                        'type': data.get('type', 'standard'),
                         'derniere_verif': datetime.now().strftime("%Y-%m-%d")
                     }
 

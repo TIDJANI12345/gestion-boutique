@@ -256,15 +256,16 @@ def enregistrer_vente():
         with db.conn:
             db.execute_query('''
                 INSERT INTO ventes (numero_vente, date_vente, total, total_ttc,
-                    montant_recu, monnaie, mode_paiement, client_id, utilisateur_id, statut)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    montant_recu, monnaie, mode_paiement, client_id, utilisateur_id, nom_caisse, statut)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 data['numero_vente'],
                 data.get('date_vente', datetime.now().strftime('%Y-%m-%d %H:%M:%S')),
                 data['total'], data.get('total_ttc', data['total']),
                 data.get('montant_recu', data['total']), data.get('monnaie', 0),
                 data.get('mode_paiement', 'especes'),
-                data.get('client_id'), data.get('utilisateur_id'), 'terminee'
+                data.get('client_id'), data.get('utilisateur_id'),
+                data.get('nom_caisse'), 'terminee'
             ))
             vente_id = db.fetch_one(
                 "SELECT id FROM ventes WHERE numero_vente = ?", (data['numero_vente'],)
@@ -323,6 +324,27 @@ def liste_utilisateurs():
             "SELECT id, nom, prenom, email, role, actif FROM utilisateurs ORDER BY nom"
         )
         return jsonify([dict(r) for r in rows])
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/login', methods=['POST'])
+@require_token
+def login_reseau():
+    """Authentifie un utilisateur côté serveur, renvoie ses infos sans le hash."""
+    try:
+        data = request.get_json() or {}
+        email = data.get('email', '').strip()
+        mot_de_passe = data.get('mot_de_passe', '')
+        if not email or not mot_de_passe:
+            return jsonify({'succes': False, 'message': 'Identifiants manquants'}), 400
+        from modules.utilisateurs import Utilisateur
+        user = Utilisateur.authentifier(email, mot_de_passe)
+        if user:
+            u = dict(user)
+            u.pop('mot_de_passe', None)
+            return jsonify({'succes': True, 'utilisateur': u})
+        return jsonify({'succes': False, 'message': 'Email ou mot de passe incorrect'}), 401
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

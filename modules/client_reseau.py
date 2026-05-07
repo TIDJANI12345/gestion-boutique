@@ -135,6 +135,13 @@ class ClientReseau:
     def get_utilisateurs(self):
         return _rows(self._get('/utilisateurs'))
 
+    def login(self, email: str, mot_de_passe: str):
+        """Authentifie via le serveur. Retourne le dict utilisateur ou None."""
+        resp = self._post('/login', {'email': email, 'mot_de_passe': mot_de_passe})
+        if resp and resp.get('succes'):
+            return resp.get('utilisateur')
+        return None
+
     def get_produits(self):
         return _rows(self._get('/produits'))
 

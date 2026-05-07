@@ -21,14 +21,14 @@ class Vente:
         return f"V{date_str}-{random_str}"
 
     @staticmethod
-    def creer_vente(client="", utilisateur_id=None):
-        """Creer une nouvelle vente"""
+    def creer_vente(client="", utilisateur_id=None, nom_caisse=None):
         numero_vente = Vente.generer_numero_vente()
-        query = "INSERT INTO ventes (numero_vente, client, total, utilisateur_id) VALUES (?, ?, 0, ?)"
-        vente_id = db.execute_query(query, (numero_vente, client, utilisateur_id))
-
+        if nom_caisse is None:
+            nom_caisse = db.get_parametre('boutique_nom', 'Caisse principale')
+        query = "INSERT INTO ventes (numero_vente, client, total, utilisateur_id, nom_caisse) VALUES (?, ?, 0, ?, ?)"
+        vente_id = db.execute_query(query, (numero_vente, client, utilisateur_id, nom_caisse))
         if vente_id:
-            logger.info(f"Vente creee : ID={vente_id}, numero={numero_vente}, utilisateur={utilisateur_id}")
+            logger.info(f"Vente creee : ID={vente_id}, numero={numero_vente}, utilisateur={utilisateur_id}, caisse={nom_caisse}")
         return vente_id
 
     @staticmethod

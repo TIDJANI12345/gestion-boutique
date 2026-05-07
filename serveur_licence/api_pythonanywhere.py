@@ -545,6 +545,7 @@ ADMIN_TEMPLATE = """
       <th>Première activation</th>
       <th>Machine (ID)</th>
       <th>Nb. utilisations</th>
+      <th>Actions</th>
     </tr>
     {% for l in licences %}
     {% set en_cours = l.machine_id and not l._expire and l.statut == 'active' %}
@@ -575,6 +576,17 @@ ADMIN_TEMPLATE = """
       <td style="white-space:nowrap;color:#6b7280">{{ l._date_activation }}</td>
       <td class="machine">{{ l.machine_id or '—' }}</td>
       <td style="text-align:center">{{ l.nb_activations }}</td>
+      <td style="white-space:nowrap">
+        {% if l.machine_id %}
+        <form method="post" action="/admin/reinitialiser-machine" style="display:inline"
+              onsubmit="return confirm('Réinitialiser la machine pour cette licence ? Le client pourra l\\'activer sur un nouveau PC.')">
+          <input type="hidden" name="cle" value="{{ l.cle_licence }}">
+          <button type="submit" style="background:#f59e0b;color:#fff;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:.85em">
+            🔄 Changer PC
+          </button>
+        </form>
+        {% else %}—{% endif %}
+      </td>
     </tr>
     {% endfor %}
   </table>
@@ -715,6 +727,22 @@ def admin_generer():
         nouvelle_cle=nouvelle_cle,
         stats=stats,
     )
+
+
+@app.route('/admin/reinitialiser-machine', methods=['POST'])
+@admin_required
+def admin_reinitialiser_machine():
+    cle = request.form.get('cle', '').strip()
+    if not cle:
+        return redirect('/admin/generer')
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute(
+        'UPDATE licences SET machine_id = NULL, nb_activations = 0 WHERE cle_licence = ?',
+        (cle,)
+    )
+    conn.commit()
+    conn.close()
+    return redirect('/admin/generer')
 
 
 if __name__ == '__main__':

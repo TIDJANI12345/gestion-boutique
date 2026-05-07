@@ -1339,6 +1339,7 @@ class VentesWindow(QDialog):
                 'mode_paiement': mode_paiement,
                 'client': client_nom or None,
                 'utilisateur_id': utilisateur_id,
+                'nom_caisse': db.get_parametre('boutique_nom', 'Caisse réseau'),
                 'details': details,
             })
 
