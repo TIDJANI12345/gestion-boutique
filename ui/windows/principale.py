@@ -732,7 +732,7 @@ class PrincipaleWindow(QMainWindow):
 
     def _setup_session_timeout(self):
         from database import db
-        timeout_str = db.get_parametre('session_timeout', '0')
+        timeout_str = db.get_parametre('session_timeout_patron', '0')
         try:
             timeout_ms = int(timeout_str) * 1000
         except ValueError:

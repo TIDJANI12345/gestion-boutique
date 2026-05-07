@@ -12,7 +12,7 @@ from PySide6.QtCore import Qt, QDate
 from PySide6.QtGui import QFont
 
 from ui.theme import Theme
-from ui.components.dialogs import information, erreur, confirmation
+from ui.components.dialogs import information, erreur
 from modules.fournisseurs import Fournisseur, CommandeFournisseur
 
 
