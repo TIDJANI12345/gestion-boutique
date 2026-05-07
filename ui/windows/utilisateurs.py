@@ -132,53 +132,59 @@ class UtilisateursWindow(QDialog):
         self._table_view.ligne_selectionnee.connect(self._selectionner_utilisateur)
         right_layout.addWidget(self._table_view, 1)
 
-        # Boutons d'action
-        actions_row = QHBoxLayout()
+        # Boutons d'action - 2 lignes
+        actions_v = QVBoxLayout()
+        actions_v.setSpacing(6)
 
-        self._btn_activer = QPushButton("Activer/Desactiver")
+        # Ligne 1 : changements de rôle / statut
+        row1 = QHBoxLayout()
+        row1.setSpacing(6)
+
+        self._btn_activer = QPushButton("Activer / Désact.")
         self._btn_activer.setCursor(Qt.PointingHandCursor)
-        self._btn_activer.setProperty("class", "primary")
+        self._btn_activer.setProperty("class", "secondary")
         self._btn_activer.clicked.connect(self._toggle_statut)
-        actions_row.addWidget(self._btn_activer)
+        row1.addWidget(self._btn_activer)
 
-        self._btn_super_admin = QPushButton("Passer en Super-Admin")
+        self._btn_super_admin = QPushButton("→ Super-Admin")
         self._btn_super_admin.setCursor(Qt.PointingHandCursor)
+        self._btn_super_admin.setProperty("class", "secondary")
         self._btn_super_admin.clicked.connect(lambda: self._changer_role("patron"))
-        actions_row.addWidget(self._btn_super_admin)
+        row1.addWidget(self._btn_super_admin)
 
-        self._btn_gestionnaire = QPushButton("Passer en Gestionnaire")
+        self._btn_gestionnaire = QPushButton("→ Gestionnaire")
         self._btn_gestionnaire.setCursor(Qt.PointingHandCursor)
+        self._btn_gestionnaire.setProperty("class", "secondary")
         self._btn_gestionnaire.clicked.connect(lambda: self._changer_role("gestionnaire"))
-        actions_row.addWidget(self._btn_gestionnaire)
+        row1.addWidget(self._btn_gestionnaire)
 
-        self._btn_caissier = QPushButton("Passer en Caissier")
+        self._btn_caissier = QPushButton("→ Caissier")
         self._btn_caissier.setCursor(Qt.PointingHandCursor)
+        self._btn_caissier.setProperty("class", "secondary")
         self._btn_caissier.clicked.connect(lambda: self._changer_role("caissier"))
-        actions_row.addWidget(self._btn_caissier)
+        row1.addWidget(self._btn_caissier)
 
-        self._btn_reset_mdp = QPushButton("🔑 Réinitialiser MDP")
+        actions_v.addLayout(row1)
+
+        # Ligne 2 : actions globales
+        row2 = QHBoxLayout()
+        row2.setSpacing(6)
+
+        self._btn_reset_mdp = QPushButton("Réinitialiser MDP")
         self._btn_reset_mdp.setCursor(Qt.PointingHandCursor)
-        self._btn_reset_mdp.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {Theme.c('warning')};
-                color: white;
-                font-weight: bold;
-                padding: 8px 12px;
-                border-radius: 4px;
-            }}
-            QPushButton:hover {{
-                background-color: #D97706;
-            }}
-        """)
+        self._btn_reset_mdp.setProperty("class", "warning")
         self._btn_reset_mdp.clicked.connect(self._reinitialiser_mot_de_passe)
-        actions_row.addWidget(self._btn_reset_mdp)
+        row2.addWidget(self._btn_reset_mdp)
+
+        row2.addStretch()
 
         btn_actualiser = QPushButton("Actualiser")
         btn_actualiser.setCursor(Qt.PointingHandCursor)
         btn_actualiser.clicked.connect(self._charger_utilisateurs)
-        actions_row.addWidget(btn_actualiser)
+        row2.addWidget(btn_actualiser)
 
-        right_layout.addLayout(actions_row)
+        actions_v.addLayout(row2)
+        right_layout.addLayout(actions_v)
 
         main_layout.addWidget(right, 1)
         layout.addWidget(main, 1)
@@ -323,11 +329,6 @@ class UtilisateursWindow(QDialog):
             erreur(self, "Accès refusé", "Seul le Super-Admin peut réinitialiser les mots de passe.")
             return
 
-        # Empêcher la réinitialisation de son propre mot de passe (utiliser changement normal)
-        if self._user_selectionne_id == self._utilisateur_connecte.get('id'):
-            erreur(self, "Erreur", "Utilisez la fonction 'Changer mot de passe' pour votre propre compte.")
-            return
-
         # Récupérer infos utilisateur
         from modules.utilisateurs import Utilisateur
         from database import db
@@ -366,10 +367,14 @@ class UtilisateursWindow(QDialog):
         # Modifier
         succes = Utilisateur.modifier_mot_de_passe(self._user_selectionne_id, nouveau_mdp)
 
+        est_propre_compte = (self._user_selectionne_id == self._utilisateur_connecte.get('id'))
         if succes:
-            information(self, "Succès",
-                        f"Mot de passe réinitialisé pour {nom_complet}.\n\n"
-                        f"Communiquez-lui le nouveau mot de passe de manière sécurisée.")
+            if est_propre_compte:
+                information(self, "Succès", "Votre mot de passe a été modifié.")
+            else:
+                information(self, "Succès",
+                            f"Mot de passe réinitialisé pour {nom_complet}.\n\n"
+                            f"Communiquez-lui le nouveau mot de passe de manière sécurisée.")
             # Logger l'action
             Utilisateur.logger_action(
                 self._utilisateur_connecte['id'],

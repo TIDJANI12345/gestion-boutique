@@ -258,6 +258,24 @@ class Theme:
         QPushButton[class="secondary"]:hover {{
             background-color: {c['light']};
         }}
+        QPushButton[class="secondary"]:disabled {{
+            background-color: {c['card_bg']};
+            color: {c['text_secondary']};
+            border: 1px solid {c['separator']};
+            opacity: 0.5;
+        }}
+
+        QPushButton[class="warning"] {{
+            background-color: {c['warning']};
+            color: white;
+        }}
+        QPushButton[class="warning"]:hover {{
+            background-color: #D97706;
+        }}
+        QPushButton[class="warning"]:disabled {{
+            background-color: {c['gray']};
+            color: #AAAAAA;
+        }}
 
         /* === CHAMPS DE SAISIE === */
         QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox,
