@@ -50,10 +50,10 @@ PLANS: dict[str, list[str]] = {
 
 # Limites numériques par plan
 LIMITES: dict[str, dict] = {
-    'demo':        {'caissiers': 1},
-    'standard':    {'caissiers': 1},
-    'pro':         {'caissiers': 999},
-    'white_label': {'caissiers': 999},
+    'demo':        {'caissiers': 1,   'terminaux': 1},
+    'standard':    {'caissiers': 1,   'terminaux': 1},
+    'pro':         {'caissiers': 999, 'terminaux': 3},
+    'white_label': {'caissiers': 999, 'terminaux': 999},
 }
 
 # ---------------------------------------------------------------------------
@@ -200,7 +200,76 @@ def ventes_autorisees() -> bool:
 # ---------------------------------------------------------------------------
 
 DEMO_MAX_VENTES = 50
-DEMO_MAX_JOURS = 14
+DEMO_MAX_JOURS  = 14
+
+_DEMO_API_BASE = "https://gbserver.pythonanywhere.com"
+_DEMO_TIMEOUT  = 5  # secondes — court pour ne pas bloquer le démarrage
+
+
+def _demo_machine_id() -> str:
+    try:
+        from modules.licence import GestionLicence
+        return GestionLicence().get_machine_id()
+    except Exception:
+        return ''
+
+
+def demo_sync_serveur():
+    """
+    Appelle le serveur au démarrage pour synchroniser l'état démo.
+    - Premier appel : enregistre le machine_id (date_debut côté serveur).
+    - Appels suivants : récupère les vrais compteurs (anti-réinstallation).
+    Silencieux si pas de connexion.
+    """
+    if not est_demo():
+        return
+
+    machine_id = _demo_machine_id()
+    if not machine_id:
+        return
+
+    import time
+    nb_local = int(db.get_parametre('licence_demo_ventes', '0'))
+
+    try:
+        import requests
+
+        # 1. Enregistrer si nouveau (idempotent si déjà connu)
+        r = requests.post(
+            f"{_DEMO_API_BASE}/api/demo/enregistrer",
+            json={'machine_id': machine_id},
+            timeout=_DEMO_TIMEOUT
+        )
+        if r.status_code == 200:
+            data = r.json()
+            date_debut_serveur = data.get('date_debut', '')
+            nb_serveur = int(data.get('nb_ventes', 0))
+
+            # Conserver la date de début la plus ancienne
+            if date_debut_serveur:
+                try:
+                    ts_serveur = datetime.fromisoformat(date_debut_serveur).timestamp()
+                    debut_local_str = db.get_parametre('licence_demo_debut', '')
+                    if not debut_local_str or ts_serveur < float(debut_local_str):
+                        db.set_parametre('licence_demo_debut', str(ts_serveur))
+                except Exception:
+                    pass
+
+            # Conserver le plus grand compteur de ventes
+            if nb_serveur > nb_local:
+                db.set_parametre('licence_demo_ventes', str(nb_serveur))
+                logger.info(f"Demo: compteur serveur {nb_serveur} > local {nb_local}, synchronisé")
+
+        # 2. Sync du compteur courant vers le serveur
+        nb_actuel = int(db.get_parametre('licence_demo_ventes', '0'))
+        requests.post(
+            f"{_DEMO_API_BASE}/api/demo/statut",
+            json={'machine_id': machine_id, 'nb_ventes': nb_actuel},
+            timeout=_DEMO_TIMEOUT
+        )
+
+    except Exception as e:
+        logger.warning(f"Demo sync serveur impossible (mode offline) : {e}")
 
 
 def demo_peut_vendre() -> tuple[bool, str]:
@@ -211,12 +280,10 @@ def demo_peut_vendre() -> tuple[bool, str]:
     if not est_demo():
         return True, ''
 
-    # Vérifier la durée (14 jours depuis premier lancement)
     import time
     debut = db.get_parametre('licence_demo_debut', '')
     if not debut:
-        # Premier lancement démo → enregistrer la date
-        db.set_parametre('licence_demo_debut', str(int(time.time())))
+        db.set_parametre('licence_demo_debut', str(time.time()))
     else:
         try:
             jours = (time.time() - float(debut)) / 86400
@@ -225,7 +292,6 @@ def demo_peut_vendre() -> tuple[bool, str]:
         except Exception:
             pass
 
-    # Vérifier le nombre de ventes
     try:
         nb = int(db.get_parametre('licence_demo_ventes', '0'))
         if nb >= DEMO_MAX_VENTES:

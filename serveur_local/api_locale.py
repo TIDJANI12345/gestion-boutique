@@ -17,6 +17,48 @@ logger = get_logger('api_locale')
 
 app = Flask(__name__)
 
+# ── Suivi des terminaux connectés (Étape 7) ───────────────────────────────────
+# machine_id → {'ip': ..., 'nom': ..., 'derniere_activite': ...}
+_terminaux: dict = {}
+_terminaux_lock = __import__('threading').Lock()
+
+def _plan_actuel() -> str:
+    try:
+        from modules.features import plan_actuel
+        return plan_actuel()
+    except Exception:
+        return 'standard'
+
+def _max_terminaux() -> int:
+    try:
+        from modules.features import LIMITES
+        return LIMITES.get(_plan_actuel(), {}).get('terminaux', 1)
+    except Exception:
+        return 1
+
+def _enregistrer_terminal(machine_id: str, nom: str, ip: str):
+    with _terminaux_lock:
+        _terminaux[machine_id] = {
+            'ip': ip,
+            'nom': nom,
+            'derniere_activite': datetime.now().isoformat(),
+        }
+
+def _verifier_quota(machine_id: str) -> tuple[bool, str]:
+    """Retourne (autorisé, message). Un terminal déjà connu est toujours autorisé."""
+    with _terminaux_lock:
+        if machine_id in _terminaux:
+            return True, 'ok'
+        nb = len(_terminaux)
+        max_t = _max_terminaux()
+        if nb >= max_t:
+            plan = _plan_actuel()
+            return False, (
+                f"Quota atteint : {nb}/{max_t} terminaux autorisés (plan {plan}). "
+                f"Passez au plan supérieur pour connecter plus de PC."
+            )
+        return True, 'ok'
+
 # Token partagé — généré au premier démarrage et stocké dans les paramètres
 def get_token():
     token = db.get_parametre('reseau_local_token')
@@ -33,6 +75,11 @@ def require_token(f):
         auth = request.headers.get('X-Local-Token', '')
         if auth != get_token():
             return jsonify({'error': 'Non autorisé'}), 401
+        # Mise à jour de l'activité du terminal si machine_id fourni
+        machine_id = request.headers.get('X-Machine-Id', '')
+        if machine_id and machine_id in _terminaux:
+            with _terminaux_lock:
+                _terminaux[machine_id]['derniere_activite'] = datetime.now().isoformat()
         return f(*args, **kwargs)
     return decorated
 
@@ -47,6 +94,63 @@ def ping():
         'serveur': boutique,
         'timestamp': datetime.now().isoformat()
     })
+
+
+# ── Connexion terminaux (Étape 7) ─────────────────────────────────────────────
+
+@app.route('/connect', methods=['POST'])
+@require_token
+def connecter_terminal():
+    """
+    Appelé par un PC client au démarrage pour s'enregistrer.
+    Vérifie le quota du plan avant d'autoriser.
+    """
+    data = request.json or {}
+    machine_id = data.get('machine_id', request.headers.get('X-Machine-Id', ''))
+    nom = data.get('nom', 'Caisse inconnue')
+    ip = request.remote_addr
+
+    if not machine_id:
+        return jsonify({'error': 'machine_id requis'}), 400
+
+    autorise, msg = _verifier_quota(machine_id)
+    if not autorise:
+        return jsonify({'error': msg, 'code': 'QUOTA_DEPASSE'}), 403
+
+    _enregistrer_terminal(machine_id, nom, ip)
+    return jsonify({
+        'status': 'ok',
+        'plan': _plan_actuel(),
+        'terminaux_connectes': len(_terminaux),
+        'terminaux_max': _max_terminaux(),
+    })
+
+
+@app.route('/terminaux', methods=['GET'])
+@require_token
+def liste_terminaux():
+    """Liste les terminaux actuellement connectés (vue admin)."""
+    with _terminaux_lock:
+        data = [
+            {'machine_id': mid, **info}
+            for mid, info in _terminaux.items()
+        ]
+    return jsonify({
+        'terminaux': data,
+        'nb': len(data),
+        'max': _max_terminaux(),
+        'plan': _plan_actuel(),
+    })
+
+
+@app.route('/deconnecter', methods=['POST'])
+@require_token
+def deconnecter_terminal():
+    machine_id = (request.json or {}).get('machine_id', '')
+    if machine_id:
+        with _terminaux_lock:
+            _terminaux.pop(machine_id, None)
+    return jsonify({'status': 'ok'})
 
 
 # ── Produits ──────────────────────────────────────────────────────────────────
@@ -242,8 +346,15 @@ def stock_alertes():
 
 def demarrer(host='0.0.0.0', port=5050):
     token = get_token()
+    boutique = db.get_parametre('boutique_nom') or 'HishamPOS'
     logger.info(f"API locale démarrée sur {host}:{port}")
     logger.info(f"Token réseau : {token}")
+    # Découverte automatique — diffuse la présence sur le réseau local
+    try:
+        from serveur_local.discovery import demarrer_broadcaster
+        demarrer_broadcaster(boutique, port, token)
+    except Exception as e:
+        logger.warning(f"Broadcaster UDP non démarré : {e}")
     app.run(host=host, port=port, debug=False, use_reloader=False)
 
 

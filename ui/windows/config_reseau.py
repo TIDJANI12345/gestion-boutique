@@ -46,13 +46,59 @@ class _PingThread(QThread):
             self.result.emit(False, str(e))
 
 
+class _DiscoveryThread(QThread):
+    found = Signal(str, int, str)   # ip, port, token
+    not_found = Signal()
+
+    def run(self):
+        try:
+            from serveur_local.discovery import chercher_serveur
+            result = chercher_serveur(timeout=6.0)
+            if result:
+                self.found.emit(result['ip'], result['port'], result['token'])
+            else:
+                self.not_found.emit()
+        except Exception as e:
+            self.not_found.emit()
+
+
+class _TerminauxThread(QThread):
+    result = Signal(list, int, int, str)  # terminaux, nb, max, plan
+
+    def __init__(self, url, token):
+        super().__init__()
+        self._url = url
+        self._token = token
+
+    def run(self):
+        try:
+            import requests
+            r = requests.get(
+                f"{self._url}/terminaux",
+                headers={'X-Local-Token': self._token},
+                timeout=3
+            )
+            if r.status_code == 200:
+                data = r.json()
+                self.result.emit(
+                    data.get('terminaux', []),
+                    data.get('nb', 0),
+                    data.get('max', 1),
+                    data.get('plan', 'standard'),
+                )
+        except Exception:
+            self.result.emit([], 0, 0, '')
+
+
 class ConfigReseauWindow(QDialog):
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Configuration réseau")
-        self.setMinimumWidth(500)
+        self.setMinimumWidth(520)
         self._ping_thread = None
+        self._discovery_thread = None
+        self._terminaux_thread = None
         self._build_ui()
         self._charger()
 
@@ -106,9 +152,22 @@ class ConfigReseauWindow(QDialog):
         )
         self._lbl_token.setTextInteractionFlags(Qt.TextSelectableByMouse)
 
+        btn_terminaux = QPushButton("Voir les terminaux connectés")
+        btn_terminaux.setStyleSheet(
+            f"background:{Theme.c('card_bg')}; color:{Theme.c('text')}; "
+            f"border:1px solid {Theme.c('input_border')}; border-radius:6px; padding:6px 14px;"
+        )
+        btn_terminaux.clicked.connect(self._voir_terminaux)
+
+        self._lbl_terminaux = QLabel()
+        self._lbl_terminaux.setStyleSheet(f"color: {Theme.c('gray')}; font-size: 10pt;")
+        self._lbl_terminaux.setWordWrap(True)
+
         srv_layout.addWidget(ip_label)
         srv_layout.addWidget(port_label)
         srv_layout.addWidget(self._lbl_token)
+        srv_layout.addWidget(btn_terminaux)
+        srv_layout.addWidget(self._lbl_terminaux)
         layout.addWidget(self._frame_serveur)
 
         # ── Config client (affiché si mode=client) ────────────────────────────
@@ -118,6 +177,16 @@ class ConfigReseauWindow(QDialog):
         )
         cli_layout = QVBoxLayout(self._frame_client)
         cli_layout.setSpacing(8)
+
+        # Bouton découverte automatique
+        btn_decouvrir = QPushButton("Rechercher le serveur automatiquement")
+        btn_decouvrir.setStyleSheet(
+            f"background:{Theme.c('primary')}; color:#fff; "
+            f"border:none; border-radius:6px; padding:7px 14px; font-weight:bold;"
+        )
+        btn_decouvrir.clicked.connect(self._decouvrir_serveur)
+        self._lbl_decouverte = QLabel()
+        self._lbl_decouverte.setStyleSheet(f"color: {Theme.c('gray')}; font-size: 10pt;")
 
         lbl_ip = QLabel("IP du serveur :")
         lbl_ip.setStyleSheet(f"color: {Theme.c('text')};")
@@ -147,6 +216,8 @@ class ConfigReseauWindow(QDialog):
         self._lbl_ping = QLabel()
         self._lbl_ping.setStyleSheet(f"color: {Theme.c('gray')}; font-size: 10pt;")
 
+        cli_layout.addWidget(btn_decouvrir)
+        cli_layout.addWidget(self._lbl_decouverte)
         cli_layout.addWidget(lbl_ip)
         cli_layout.addWidget(self._input_ip)
         cli_layout.addWidget(lbl_token)
@@ -213,6 +284,45 @@ class ConfigReseauWindow(QDialog):
         if self._btn_client.isChecked():
             return 'client'
         return 'standalone'
+
+    def _decouvrir_serveur(self):
+        self._lbl_decouverte.setStyleSheet(f"color: {Theme.c('gray')}; font-size: 10pt;")
+        self._lbl_decouverte.setText("Recherche en cours (6 secondes max)...")
+        self._discovery_thread = _DiscoveryThread()
+        self._discovery_thread.found.connect(self._on_serveur_trouve)
+        self._discovery_thread.not_found.connect(self._on_serveur_non_trouve)
+        self._discovery_thread.start()
+
+    def _on_serveur_trouve(self, ip: str, port: int, token: str):
+        self._lbl_decouverte.setStyleSheet("color: #16a34a; font-size: 10pt;")
+        self._lbl_decouverte.setText(f"Serveur trouvé : {ip}")
+        self._input_ip.setText(ip)
+        self._input_token.setText(token)
+
+    def _on_serveur_non_trouve(self):
+        self._lbl_decouverte.setStyleSheet("color: #dc2626; font-size: 10pt;")
+        self._lbl_decouverte.setText("Aucun serveur trouvé. Saisissez l'IP manuellement.")
+
+    def _voir_terminaux(self):
+        ip = _get_local_ip()
+        token = db.get_parametre('reseau_local_token', '')
+        if not token:
+            self._lbl_terminaux.setText("Serveur pas encore démarré.")
+            return
+        url = f"http://127.0.0.1:{RESEAU_LOCAL_PORT}"
+        self._lbl_terminaux.setText("Chargement...")
+        self._terminaux_thread = _TerminauxThread(url, token)
+        self._terminaux_thread.result.connect(self._on_terminaux_result)
+        self._terminaux_thread.start()
+
+    def _on_terminaux_result(self, terminaux: list, nb: int, max_t: int, plan: str):
+        if not terminaux:
+            self._lbl_terminaux.setText(f"0/{max_t} terminaux connectés (plan {plan})")
+            return
+        lignes = [f"{nb}/{max_t} terminaux (plan {plan}) :"]
+        for t in terminaux:
+            lignes.append(f"  • {t.get('nom','?')} — {t.get('ip','?')}")
+        self._lbl_terminaux.setText("\n".join(lignes))
 
     def _tester_connexion(self):
         ip = self._input_ip.text().strip()
