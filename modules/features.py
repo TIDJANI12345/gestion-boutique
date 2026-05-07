@@ -131,6 +131,10 @@ def plan_actuel() -> str:
     plan_enc = db.get_parametre('licence_plan_enc', '')
     if not plan_enc or plan_enc == '__demo__':
         return 'demo'
+    # Mode client réseau : plan transmis par le serveur lors de /connect
+    if plan_enc.startswith('__reseau_') and plan_enc.endswith('__'):
+        plan = plan_enc[9:-2]
+        return plan if plan in PLANS else 'standard'
     try:
         plan = _dechiffrer_plan(plan_enc)
         if plan in PLANS:

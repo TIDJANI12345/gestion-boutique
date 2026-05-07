@@ -118,9 +118,16 @@ def connecter_terminal():
         return jsonify({'error': msg, 'code': 'QUOTA_DEPASSE'}), 403
 
     _enregistrer_terminal(machine_id, nom, ip)
+    plan = _plan_actuel()
+    logger.info(f"Terminal connecté : {nom} ({ip}) — {len(_terminaux)}/{_max_terminaux()} terminaux, plan {plan}")
+    try:
+        from modules.utilisateurs import Utilisateur
+        Utilisateur.logger_action(None, 'terminal_connexion', f"{nom} ({ip}) connecté au réseau")
+    except Exception:
+        pass
     return jsonify({
         'status': 'ok',
-        'plan': _plan_actuel(),
+        'plan': plan,
         'terminaux_connectes': len(_terminaux),
         'terminaux_max': _max_terminaux(),
     })
@@ -149,7 +156,16 @@ def deconnecter_terminal():
     machine_id = (request.json or {}).get('machine_id', '')
     if machine_id:
         with _terminaux_lock:
-            _terminaux.pop(machine_id, None)
+            info = _terminaux.pop(machine_id, None)
+        if info:
+            nom = info.get('nom', machine_id)
+            ip = info.get('ip', '?')
+            logger.info(f"Terminal déconnecté : {nom} ({ip})")
+            try:
+                from modules.utilisateurs import Utilisateur
+                Utilisateur.logger_action(None, 'terminal_deconnexion', f"{nom} ({ip}) déconnecté du réseau")
+            except Exception:
+                pass
     return jsonify({'status': 'ok'})
 
 

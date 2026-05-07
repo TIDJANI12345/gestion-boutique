@@ -51,11 +51,18 @@ def initialiser(url: str, token: str, machine_id: str, nom_caisse: str) -> bool:
             return False
 
         info = r.json()
+        plan = info.get('plan', 'standard')
         logger.info(
             f"Connecté au serveur {url} "
             f"({info.get('terminaux_connectes', '?')}/{info.get('terminaux_max', '?')} terminaux, "
-            f"plan {info.get('plan', '?')})"
+            f"plan {plan})"
         )
+        # Stocker le plan du serveur localement pour que features.plan_actuel() soit correct
+        try:
+            from database import db as _db
+            _db.set_parametre('licence_plan_enc', f'__reseau_{plan}__')
+        except Exception:
+            pass
         _client = client
         return True
 
