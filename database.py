@@ -202,17 +202,6 @@ class Database:
             )
         ''')
 
-        # Table file d'attente sync hors-ligne
-        self.cursor.execute('''
-            CREATE TABLE IF NOT EXISTS sync_queue (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                action TEXT NOT NULL,
-                table_name TEXT NOT NULL,
-                data_json TEXT NOT NULL,
-                created_at TIMESTAMP DEFAULT (strftime('%Y-%m-%d %H:%M:%S', 'now', 'localtime'))
-            )
-        ''')
-
         # Table Clients
         self.cursor.execute('''
             CREATE TABLE IF NOT EXISTS clients (

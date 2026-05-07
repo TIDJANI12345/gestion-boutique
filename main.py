@@ -19,7 +19,7 @@ from config import APP_NAME, APP_VERSION
 def initialiser_features():
     """Charge les features extras et initialise le démo si besoin."""
     try:
-        from modules.features import charger_extras, est_demo, statut_expiration
+        from modules.features import charger_extras, est_demo, statut_expiration, demo_sync_serveur
         charger_extras()
         statut = statut_expiration()
         if statut == 'grace':
@@ -27,6 +27,10 @@ def initialiser_features():
             expire = db.get_parametre('licence_expire', '')
             from modules.logger import get_logger
             get_logger('main').warning(f"Licence en grace period, expire le {expire}")
+        # Sync démo côté serveur (non bloquant si pas d'internet)
+        if statut == 'demo':
+            import threading
+            threading.Thread(target=demo_sync_serveur, daemon=True).start()
     except Exception:
         pass
 
@@ -196,6 +200,25 @@ def lancer_dashboard(app: QApplication, utilisateur: dict):
     QTimer.singleShot(3000, lambda: verifier_mises_a_jour_auto(fenetre))
 
 
+def demarrer_serveur_local():
+    """Démarre l'API locale en arrière-plan si le mode réseau est 'serveur'."""
+    try:
+        from database import db
+        from config import RESEAU_LOCAL_PORT
+        mode = db.get_parametre('reseau_mode', 'standalone')
+        if mode != 'serveur':
+            return
+        import threading
+        from serveur_local.api_locale import demarrer
+        t = threading.Thread(target=demarrer, kwargs={'port': RESEAU_LOCAL_PORT}, daemon=True)
+        t.start()
+        from modules.logger import get_logger
+        get_logger('main').info(f"Serveur local démarré sur le port {RESEAU_LOCAL_PORT}")
+    except Exception as e:
+        from modules.logger import get_logger
+        get_logger('main').error(f"Impossible de démarrer le serveur local : {e}")
+
+
 def main():
     # Corrections specifiques a l'OS
     fix_encoding()
@@ -227,6 +250,7 @@ def main():
     splash.close()
 
     # 1. Verifier licence
+    demarrer_serveur_local()
     if not verifier_licence():
         sys.exit(0)
 

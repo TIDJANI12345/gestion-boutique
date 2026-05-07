@@ -10,7 +10,8 @@ import platform
 # Format: MAJEUR.MINEUR.PATCH (Semantic Versioning)
 # À incrémenter à chaque release
 APP_VERSION = "2.5.0"
-APP_NAME = "Gestion Boutique"
+APP_NAME = "HishamPOS"
+APP_SUBTITLE = "Logiciel de gestion de boutique et ventes"
 
 # Forcer UTF-8 sur stdout/stderr (necessaire uniquement sur Windows cp1252)
 if platform.system() == 'Windows' and sys.stdout and hasattr(sys.stdout, 'reconfigure'):
@@ -62,7 +63,7 @@ for directory in [DATA_DIR, IMAGES_DIR, RECUS_DIR, EXPORTS_DIR]:
         logging.warning(f"Impossible de creer {directory}: {e}")
 
 # Configuration de l'application
-APP_NAME = "Gestion Boutique"
+APP_NAME = "HishamPOS"
 APP_VERSION = "2.5.0"
 
 # Configuration de l'interface
@@ -183,9 +184,11 @@ WHATSAPP_EMOJI_STYLES = {
 # Préfixe pour génération de codes-barres
 BARCODE_PREFIX = "PRD"
 
-# Configuration de la synchronisation cloud
-SYNC_SERVER_URL = "https://gbserver.pythonanywhere.com"
-SYNC_INTERVAL = 300  # 5 minutes
+# Configuration réseau local multi-terminaux
+# Valeurs lues depuis la DB via db.get_parametre() au démarrage
+# MODE_RESEAU : 'standalone' | 'serveur' | 'client'
+MODE_RESEAU_DEFAULT = 'standalone'
+RESEAU_LOCAL_PORT = 5050
 
 # Configuration des sauvegardes
 BACKUP_DIR = os.path.join(BASE_DIR, 'sauvegardes')
@@ -201,3 +204,8 @@ IMPRIMANTE_LARGEURS = {
 TVA_TAUX_DEFAUT = 18  # % - Standard Benin
 DEVISE_DEFAUT_CODE = 'XOF'
 DEVISE_DEFAUT_SYMBOLE = 'FCFA'
+
+# Support client
+# Surcharger via variable d'environnement : HISHIPOS_WHATSAPP=22961000000
+SUPPORT_WHATSAPP = os.environ.get('HISHIPOS_WHATSAPP', '2200155503576')
+SUPPORT_SITE_URL = "https://hishamdigital.com"

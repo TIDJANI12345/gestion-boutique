@@ -168,8 +168,8 @@ class PrincipaleWindow(QMainWindow):
                 ("Parametres caisse", self.ouvrir_preferences_caisse),
                 ("Modes de paiement", self.ouvrir_parametres_paiement),
                 ("Categories produits", self.ouvrir_categories),
-                ("Synchronisation", self.ouvrir_sync),
                 ("Parametres fiscaux", self.ouvrir_parametres_fiscaux),
+                ("Reseau local", self.ouvrir_config_reseau),
                 ("Gestion clients", self.ouvrir_clients),
             ]:
                 action = QAction(label, self)
@@ -907,9 +907,9 @@ class PrincipaleWindow(QMainWindow):
         dlg = UtilisateursWindow(self.utilisateur, parent=self)
         dlg.exec()
 
-    def ouvrir_sync(self):
-        from ui.windows.config_sync import ConfigSyncWindow
-        dlg = ConfigSyncWindow(parent=self)
+    def ouvrir_config_reseau(self):
+        from ui.windows.config_reseau import ConfigReseauWindow
+        dlg = ConfigReseauWindow(parent=self)
         dlg.exec()
 
     def ouvrir_preferences_caisse(self):

@@ -1,13 +1,39 @@
 """
-API Flask pour le système de licences Gestion Boutique
+API Flask pour le système de licences HishamPOS
 À déployer sur PythonAnywhere
 """
 from flask import Flask, request, jsonify, render_template_string, redirect, url_for, session
 import sqlite3
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import secrets
 import os
 from functools import wraps
+
+TZ_LOCAL = timezone(timedelta(hours=1))  # Africa/Porto-Novo UTC+1
+
+def now_local():
+    return datetime.now(TZ_LOCAL)
+
+def now_iso():
+    return now_local().isoformat()
+
+def fmt_date(s, with_time=False):
+    """Formate une date ISO ou SQLite en dd/mm/yyyy [hh:mm]"""
+    if not s:
+        return '—'
+    try:
+        s = str(s)[:19].replace('T', ' ')
+        dt = datetime.strptime(s, '%Y-%m-%d %H:%M:%S')
+        return dt.strftime('%d/%m/%Y %H:%M') if with_time else dt.strftime('%d/%m/%Y')
+    except Exception:
+        return str(s)[:10]
+
+def parse_dt(s: str) -> datetime:
+    """Parse une date ISO stockée en datetime aware (UTC+1)"""
+    dt = datetime.fromisoformat(s.replace('Z', '+00:00').split('.')[0])
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=TZ_LOCAL)
+    return dt
 
 # Clé secrète — à définir dans les variables d'environnement PythonAnywhere
 API_SECRET_KEY = os.environ.get('PA_API_SECRET', 'changeme')
@@ -28,7 +54,6 @@ app.secret_key = os.environ.get('PA_FLASK_SECRET', 'flask-secret-changeme')
 
 # Base de données
 DB_PATH = '/home/gbserver/boutique_licences.db'
-SYNC_DB_PATH = '/home/gbserver/boutique_sync.db'
 
 def init_db():
     """Initialiser la base de données"""
@@ -63,106 +88,22 @@ def init_db():
         except Exception:
             pass
     
+    # Table demos — suivi machine_id pour éviter reset par réinstallation
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS demos (
+            machine_id TEXT PRIMARY KEY,
+            date_debut TIMESTAMP NOT NULL,
+            nb_ventes INTEGER DEFAULT 0,
+            derniere_activite TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+
     conn.commit()
     conn.close()
 
 # Initialiser au démarrage
 init_db()
 
-
-def get_sync_db():
-    conn = sqlite3.connect(SYNC_DB_PATH)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL")
-    return conn
-
-
-def init_sync_db():
-    conn = get_sync_db()
-    conn.execute('''
-        CREATE TABLE IF NOT EXISTS sync_produits (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            licence_key TEXT NOT NULL,
-            machine_id TEXT NOT NULL,
-            code_barre TEXT NOT NULL,
-            nom TEXT,
-            categorie TEXT,
-            prix_achat REAL DEFAULT 0,
-            prix_vente REAL,
-            stock_actuel INTEGER DEFAULT 0,
-            stock_alerte INTEGER DEFAULT 5,
-            type_code_barre TEXT DEFAULT 'code128',
-            date_ajout TIMESTAMP,
-            description TEXT,
-            updated_at TIMESTAMP,
-            synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE(licence_key, code_barre)
-        )
-    ''')
-    conn.execute('''
-        CREATE TABLE IF NOT EXISTS sync_ventes (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            licence_key TEXT NOT NULL,
-            machine_id TEXT NOT NULL,
-            numero_vente TEXT NOT NULL,
-            date_vente TIMESTAMP,
-            total REAL,
-            client TEXT,
-            statut TEXT DEFAULT 'terminee',
-            deleted_at TIMESTAMP,
-            synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE(licence_key, numero_vente)
-        )
-    ''')
-    conn.execute('''
-        CREATE TABLE IF NOT EXISTS sync_details_ventes (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            licence_key TEXT NOT NULL,
-            machine_id TEXT NOT NULL,
-            numero_vente TEXT NOT NULL,
-            produit_code_barre TEXT,
-            quantite INTEGER,
-            prix_unitaire REAL,
-            sous_total REAL,
-            synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-    conn.execute('''
-        CREATE TABLE IF NOT EXISTS sync_historique_stock (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            licence_key TEXT NOT NULL,
-            machine_id TEXT NOT NULL,
-            produit_code_barre TEXT,
-            quantite_avant INTEGER,
-            quantite_apres INTEGER,
-            operation TEXT,
-            date_operation TIMESTAMP,
-            synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-    conn.execute('''
-        CREATE TABLE IF NOT EXISTS sync_utilisateurs (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            licence_key TEXT NOT NULL,
-            machine_id TEXT NOT NULL,
-            nom TEXT,
-            prenom TEXT,
-            email TEXT NOT NULL,
-            mot_de_passe TEXT,
-            role TEXT DEFAULT 'caissier',
-            actif BOOLEAN DEFAULT 1,
-            date_creation TIMESTAMP,
-            dernier_login TIMESTAMP,
-            updated_at TIMESTAMP,
-            synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE(licence_key, email)
-        )
-    ''')
-    conn.commit()
-    conn.close()
-
-
-init_sync_db()
 
 
 def valider_licence(licence_key):
@@ -180,40 +121,97 @@ def valider_licence(licence_key):
         date_exp = row[4]  # date_expiration
         if date_exp:
             try:
-                exp = datetime.fromisoformat(date_exp.replace('Z', '').split('+')[0])
+                exp = parse_dt(date_exp)
             except ValueError:
                 return True
-            if datetime.now() > exp:
+            if now_local() > exp:
                 return False
         return True
     except Exception:
         return False
 
 
-def require_sync_auth(f):
-    """Décorateur : valide X-Licence-Key + X-Machine-Id pour les routes sync"""
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        licence_key = request.headers.get('X-Licence-Key', '')
-        machine_id = request.headers.get('X-Machine-Id', '')
-
-        if not licence_key or not machine_id:
-            return jsonify({'error': 'Authentification requise'}), 401
-
-        if not valider_licence(licence_key):
-            return jsonify({'error': 'Licence invalide ou expirée'}), 403
-
-        return f(licence_key, machine_id, *args, **kwargs)
-    return decorated
-
 @app.route('/api/ping', methods=['GET'])
 def ping():
     """Vérifier que l'API fonctionne"""
     return jsonify({
         'status': 'ok',
-        'message': 'API Gestion Boutique opérationnelle',
-        'timestamp': datetime.now().isoformat()
+        'message': 'API HishamPOS opérationnelle',
+        'timestamp': now_local().isoformat()
     })
+
+@app.route('/api/demo/enregistrer', methods=['POST'])
+def demo_enregistrer():
+    """Enregistre un machine_id au premier lancement démo."""
+    try:
+        data = request.json or {}
+        machine_id = data.get('machine_id', '').strip()
+        if not machine_id or len(machine_id) < 8:
+            return jsonify({'error': 'machine_id invalide'}), 400
+
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute('SELECT date_debut, nb_ventes FROM demos WHERE machine_id = ?', (machine_id,))
+        row = c.fetchone()
+
+        if row:
+            # Machine déjà connue — retourner les vrais compteurs
+            conn.close()
+            return jsonify({
+                'status': 'existant',
+                'date_debut': row[0],
+                'nb_ventes': row[1],
+            })
+
+        now = now_local().isoformat()
+        c.execute(
+            'INSERT INTO demos (machine_id, date_debut, nb_ventes) VALUES (?, ?, 0)',
+            (machine_id, now)
+        )
+        conn.commit()
+        conn.close()
+        return jsonify({'status': 'nouveau', 'date_debut': now, 'nb_ventes': 0})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/demo/statut', methods=['POST'])
+def demo_statut():
+    """Retourne l'état démo d'un machine_id + synchronise le compteur de ventes."""
+    try:
+        data = request.json or {}
+        machine_id = data.get('machine_id', '').strip()
+        nb_ventes_local = int(data.get('nb_ventes', 0))
+
+        if not machine_id:
+            return jsonify({'error': 'machine_id manquant'}), 400
+
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute('SELECT date_debut, nb_ventes FROM demos WHERE machine_id = ?', (machine_id,))
+        row = c.fetchone()
+
+        if not row:
+            conn.close()
+            return jsonify({'connu': False})
+
+        # Conserver le plus grand compteur (client ou serveur)
+        nb_ventes_max = max(row[1], nb_ventes_local)
+        c.execute(
+            'UPDATE demos SET nb_ventes = ?, derniere_activite = ? WHERE machine_id = ?',
+            (nb_ventes_max, now_local().isoformat(), machine_id)
+        )
+        conn.commit()
+        conn.close()
+
+        return jsonify({
+            'connu': True,
+            'date_debut': row[0],
+            'nb_ventes': nb_ventes_max,
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 
 @app.route('/api/enregistrer-licence', methods=['POST'])
 @require_api_key
@@ -263,7 +261,7 @@ def enregistrer_licence():
 def verifier_licence():
     """
     Activer/Vérifier une licence (appelé par le logiciel client)
-    Endpoints: /api/activer (utilisé par Gestion Boutique) et /api/verifier
+    Endpoints: /api/activer (utilisé par HishamPOS) et /api/verifier
     """
     try:
         data = request.json
@@ -304,8 +302,8 @@ def verifier_licence():
         
         # Vérifier si expirée
         if date_exp:
-            exp_dt = datetime.fromisoformat(date_exp.replace('Z', '').split('+')[0])
-            if datetime.now() > exp_dt:
+            exp_dt = parse_dt(date_exp)
+            if now_local() > exp_dt:
                 conn.close()
                 return jsonify({
                     'valide': False,
@@ -331,7 +329,7 @@ def verifier_licence():
             }
             jours = durees.get(type_lic)
             if jours:
-                date_exp = (datetime.now() + timedelta(days=jours)).isoformat()
+                date_exp = (now_local() + timedelta(days=jours)).isoformat()
             else:
                 date_exp = None  # perpetuelle
 
@@ -342,7 +340,7 @@ def verifier_licence():
                     date_expiration = ?,
                     nb_activations = 1
                 WHERE cle_licence = ?
-            ''', (machine_id, datetime.now().isoformat(), date_exp, cle))
+            ''', (machine_id, now_local().isoformat(), date_exp, cle))
             conn.commit()
             conn.close()
 
@@ -433,179 +431,13 @@ def statistiques():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/sync/ping', methods=['GET'])
-def sync_ping():
-    return jsonify({'status': 'ok', 'service': 'sync', 'timestamp': datetime.now().isoformat()})
-
-
-@app.route('/api/sync/push', methods=['POST'])
-@require_sync_auth
-def sync_push(licence_key, machine_id):
-    """Recevoir les changements d'un client"""
-    try:
-        data = request.json
-        if not data:
-            return jsonify({'error': 'Aucune donnée'}), 400
-
-        conn = get_sync_db()
-        now = datetime.now().isoformat()
-
-        for p in data.get('produits', []):
-            conn.execute('''
-                INSERT INTO sync_produits
-                    (licence_key, machine_id, code_barre, nom, categorie, prix_achat,
-                     prix_vente, stock_actuel, stock_alerte, type_code_barre,
-                     date_ajout, description, updated_at, synced_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(licence_key, code_barre) DO UPDATE SET
-                    machine_id=excluded.machine_id, nom=excluded.nom,
-                    categorie=excluded.categorie, prix_achat=excluded.prix_achat,
-                    prix_vente=excluded.prix_vente, stock_actuel=excluded.stock_actuel,
-                    stock_alerte=excluded.stock_alerte, type_code_barre=excluded.type_code_barre,
-                    description=excluded.description, updated_at=excluded.updated_at,
-                    synced_at=excluded.synced_at
-            ''', (
-                licence_key, machine_id, p['code_barre'], p['nom'],
-                p.get('categorie'), p.get('prix_achat', 0), p['prix_vente'],
-                p.get('stock_actuel', 0), p.get('stock_alerte', 5),
-                p.get('type_code_barre', 'code128'), p.get('date_ajout'),
-                p.get('description'), p.get('updated_at', now), now
-            ))
-
-        for v in data.get('ventes', []):
-            conn.execute('''
-                INSERT OR IGNORE INTO sync_ventes
-                    (licence_key, machine_id, numero_vente, date_vente, total,
-                     client, statut, deleted_at, synced_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (
-                licence_key, machine_id, v['numero_vente'], v['date_vente'],
-                v['total'], v.get('client'), v.get('statut', 'terminee'),
-                v.get('deleted_at'), now
-            ))
-
-        for d in data.get('details_ventes', []):
-            numero_vente = d.get('numero_vente', '')
-            if not numero_vente:
-                for v in data.get('ventes', []):
-                    if v.get('id') == d.get('vente_id'):
-                        numero_vente = v['numero_vente']
-                        break
-            conn.execute('''
-                INSERT INTO sync_details_ventes
-                    (licence_key, machine_id, numero_vente, produit_code_barre,
-                     quantite, prix_unitaire, sous_total, synced_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (
-                licence_key, machine_id, numero_vente,
-                d.get('produit_code_barre', ''), d['quantite'],
-                d['prix_unitaire'], d['sous_total'], now
-            ))
-
-        for h in data.get('historique_stock', []):
-            conn.execute('''
-                INSERT INTO sync_historique_stock
-                    (licence_key, machine_id, produit_code_barre, quantite_avant,
-                     quantite_apres, operation, date_operation, synced_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (
-                licence_key, machine_id, h.get('produit_code_barre', ''),
-                h.get('quantite_avant'), h.get('quantite_apres'),
-                h.get('operation'), h.get('date_operation'), now
-            ))
-
-        for u in data.get('utilisateurs', []):
-            conn.execute('''
-                INSERT INTO sync_utilisateurs
-                    (licence_key, machine_id, nom, prenom, email, mot_de_passe,
-                     role, actif, date_creation, dernier_login, updated_at, synced_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(licence_key, email) DO UPDATE SET
-                    machine_id=excluded.machine_id, nom=excluded.nom,
-                    prenom=excluded.prenom, mot_de_passe=excluded.mot_de_passe,
-                    role=excluded.role, actif=excluded.actif,
-                    dernier_login=excluded.dernier_login, updated_at=excluded.updated_at,
-                    synced_at=excluded.synced_at
-            ''', (
-                licence_key, machine_id, u['nom'], u['prenom'],
-                u['email'], u['mot_de_passe'], u.get('role', 'caissier'),
-                u.get('actif', 1), u.get('date_creation'),
-                u.get('dernier_login'), u.get('updated_at', now), now
-            ))
-
-        conn.commit()
-        conn.close()
-        return jsonify({'status': 'ok', 'message': 'Push reçu'})
-
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-@app.route('/api/sync/pull', methods=['POST'])
-@require_sync_auth
-def sync_pull(licence_key, machine_id):
-    """Renvoyer les changements depuis un timestamp, en excluant le même machine_id"""
-    try:
-        data = request.json or {}
-        depuis = data.get('depuis', '2000-01-01T00:00:00')
-
-        conn = get_sync_db()
-
-        produits = conn.execute('''
-            SELECT code_barre, nom, categorie, prix_achat, prix_vente,
-                   stock_actuel, stock_alerte, type_code_barre, date_ajout,
-                   description, updated_at
-            FROM sync_produits
-            WHERE licence_key = ? AND machine_id != ? AND synced_at > ?
-        ''', (licence_key, machine_id, depuis)).fetchall()
-
-        ventes = conn.execute('''
-            SELECT numero_vente, date_vente, total, client, statut, deleted_at
-            FROM sync_ventes
-            WHERE licence_key = ? AND machine_id != ? AND synced_at > ?
-        ''', (licence_key, machine_id, depuis)).fetchall()
-
-        details = conn.execute('''
-            SELECT numero_vente, produit_code_barre, quantite, prix_unitaire, sous_total
-            FROM sync_details_ventes
-            WHERE licence_key = ? AND machine_id != ? AND synced_at > ?
-        ''', (licence_key, machine_id, depuis)).fetchall()
-
-        historique = conn.execute('''
-            SELECT produit_code_barre, quantite_avant, quantite_apres, operation, date_operation
-            FROM sync_historique_stock
-            WHERE licence_key = ? AND machine_id != ? AND synced_at > ?
-        ''', (licence_key, machine_id, depuis)).fetchall()
-
-        utilisateurs = conn.execute('''
-            SELECT nom, prenom, email, mot_de_passe, role, actif,
-                   date_creation, dernier_login, updated_at
-            FROM sync_utilisateurs
-            WHERE licence_key = ? AND machine_id != ? AND synced_at > ?
-        ''', (licence_key, machine_id, depuis)).fetchall()
-
-        conn.close()
-
-        return jsonify({
-            'produits': [dict(r) for r in produits],
-            'ventes': [dict(r) for r in ventes],
-            'details_ventes': [dict(r) for r in details],
-            'historique_stock': [dict(r) for r in historique],
-            'utilisateurs': [dict(r) for r in utilisateurs],
-            'timestamp': datetime.now().isoformat()
-        })
-
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
 ADMIN_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Admin — Gestion Boutique Licences</title>
+<title>Admin — HishamPOS Licences</title>
 <style>
   body { font-family: sans-serif; max-width: 1100px; margin: 40px auto; padding: 0 20px; background: #f5f5f5; }
   h1 { color: #333; }
@@ -715,42 +547,32 @@ ADMIN_TEMPLATE = """
       <th>Nb. utilisations</th>
     </tr>
     {% for l in licences %}
-    {% set expire = l.date_expiration and l.date_expiration < now %}
-    {% set en_cours = l.machine_id and not expire and l.statut == 'active' %}
-    {% set dispo = not l.machine_id and l.statut == 'active' and not expire %}
+    {% set en_cours = l.machine_id and not l._expire and l.statut == 'active' %}
+    {% set dispo = not l.machine_id and l.statut == 'active' and not l._expire %}
     <tr>
       <td style="font-family:monospace;font-size:.88em;white-space:nowrap">{{ l.cle_licence }}</td>
       <td>{{ l.type_licence }}</td>
       <td>
-        {% if l.plan == 'pro' %}
-          <span class="badge badge-en-cours">Pro</span>
-        {% elif l.plan == 'white_label' %}
-          <span class="badge badge-active">White Label</span>
-        {% else %}
-          <span class="badge badge-dispo">Standard</span>
+        {% if l.plan == 'pro' %}<span class="badge badge-en-cours">Pro</span>
+        {% elif l.plan == 'white_label' %}<span class="badge badge-active">White Label</span>
+        {% else %}<span class="badge badge-dispo">Standard</span>
         {% endif %}
       </td>
       <td>
-        {% if l.source == 'hishamdigital' %}
-          <span class="badge badge-active">hishamdigital</span>
-        {% else %}
-          <span class="badge badge-dispo">admin</span>
+        {% if l.source == 'hishamdigital' %}<span class="badge badge-active">hishamdigital</span>
+        {% else %}<span class="badge badge-dispo">admin</span>
         {% endif %}
       </td>
       <td>
-        {% if l.statut != 'active' %}
-          <span class="badge badge-inactive">désactivée</span>
-        {% elif expire %}
-          <span class="badge badge-expire">expirée</span>
-        {% elif dispo %}
-          <span class="badge badge-dispo">disponible</span>
-        {% else %}
-          <span class="badge badge-en-cours">en cours d'utilisation</span>
+        {% if l.statut != 'active' %}<span class="badge badge-inactive">désactivée</span>
+        {% elif l._expire %}<span class="badge badge-expire">expirée</span>
+        {% elif dispo %}<span class="badge badge-dispo">disponible</span>
+        {% else %}<span class="badge badge-en-cours">en cours</span>
         {% endif %}
       </td>
-      <td style="white-space:nowrap;color:#6b7280">{{ l.date_creation[:16].replace('T',' ') if l.date_creation else '—' }}</td>
-      <td style="white-space:nowrap">{{ l.date_expiration[:10] if l.date_expiration else '∞' }}</td>
-      <td style="white-space:nowrap;color:#6b7280">{{ l.date_activation[:16].replace('T',' ') if l.date_activation else '—' }}</td>
+      <td style="white-space:nowrap;color:#6b7280">{{ l._date_creation }}</td>
+      <td style="white-space:nowrap">{{ l._date_expiration }}</td>
+      <td style="white-space:nowrap;color:#6b7280">{{ l._date_activation }}</td>
       <td class="machine">{{ l.machine_id or '—' }}</td>
       <td style="text-align:center">{{ l.nb_activations }}</td>
     </tr>
@@ -801,7 +623,7 @@ def admin_required(f):
     return decorated
 
 
-def generer_cle_licence(prefix='GB26'):
+def generer_cle_licence(prefix='HP26'):
     """Génère une clé au format PREFIX-XXXX-XXXX-XXXX (alphanumériques majuscules)"""
     alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
     parts = [''.join(secrets.choice(alphabet) for _ in range(4)) for _ in range(3)]
@@ -855,16 +677,34 @@ def admin_generer():
 
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
-    licences = conn.execute('SELECT * FROM licences ORDER BY date_creation DESC').fetchall()
+    rows = conn.execute('SELECT * FROM licences ORDER BY date_creation DESC').fetchall()
     conn.close()
 
-    now_iso = datetime.now().isoformat()
+    now_dt = now_local()
+    licences = []
+    for r in rows:
+        d = dict(r)
+        # date formatée pour l'affichage
+        d['_date_creation']  = fmt_date(d.get('date_creation'), with_time=True)
+        d['_date_activation'] = fmt_date(d.get('date_activation'), with_time=True)
+        exp = d.get('date_expiration')
+        if exp:
+            d['_date_expiration'] = fmt_date(exp)
+            try:
+                d['_expire'] = parse_dt(exp) < now_dt
+            except Exception:
+                d['_expire'] = False
+        else:
+            d['_date_expiration'] = '∞'
+            d['_expire'] = False
+        licences.append(d)
+
     stats = {
-        'total': len(licences),
-        'disponibles': sum(1 for l in licences if not l['machine_id'] and l['statut'] == 'active' and (not l['date_expiration'] or l['date_expiration'] > now_iso)),
-        'en_cours': sum(1 for l in licences if l['machine_id'] and l['statut'] == 'active' and (not l['date_expiration'] or l['date_expiration'] > now_iso)),
-        'expirees': sum(1 for l in licences if l['date_expiration'] and l['date_expiration'] < now_iso),
-        'inactives': sum(1 for l in licences if l['statut'] != 'active'),
+        'total':      len(licences),
+        'disponibles': sum(1 for l in licences if not l['machine_id'] and l['statut'] == 'active' and not l['_expire']),
+        'en_cours':   sum(1 for l in licences if l['machine_id'] and l['statut'] == 'active' and not l['_expire']),
+        'expirees':   sum(1 for l in licences if l['_expire']),
+        'inactives':  sum(1 for l in licences if l['statut'] != 'active'),
     }
 
     return render_template_string(
@@ -874,7 +714,6 @@ def admin_generer():
         erreur=erreur,
         nouvelle_cle=nouvelle_cle,
         stats=stats,
-        now=now_iso,
     )
 
 

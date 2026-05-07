@@ -27,7 +27,7 @@ def reset_db():
     Reutilise la meme instance db (et donc la meme connexion :memory:)."""
     db = database.db
     for table in ['encaissements_ardoise', 'ardoise', 'paiements', 'details_ventes',
-                  'historique_stock', 'logs_actions', 'sync_queue', 'ventes',
+                  'historique_stock', 'logs_actions', 'ventes',
                   'produits', 'clients', 'utilisateurs', 'sessions_caisse',
                   'parametres', 'taux_tva', 'devises']:
         try:
