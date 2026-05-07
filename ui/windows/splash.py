@@ -6,7 +6,7 @@ from PySide6.QtWidgets import QSplashScreen, QApplication
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QPixmap, QPainter, QFont, QColor
 
-from config import APP_NAME, APP_VERSION
+from config import APP_NAME, APP_VERSION, APP_SUBTITLE
 from ui.theme import Theme
 
 
@@ -44,6 +44,16 @@ class SplashScreen(QSplashScreen):
         self._progress = min(100, self._progress + 1)
         self.repaint()
 
+    def close(self):
+        if self._timer.isActive():
+            self._timer.stop()
+        super().close()
+
+    def closeEvent(self, event):
+        if self._timer.isActive():
+            self._timer.stop()
+        super().closeEvent(event)
+
     def drawContents(self, painter: QPainter):
         """Dessine le contenu du splash screen."""
         w = self.width()
@@ -56,11 +66,17 @@ class SplashScreen(QSplashScreen):
         # Titre
         painter.setPen(QColor("white"))
         painter.setFont(QFont("Segoe UI", 28, QFont.Bold))
-        painter.drawText(0, 60, w, 50, Qt.AlignCenter, APP_NAME.upper())
+        painter.drawText(0, 50, w, 50, Qt.AlignCenter, APP_NAME)
+
+        # Sous-titre
+        painter.setPen(QColor(255, 255, 255, 180))
+        painter.setFont(QFont("Segoe UI", 11))
+        painter.drawText(0, 98, w, 28, Qt.AlignCenter, APP_SUBTITLE)
 
         # Version
-        painter.setFont(QFont("Segoe UI", 12))
-        painter.drawText(0, 110, w, 30, Qt.AlignCenter, f"Version {APP_VERSION}")
+        painter.setPen(QColor(255, 255, 255, 130))
+        painter.setFont(QFont("Segoe UI", 10))
+        painter.drawText(0, 126, w, 24, Qt.AlignCenter, f"v{APP_VERSION}")
 
         # Message de chargement
         message = "Chargement..."
