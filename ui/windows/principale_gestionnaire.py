@@ -313,6 +313,8 @@ class PrincipaleGestionnaireWindow(QMainWindow):
             gestion_menu.addAction("Catégories", self.ouvrir_categories)
         if Permissions.peut(self.utilisateur, 'gerer_clients'):
             gestion_menu.addAction("Clients", self.ouvrir_clients)
+        if Permissions.peut(self.utilisateur, 'gerer_produits'):
+            gestion_menu.addAction("Fournisseurs", self.ouvrir_fournisseurs)
         if Permissions.peut(self.utilisateur, 'effectuer_ventes'):
             gestion_menu.addAction("Nouvelle Vente", self.ouvrir_ventes)
         if Permissions.peut(self.utilisateur, 'voir_mes_ventes'):
@@ -412,6 +414,14 @@ class PrincipaleGestionnaireWindow(QMainWindow):
             dlg.exec()
         else:
             QMessageBox.warning(self, "Accès refusé", "Vous n'avez pas la permission de gérer les clients.")
+
+    def ouvrir_fournisseurs(self):
+        from ui.windows.fournisseurs import FournisseursWindow
+        if Permissions.peut(self.utilisateur, 'gerer_produits'):
+            dlg = FournisseursWindow(parent=self)
+            dlg.exec()
+        else:
+            QMessageBox.warning(self, "Accès refusé", "Vous n'avez pas la permission de gérer les fournisseurs.")
 
     def ouvrir_ventes(self):
         from ui.windows.ventes import VentesWindow

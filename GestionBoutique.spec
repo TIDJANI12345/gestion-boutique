@@ -35,7 +35,7 @@ a = Analysis(
         'modules.imprimante', 'modules.sauvegarde', 'modules.licence',
         'modules.features', 'modules.sessions', 'modules.ardoise',
         'modules.import_csv', 'modules.logger',
-        'modules.reseau', 'modules.client_reseau',
+        'modules.reseau', 'modules.client_reseau', 'modules.fournisseurs',
         'serveur_local.api_locale', 'serveur_local.discovery',
         # UI windows
         'ui.windows.ventes', 'ui.windows.paiement',
@@ -44,6 +44,7 @@ a = Analysis(
         'ui.windows.ardoise', 'ui.windows.annulation_vente',
         'ui.windows.import_csv', 'ui.windows.sauvegarde',
         'ui.windows.confirmation_vente', 'ui.windows.config_reseau',
+        'ui.windows.fournisseurs', 'ui.windows.ecran_client',
         # UI dialogs
         'ui.dialogs.ouverture_caisse', 'ui.dialogs.cloture_z',
     ],

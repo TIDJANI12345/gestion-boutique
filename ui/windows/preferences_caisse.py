@@ -202,6 +202,28 @@ class PreferencesCaisseWindow(QDialog):
         content_layout.addSpacing(20)
 
         # === SON DE SCAN ===
+        # === ÉCRAN CLIENT ===
+        ec_label = QLabel("Écran client")
+        ec_label.setStyleSheet(f"font-size: 13pt; font-weight: bold; color: {Theme.c('text')};")
+        content_layout.addWidget(ec_label)
+
+        ec_frame = QFrame()
+        ec_frame.setStyleSheet(f"background-color: {Theme.c('light')}; border-radius: 8px; padding: 16px;")
+        ec_layout = QVBoxLayout(ec_frame)
+        ec_layout.setSpacing(6)
+
+        self.checkbox_ecran_client = self._chk("🖥️  Afficher l'écran client lors des ventes")
+        ec_layout.addWidget(self.checkbox_ecran_client)
+        ec_info = QLabel(
+            "Ouvre une fenêtre face au client montrant les articles et le total en temps réel.\n"
+            "Sur 2 écrans : la fenêtre s'affiche automatiquement sur le 2ème écran."
+        )
+        ec_info.setStyleSheet(f"color: {Theme.c('text_secondary')}; font-size: 9pt; margin-left: 26px;")
+        ec_info.setWordWrap(True)
+        ec_layout.addWidget(ec_info)
+        content_layout.addWidget(ec_frame)
+        content_layout.addSpacing(20)
+
         son_label = QLabel("Son de confirmation")
         son_label.setStyleSheet(f"font-size: 13pt; font-weight: bold; color: {Theme.c('text')};")
         content_layout.addWidget(son_label)
@@ -692,6 +714,10 @@ class PreferencesCaisseWindow(QDialog):
         else:
             self.radio_manuel.setChecked(True)
 
+        # Écran client
+        ecran_client = db.get_parametre('ecran_client_actif', '0') == '1'
+        self.checkbox_ecran_client.setChecked(ecran_client)
+
         # Son de scan
         son_actif = db.get_parametre('son_scan_actif', '1') == '1'
         self.checkbox_son.setChecked(son_actif)
@@ -774,6 +800,9 @@ class PreferencesCaisseWindow(QDialog):
         # Mode de scan
         mode_auto = '1' if self.radio_auto.isChecked() else '0'
         db.set_parametre('mode_scan_auto', mode_auto)
+
+        # Écran client
+        db.set_parametre('ecran_client_actif', '1' if self.checkbox_ecran_client.isChecked() else '0')
 
         # Son de scan
         son_actif = '1' if self.checkbox_son.isChecked() else '0'

@@ -171,6 +171,7 @@ class PrincipaleWindow(QMainWindow):
                 ("Parametres fiscaux", self.ouvrir_parametres_fiscaux),
                 ("Reseau local", self.ouvrir_config_reseau),
                 ("Gestion clients", self.ouvrir_clients),
+                ("Fournisseurs", self.ouvrir_fournisseurs),
             ]:
                 action = QAction(label, self)
                 action.triggered.connect(slot)
@@ -799,9 +800,18 @@ class PrincipaleWindow(QMainWindow):
 
     def ouvrir_ventes(self):
         from ui.windows.ventes import VentesWindow
+        from ui.windows.ecran_client import EcranClientWindow
         dlg = VentesWindow(parent=self, utilisateur=self.utilisateur)
         dlg.vente_terminee.connect(self.actualiser_stats)
+        from database import db
+        if db.get_parametre('ecran_client_actif', '0') == '1':
+            ecran = EcranClientWindow()
+            dlg.panier_modifie.connect(ecran.update_panier)
+            dlg.vente_terminee.connect(ecran.vente_terminee)
+            dlg._ecran_client = ecran
         dlg.exec()
+        if dlg._ecran_client:
+            dlg._ecran_client.close()
 
     def ouvrir_produits(self):
         from ui.windows.produits import ProduitsWindow
@@ -910,6 +920,11 @@ class PrincipaleWindow(QMainWindow):
     def ouvrir_config_reseau(self):
         from ui.windows.config_reseau import ConfigReseauWindow
         dlg = ConfigReseauWindow(parent=self)
+        dlg.exec()
+
+    def ouvrir_fournisseurs(self):
+        from ui.windows.fournisseurs import FournisseursWindow
+        dlg = FournisseursWindow(parent=self)
         dlg.exec()
 
     def ouvrir_preferences_caisse(self):

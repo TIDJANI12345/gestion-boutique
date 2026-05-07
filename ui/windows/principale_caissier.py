@@ -327,9 +327,19 @@ class PrincipaleCaissierWindow(QMainWindow):
 
     def ouvrir_ventes(self):
         from ui.windows.ventes import VentesWindow
+        from ui.windows.ecran_client import EcranClientWindow
         dlg = VentesWindow(parent=self, utilisateur=self.utilisateur)
         dlg.vente_terminee.connect(self.actualiser_stats)
+        # Ouvrir l'écran client si activé dans les préférences
+        from database import db
+        if db.get_parametre('ecran_client_actif', '0') == '1':
+            ecran = EcranClientWindow()
+            dlg.panier_modifie.connect(ecran.update_panier)
+            dlg.vente_terminee.connect(ecran.vente_terminee)
+            dlg._ecran_client = ecran
         dlg.exec()
+        if dlg._ecran_client:
+            dlg._ecran_client.close()
 
     # === SESSION CAISSE ===
 

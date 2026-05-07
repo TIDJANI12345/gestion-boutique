@@ -21,6 +21,7 @@ class VentesWindow(QDialog):
     """Fenetre de vente - panier en memoire, validation atomique."""
 
     vente_terminee = Signal()
+    panier_modifie = Signal(list, float, str)   # articles, total, devise
 
     def __init__(self, parent=None, utilisateur=None):
         super().__init__(parent)
@@ -33,6 +34,7 @@ class VentesWindow(QDialog):
             self.client_id = None
             self.client_selectionne = None
             self.utilisateur = utilisateur
+            self._ecran_client = None
             self._remise_valeur = 0.0
             self._remise_montant = 0.0
             from database import db as _db
@@ -708,6 +710,7 @@ class VentesWindow(QDialog):
             self._label_vide.setVisible(True)
             self._label_nb_articles.setText("0")
             self._label_total.setText("0")
+            self.panier_modifie.emit([], 0, '')
             return
 
         self._scroll_panier.setVisible(True)
@@ -741,6 +744,7 @@ class VentesWindow(QDialog):
 
         total_net = total_prix - self._remise_montant
         self._label_total.setText(f"{total_net:,.0f} {devise}")
+        self.panier_modifie.emit(list(self.panier), total_net, devise)
 
     def _creer_widget_article(self, idx: int, item: dict) -> QWidget:
         """Créer un widget de ligne de panier avec contrôles +/−/×."""

@@ -353,6 +353,44 @@ class Database:
                 self.cursor.execute(f"ALTER TABLE sessions_caisse ADD COLUMN {col} INTEGER DEFAULT 0")
                 self.conn.commit()
 
+        # Tables fournisseurs
+        self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS fournisseurs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                nom TEXT NOT NULL,
+                telephone TEXT,
+                email TEXT,
+                adresse TEXT,
+                contact_nom TEXT,
+                actif INTEGER DEFAULT 1,
+                date_creation TIMESTAMP DEFAULT (strftime('%Y-%m-%d %H:%M:%S', 'now', 'localtime'))
+            )
+        ''')
+        self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS commandes_fournisseurs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                fournisseur_id INTEGER NOT NULL,
+                date_commande TIMESTAMP DEFAULT (strftime('%Y-%m-%d %H:%M:%S', 'now', 'localtime')),
+                date_livraison_prevue DATE,
+                statut TEXT DEFAULT 'en_attente',
+                total REAL DEFAULT 0,
+                notes TEXT,
+                FOREIGN KEY (fournisseur_id) REFERENCES fournisseurs(id)
+            )
+        ''')
+        self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS details_commandes_fournisseurs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                commande_id INTEGER NOT NULL,
+                produit_id INTEGER NOT NULL,
+                quantite_commandee INTEGER NOT NULL,
+                prix_unitaire REAL DEFAULT 0,
+                quantite_recue INTEGER DEFAULT 0,
+                FOREIGN KEY (commande_id) REFERENCES commandes_fournisseurs(id),
+                FOREIGN KEY (produit_id) REFERENCES produits(id)
+            )
+        ''')
+
         self.conn.commit()
         logger.info("Tables creees/verifiees avec succes")
 
