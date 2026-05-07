@@ -132,6 +132,9 @@ class ClientReseau:
 
     # ── Méthodes métier spécifiques réseau ────────────────────────────────────
 
+    def get_utilisateurs(self):
+        return _rows(self._get('/utilisateurs'))
+
     def get_produits(self):
         return _rows(self._get('/produits'))
 

@@ -219,6 +219,37 @@ def demarrer_serveur_local():
         get_logger('main').error(f"Impossible de démarrer le serveur local : {e}")
 
 
+def _assurer_users_client():
+    """
+    En mode client, synchronise les utilisateurs depuis le serveur
+    pour permettre le login local. Crée les users s'ils n'existent pas encore.
+    """
+    try:
+        import modules.reseau as reseau
+        if not reseau.actif():
+            return
+        users_serveur = reseau.get_client().get_utilisateurs()
+        if not users_serveur:
+            return
+        from database import db
+        from modules.utilisateurs import Utilisateur
+        for u in users_serveur:
+            existant = db.fetch_one(
+                "SELECT id FROM utilisateurs WHERE email = ?", (u.get('email', ''),)
+            )
+            if not existant and u.get('email'):
+                db.execute_query(
+                    """INSERT OR IGNORE INTO utilisateurs
+                       (nom, prenom, email, mot_de_passe, role, actif)
+                       VALUES (?, ?, ?, ?, ?, ?)""",
+                    (u.get('nom', ''), u.get('prenom', ''), u['email'],
+                     u.get('mot_de_passe', ''), u.get('role', 'caissier'), u.get('actif', 1))
+                )
+    except Exception as e:
+        from modules.logger import get_logger
+        get_logger('main').warning(f"Sync users depuis serveur échoué : {e}")
+
+
 def connecter_reseau_client(app) -> bool:
     """
     Si mode='client', connecte ce PC au serveur local.
@@ -311,8 +342,10 @@ def main():
     if _mode_reseau != 'client' and not verifier_licence():
         sys.exit(0)
 
-    # 2. Verifier premier lancement
-    if not verifier_premier_lancement():
+    # 2. Verifier premier lancement (sauf mode client — les users sont sur le serveur)
+    if _mode_reseau == 'client':
+        _assurer_users_client()
+    elif not verifier_premier_lancement():
         sys.exit(0)
 
     # 3. Login

@@ -55,14 +55,14 @@ class LicenceWindow(QDialog):
         layout.addSpacerItem(QSpacerItem(0, 20, QSizePolicy.Minimum, QSizePolicy.Fixed))
 
         # Label champ
-        lbl = QLabel("Cle de licence (Format GB26-...)")
+        lbl = QLabel("Cle de licence (Format HP26-...)")
         layout.addWidget(lbl)
 
         # Champ de saisie
         self._entry_cle = QLineEdit()
         self._entry_cle.setFont(QFont("Consolas", 12))
         self._entry_cle.setAlignment(Qt.AlignCenter)
-        self._entry_cle.setPlaceholderText("GB26-XXXX-XXXX-XXXX")
+        self._entry_cle.setPlaceholderText("HP26-XXXX-XXXX-XXXX")
         self._entry_cle.returnPressed.connect(self._activer)
         layout.addWidget(self._entry_cle)
 
@@ -111,6 +111,40 @@ class LicenceWindow(QDialog):
         lbl_demo_info.setWordWrap(True)
         lbl_demo_info.setStyleSheet(f"color: {Theme.c('gray')}; font-size: 9pt;")
         layout.addWidget(lbl_demo_info)
+
+        layout.addSpacing(4)
+
+        # Séparateur réseau
+        sep2 = QFrame()
+        sep2.setFrameShape(QFrame.HLine)
+        sep2.setStyleSheet(f"color: {Theme.c('separator')};")
+        layout.addWidget(sep2)
+
+        # Bouton caisse réseau
+        btn_reseau = QPushButton("🖧  Ce PC est une caisse réseau (mode client)")
+        btn_reseau.setCursor(Qt.PointingHandCursor)
+        btn_reseau.setFont(QFont("Segoe UI", 10))
+        btn_reseau.setStyleSheet(f"""
+            QPushButton {{
+                color: {Theme.c('success')};
+                background: transparent;
+                border: 1px solid {Theme.c('success')};
+                border-radius: 6px;
+                padding: 8px;
+            }}
+            QPushButton:hover {{
+                background-color: {Theme.c('light')};
+            }}
+        """)
+        btn_reseau.clicked.connect(self._configurer_mode_reseau)
+        layout.addWidget(btn_reseau)
+
+        lbl_reseau_info = QLabel(
+            "Pas de licence requise — ce PC se connecte au serveur de la boutique."
+        )
+        lbl_reseau_info.setAlignment(Qt.AlignCenter)
+        lbl_reseau_info.setStyleSheet(f"color: {Theme.c('gray')}; font-size: 9pt;")
+        layout.addWidget(lbl_reseau_info)
 
         layout.addSpacing(8)
 
@@ -164,6 +198,17 @@ class LicenceWindow(QDialog):
             self.accept()
         else:
             QMessageBox.critical(self, "Erreur", "Impossible d'activer le mode démonstration.")
+
+    def _configurer_mode_reseau(self):
+        from ui.windows.config_reseau import ConfigReseauWindow
+        dlg = ConfigReseauWindow(parent=self)
+        if dlg.exec():
+            QMessageBox.information(
+                self, "Configuration enregistrée",
+                "Le mode réseau a été configuré.\n\n"
+                "Redémarrez l'application — aucune licence ne sera demandée."
+            )
+            self.accept()
 
     def closeEvent(self, event):
         self.reject()
