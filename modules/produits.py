@@ -159,6 +159,12 @@ class Produit:
     @staticmethod
     def obtenir_tous():
         """Obtenir tous les produits"""
+        try:
+            import modules.reseau as reseau
+            if reseau.actif():
+                return reseau.get_client().get_produits()
+        except Exception:
+            pass
         query = "SELECT * FROM produits ORDER BY id ASC"
         return db.fetch_all(query)
 
@@ -171,12 +177,28 @@ class Produit:
     @staticmethod
     def obtenir_par_code_barre(code_barre):
         """Obtenir un produit par son code-barres"""
+        try:
+            import modules.reseau as reseau
+            if reseau.actif():
+                return reseau.get_client().get_produit_par_code(code_barre)
+        except Exception:
+            pass
         query = "SELECT * FROM produits WHERE code_barre = ?"
         return db.fetch_one(query, (code_barre,))
 
     @staticmethod
     def rechercher(terme):
         """Rechercher des produits par nom ou categorie"""
+        try:
+            import modules.reseau as reseau
+            if reseau.actif():
+                tous = reseau.get_client().get_produits()
+                t = terme.lower()
+                return [p for p in tous if t in str(p.get('nom', '')).lower()
+                        or t in str(p.get('categorie', '')).lower()
+                        or t in str(p.get('code_barre', '')).lower()]
+        except Exception:
+            pass
         query = "SELECT * FROM produits WHERE nom LIKE ? OR categorie LIKE ? OR code_barre LIKE ?"
         terme = f"%{terme}%"
         return db.fetch_all(query, (terme, terme, terme))

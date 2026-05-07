@@ -219,6 +219,57 @@ def demarrer_serveur_local():
         get_logger('main').error(f"Impossible de démarrer le serveur local : {e}")
 
 
+def connecter_reseau_client(app) -> bool:
+    """
+    Si mode='client', connecte ce PC au serveur local.
+    Affiche une erreur et retourne False si la connexion échoue.
+    """
+    from database import db
+    from config import RESEAU_LOCAL_PORT
+
+    mode = db.get_parametre('reseau_mode', 'standalone')
+    if mode != 'client':
+        return True
+
+    ip = db.get_parametre('reseau_serveur_ip', '')
+    token = db.get_parametre('reseau_client_token', '')
+
+    if not ip or not token:
+        from PySide6.QtWidgets import QMessageBox
+        QMessageBox.critical(
+            None, "Réseau non configuré",
+            "Ce PC est en mode Client mais le serveur n'est pas configuré.\n"
+            "Allez dans Admin → Réseau local pour saisir l'IP et le token."
+        )
+        return False
+
+    url = f"http://{ip}:{RESEAU_LOCAL_PORT}"
+
+    from modules.licence import GestionLicence
+    import platform, uuid, hashlib
+    info = f"{platform.node()}-{platform.system()}-{platform.machine()}-{uuid.getnode()}"
+    machine_id = hashlib.sha256(info.encode()).hexdigest()
+    nom_caisse = db.get_parametre('boutique_nom', platform.node())
+
+    import modules.reseau as reseau
+    ok = reseau.initialiser(url, token, machine_id, nom_caisse)
+
+    if not ok:
+        from PySide6.QtWidgets import QMessageBox
+        QMessageBox.critical(
+            None, "Connexion impossible",
+            f"Impossible de se connecter au serveur réseau ({ip}).\n\n"
+            "Vérifiez que :\n"
+            "  • Le PC Serveur est allumé\n"
+            "  • Vous êtes sur le même réseau WiFi\n"
+            "  • Le token est correct\n"
+            "  • Le quota de terminaux n'est pas dépassé"
+        )
+        return False
+
+    return True
+
+
 def main():
     # Corrections specifiques a l'OS
     fix_encoding()
@@ -249,8 +300,11 @@ def main():
         time.sleep(0.05)
     splash.close()
 
-    # 1. Verifier licence
+    # 1. Mode réseau
     demarrer_serveur_local()
+    if not connecter_reseau_client(app):
+        sys.exit(0)
+
     if not verifier_licence():
         sys.exit(0)
 
@@ -266,7 +320,21 @@ def main():
     # 4. Dashboard avec routage par role
     lancer_dashboard(app, utilisateur)
 
-    sys.exit(app.exec())
+    exit_code = app.exec()
+
+    # Déconnexion propre du réseau client
+    try:
+        import modules.reseau as reseau
+        if reseau.actif():
+            from database import db
+            import platform, uuid, hashlib
+            info = f"{platform.node()}-{platform.system()}-{platform.machine()}-{uuid.getnode()}"
+            machine_id = hashlib.sha256(info.encode()).hexdigest()
+            reseau.deconnecter(machine_id)
+    except Exception:
+        pass
+
+    sys.exit(exit_code)
 
 
 if __name__ == '__main__':

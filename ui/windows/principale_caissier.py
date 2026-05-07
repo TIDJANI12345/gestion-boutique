@@ -307,6 +307,17 @@ class PrincipaleCaissierWindow(QMainWindow):
         """Actualiser stats PERSONNELLES du caissier (uniquement ses ventes)"""
         self._afficher_bandeau_statut()
         try:
+            import modules.reseau as reseau
+            if reseau.actif():
+                stats = reseau.get_client().get_stats_dashboard()
+                self._label_ventes.setText(str(stats.get('ventes_jour', {}).get('nb', 0)))
+                self._label_ca.setText(
+                    f"{stats.get('ventes_jour', {}).get('total', 0):,.0f} {get_devise()}"
+                )
+                return
+        except Exception:
+            pass
+        try:
             from modules.rapports import Rapport
             stats = Rapport.statistiques_utilisateur(self.utilisateur['id'])
             self._label_ventes.setText(str(stats['nb_ventes']))

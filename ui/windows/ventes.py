@@ -1133,6 +1133,14 @@ class VentesWindow(QDialog):
         client_nom = self._entry_client.text().strip()
         client_id = self.client_id
 
+        # Mode réseau client : déléguer la vente au serveur
+        try:
+            import modules.reseau as reseau
+            if reseau.actif():
+                return self._finaliser_vente_reseau(paiements)
+        except Exception:
+            pass
+
         try:
             from modules.ventes import Vente
             from modules.paiements import Paiement
@@ -1289,6 +1297,63 @@ class VentesWindow(QDialog):
             )
             import traceback
             traceback.print_exc()
+
+    def _finaliser_vente_reseau(self, paiements: list):
+        """Envoie la vente au serveur local (mode client réseau)."""
+        try:
+            import modules.reseau as reseau
+            from modules.ventes import Vente
+            from datetime import datetime
+
+            client_nom = self._entry_client.text().strip()
+            sous_total = sum(item['sous_total'] for item in self.panier)
+            remise = self._remise_montant
+            total = sous_total - remise
+            numero_vente = Vente.generer_numero_vente()
+            utilisateur_id = self.utilisateur['id'] if self.utilisateur else None
+
+            details = [
+                {
+                    'produit_id': item['produit_id'],
+                    'quantite': item['quantite'],
+                    'prix_unitaire': self._prix_effectif(item),
+                    'sous_total': item['sous_total'],
+                }
+                for item in self.panier
+            ]
+
+            mode_paiement = paiements[0].get('mode', 'especes') if paiements else 'especes'
+            montant_recu = sum(p.get('montant', 0) for p in paiements)
+
+            vente_id = reseau.get_client().enregistrer_vente({
+                'numero_vente': numero_vente,
+                'date_vente': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                'total': total,
+                'total_ttc': total,
+                'montant_recu': montant_recu,
+                'monnaie': montant_recu - total,
+                'mode_paiement': mode_paiement,
+                'client': client_nom or None,
+                'utilisateur_id': utilisateur_id,
+                'details': details,
+            })
+
+            if not vente_id:
+                raise RuntimeError("Le serveur n'a pas retourné d'ID de vente")
+
+            self._reset_pour_nouvelle_vente()
+            if self.vente_confirmee:
+                self.vente_confirmee.emit()
+            return True
+
+        except Exception as e:
+            from PySide6.QtWidgets import QMessageBox
+            QMessageBox.critical(
+                self, "Erreur réseau",
+                f"Impossible d'enregistrer la vente sur le serveur :\n{e}\n\n"
+                "Vérifiez la connexion au serveur."
+            )
+            return False
 
     def _reset_pour_nouvelle_vente(self):
         """Reinitialiser le panier pour une nouvelle vente."""
