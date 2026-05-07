@@ -424,7 +424,7 @@ class PrincipaleCaissierWindow(QMainWindow):
             self._session_timer.start()
 
     def _reset_session_timer(self):
-        if hasattr(self, '_session_timer'):
+        if hasattr(self, '_session_timer') and self._session_timer.interval() > 0:
             self._session_timer.start()
 
     def keyPressEvent(self, event):
