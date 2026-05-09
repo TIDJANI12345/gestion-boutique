@@ -102,6 +102,20 @@ class Database:
             self.cursor.execute("ALTER TABLE ventes ADD COLUMN nom_caisse TEXT DEFAULT NULL")
             self.conn.commit()
 
+        # Migrations : colonnes paiement sur ventes (requises par api_locale)
+        for col, definition in [
+            ('total_ttc',      'REAL DEFAULT 0'),
+            ('montant_recu',   'REAL DEFAULT 0'),
+            ('monnaie',        'REAL DEFAULT 0'),
+            ('mode_paiement',  "TEXT DEFAULT 'especes'"),
+        ]:
+            try:
+                self.cursor.execute(f"SELECT {col} FROM ventes LIMIT 1")
+            except sqlite3.OperationalError:
+                logger.info(f"Migration: Ajout colonne {col} à table ventes")
+                self.cursor.execute(f"ALTER TABLE ventes ADD COLUMN {col} {definition}")
+                self.conn.commit()
+
         # Migration : Ajouter colonnes prix_gros / seuil_gros à produits
         try:
             self.cursor.execute("SELECT prix_gros FROM produits LIMIT 1")

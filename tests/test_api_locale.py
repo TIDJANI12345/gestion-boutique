@@ -171,13 +171,6 @@ class TestProduits(ApiTestBase):
 class TestVentes(ApiTestBase):
     def setUp(self):
         super().setUp()
-        # api_locale.py insère des colonnes supplémentaires non présentes dans le schéma de base
-        for col_def in ('total_ttc REAL', 'montant_recu REAL', 'monnaie REAL DEFAULT 0',
-                        'mode_paiement TEXT DEFAULT \'especes\''):
-            try:
-                database.db.execute_query(f"ALTER TABLE ventes ADD COLUMN {col_def}")
-            except Exception:
-                pass
         database.db.execute_query(
             "INSERT INTO produits (nom, code_barre, prix_vente, stock_actuel) VALUES (?, ?, ?, ?)",
             ('TestProd', 'TP001', 1000, 50)
