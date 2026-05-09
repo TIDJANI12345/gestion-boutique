@@ -1,6 +1,6 @@
 """
-Serveur de synchronisation cloud pour Gestion Boutique
-Endpoints : /api/sync/ping, /api/sync/push, /api/sync/pull
+Serveur de synchronisation pour HishamPOS
+Endpoints : /api/sync/ping, /api/sync/push, /api/sync/pull, /api/sync/bootstrap
 Authentification par X-Licence-Key + X-Machine-Id
 """
 import os
@@ -15,7 +15,6 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 SYNC_DB_PATH = os.path.join(BASE_DIR, 'sync_data.db')
 LICENCE_DB_PATH = os.path.join(BASE_DIR, '..', 'serveur_licence', 'licences.db')
 
-# --- Base de données sync ---
 
 def get_sync_db():
     conn = sqlite3.connect(SYNC_DB_PATH)
@@ -25,7 +24,6 @@ def get_sync_db():
 
 
 def init_sync_db():
-    """Creer les tables miroir pour la synchronisation"""
     conn = get_sync_db()
 
     conn.execute('''
@@ -79,19 +77,25 @@ def init_sync_db():
         )
     ''')
 
+    # Log d'événements de stock — remplace sync_historique_stock.
+    # stock_actuel dans sync_produits est toujours recalculé via delta,
+    # jamais écrasé par un snapshot client.
     conn.execute('''
-        CREATE TABLE IF NOT EXISTS sync_historique_stock (
+        CREATE TABLE IF NOT EXISTS stock_events (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            event_uuid TEXT UNIQUE NOT NULL,
             licence_key TEXT NOT NULL,
-            machine_id TEXT NOT NULL,
-            produit_code_barre TEXT,
-            quantite_avant INTEGER,
-            quantite_apres INTEGER,
-            operation TEXT,
-            date_operation TIMESTAMP,
-            synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            terminal_id TEXT NOT NULL,
+            code_barre TEXT NOT NULL,
+            delta INTEGER NOT NULL,
+            event_type TEXT NOT NULL DEFAULT 'vente',
+            reference TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
+    conn.execute(
+        'CREATE INDEX IF NOT EXISTS idx_events_licence ON stock_events(licence_key, id)'
+    )
 
     conn.execute('''
         CREATE TABLE IF NOT EXISTS sync_utilisateurs (
@@ -122,15 +126,12 @@ init_sync_db()
 # --- Validation licence ---
 
 def valider_licence(licence_key):
-    """Verifie que la licence existe et est active dans la base licences"""
     try:
         licence_db = os.path.join(BASE_DIR, 'licences.db')
         if not os.path.exists(licence_db):
-            # Chercher dans le dossier serveur_licence au meme niveau
             licence_db = LICENCE_DB_PATH
         if not os.path.exists(licence_db):
-            # En production sur PythonAnywhere, la base licences est dans le meme dossier
-            return True  # Accepter si pas de base licence disponible
+            return True
 
         conn = sqlite3.connect(licence_db)
         conn.row_factory = sqlite3.Row
@@ -141,7 +142,6 @@ def valider_licence(licence_key):
         conn.close()
 
         if row:
-            # Verifier expiration
             if row['date_expiration']:
                 try:
                     exp = datetime.strptime(row['date_expiration'], '%Y-%m-%d %H:%M:%S')
@@ -155,31 +155,26 @@ def valider_licence(licence_key):
             return True
         return False
     except Exception:
-        return True  # En cas d'erreur, on accepte pour ne pas bloquer la sync
+        return True
 
 
 def require_auth(f):
-    """Decorateur pour valider l'authentification des requetes sync"""
     @wraps(f)
     def decorated(*args, **kwargs):
         licence_key = request.headers.get('X-Licence-Key', '')
         machine_id = request.headers.get('X-Machine-Id', '')
-
         if not licence_key or not machine_id:
             return jsonify({'error': 'Authentification requise'}), 401
-
         if not valider_licence(licence_key):
-            return jsonify({'error': 'Licence invalide ou expiree'}), 403
-
+            return jsonify({'error': 'Licence invalide ou expirée'}), 403
         return f(licence_key, machine_id, *args, **kwargs)
     return decorated
 
 
-# --- Routes API ---
+# --- Routes ---
 
 @app.route('/api/sync/ping', methods=['GET'])
 def ping():
-    """Health check"""
     return jsonify({
         'status': 'ok',
         'service': 'sync',
@@ -190,38 +185,61 @@ def ping():
 @app.route('/api/sync/push', methods=['POST'])
 @require_auth
 def push(licence_key, machine_id):
-    """Recevoir les changements d'un client"""
     try:
         data = request.json
         if not data:
-            return jsonify({'error': 'Aucune donnee'}), 400
+            return jsonify({'error': 'Aucune donnée'}), 400
 
         conn = get_sync_db()
         now = datetime.now().isoformat()
 
-        # Produits
+        # Produits : infos seulement, jamais stock_actuel (géré via events)
         for p in data.get('produits', []):
             conn.execute('''
                 INSERT INTO sync_produits
                     (licence_key, machine_id, code_barre, nom, categorie, prix_achat,
-                     prix_vente, stock_actuel, stock_alerte, type_code_barre,
+                     prix_vente, stock_alerte, type_code_barre,
                      date_ajout, description, updated_at, synced_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(licence_key, code_barre) DO UPDATE SET
                     machine_id=excluded.machine_id,
-                    nom=excluded.nom, categorie=excluded.categorie,
-                    prix_achat=excluded.prix_achat, prix_vente=excluded.prix_vente,
-                    stock_actuel=excluded.stock_actuel, stock_alerte=excluded.stock_alerte,
+                    nom=excluded.nom,
+                    categorie=excluded.categorie,
+                    prix_achat=excluded.prix_achat,
+                    prix_vente=excluded.prix_vente,
+                    stock_alerte=excluded.stock_alerte,
                     type_code_barre=excluded.type_code_barre,
                     description=excluded.description,
-                    updated_at=excluded.updated_at, synced_at=excluded.synced_at
+                    updated_at=excluded.updated_at,
+                    synced_at=excluded.synced_at
             ''', (
                 licence_key, machine_id, p['code_barre'], p['nom'],
                 p.get('categorie'), p.get('prix_achat', 0), p['prix_vente'],
-                p.get('stock_actuel', 0), p.get('stock_alerte', 5),
-                p.get('type_code_barre', 'code128'), p.get('date_ajout'),
-                p.get('description'), p.get('updated_at', now), now
+                p.get('stock_alerte', 5), p.get('type_code_barre', 'code128'),
+                p.get('date_ajout'), p.get('description'), p.get('updated_at', now), now
             ))
+
+        # Stock events : idempotent via event_uuid, delta appliqué sur stock_actuel
+        for e in data.get('stock_events', []):
+            event_uuid = e.get('event_uuid')
+            code_barre = e.get('code_barre')
+            delta = e.get('delta', 0)
+            if not event_uuid or not code_barre or delta == 0:
+                continue
+            inserted = conn.execute('''
+                INSERT OR IGNORE INTO stock_events
+                    (event_uuid, licence_key, terminal_id, code_barre, delta, event_type, reference)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                event_uuid, licence_key, machine_id, code_barre, delta,
+                e.get('event_type', 'vente'), e.get('reference')
+            )).rowcount
+            if inserted:
+                conn.execute('''
+                    UPDATE sync_produits
+                    SET stock_actuel = MAX(0, stock_actuel + ?)
+                    WHERE licence_key = ? AND code_barre = ?
+                ''', (delta, licence_key, code_barre))
 
         # Ventes
         for v in data.get('ventes', []):
@@ -231,22 +249,16 @@ def push(licence_key, machine_id):
                      client, statut, deleted_at, synced_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
-                licence_key, machine_id, v['numero_vente'], v['date_vente'],
-                v['total'], v.get('client'), v.get('statut', 'terminee'),
+                licence_key, machine_id, v['numero_vente'], v.get('date_vente'),
+                v.get('total'), v.get('client'), v.get('statut', 'terminee'),
                 v.get('deleted_at'), now
             ))
 
-        # Details ventes
+        # Détails ventes
         for d in data.get('details_ventes', []):
-            # Retrouver le numero_vente pour ce detail
             numero_vente = d.get('numero_vente', '')
             if not numero_vente:
-                # Chercher dans les ventes envoyees dans le meme push
-                for v in data.get('ventes', []):
-                    if v.get('id') == d.get('vente_id'):
-                        numero_vente = v['numero_vente']
-                        break
-
+                continue
             conn.execute('''
                 INSERT INTO sync_details_ventes
                     (licence_key, machine_id, numero_vente, produit_code_barre,
@@ -254,21 +266,8 @@ def push(licence_key, machine_id):
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 licence_key, machine_id, numero_vente,
-                d.get('produit_code_barre', ''),
-                d['quantite'], d['prix_unitaire'], d['sous_total'], now
-            ))
-
-        # Historique stock
-        for h in data.get('historique_stock', []):
-            conn.execute('''
-                INSERT INTO sync_historique_stock
-                    (licence_key, machine_id, produit_code_barre, quantite_avant,
-                     quantite_apres, operation, date_operation, synced_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (
-                licence_key, machine_id, h.get('produit_code_barre', ''),
-                h.get('quantite_avant'), h.get('quantite_apres'),
-                h.get('operation'), h.get('date_operation'), now
+                d.get('produit_code_barre', ''), d['quantite'],
+                d['prix_unitaire'], d['sous_total'], now
             ))
 
         # Utilisateurs
@@ -285,7 +284,7 @@ def push(licence_key, machine_id):
                     actif=excluded.actif, dernier_login=excluded.dernier_login,
                     updated_at=excluded.updated_at, synced_at=excluded.synced_at
             ''', (
-                licence_key, machine_id, u['nom'], u['prenom'],
+                licence_key, machine_id, u['nom'], u.get('prenom', ''),
                 u['email'], u['mot_de_passe'], u.get('role', 'caissier'),
                 u.get('actif', 1), u.get('date_creation'),
                 u.get('dernier_login'), u.get('updated_at', now), now
@@ -293,8 +292,7 @@ def push(licence_key, machine_id):
 
         conn.commit()
         conn.close()
-
-        return jsonify({'status': 'ok', 'message': 'Push recu'})
+        return jsonify({'status': 'ok', 'message': 'Push reçu'})
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -303,108 +301,110 @@ def push(licence_key, machine_id):
 @app.route('/api/sync/pull', methods=['POST'])
 @require_auth
 def pull(licence_key, machine_id):
-    """Renvoyer les changements depuis un timestamp, en excluant ceux du meme machine_id"""
     try:
         data = request.json or {}
-        depuis = data.get('depuis', '2000-01-01T00:00:00')
+        depuis_event_id = int(data.get('depuis_event_id', 0))
+        depuis_ts = data.get('depuis', '2000-01-01T00:00:00')
 
         conn = get_sync_db()
 
-        # Produits modifies par d'autres postes de la meme boutique
+        # Événements de stock depuis le dernier ID connu, des autres terminaux
+        events = conn.execute('''
+            SELECT id, event_uuid, terminal_id, code_barre, delta, event_type, reference, created_at
+            FROM stock_events
+            WHERE licence_key = ? AND terminal_id != ? AND id > ?
+            ORDER BY id
+        ''', (licence_key, machine_id, depuis_event_id)).fetchall()
+
+        result_events = []
+        last_event_id = depuis_event_id
+        for e in events:
+            result_events.append({
+                'id': e['id'],
+                'event_uuid': e['event_uuid'],
+                'terminal_id': e['terminal_id'],
+                'code_barre': e['code_barre'],
+                'delta': e['delta'],
+                'event_type': e['event_type'],
+                'reference': e['reference'],
+                'created_at': e['created_at'],
+            })
+            if e['id'] > last_event_id:
+                last_event_id = e['id']
+
+        # Infos produits (pas stock_actuel) modifiées par d'autres terminaux
         produits = conn.execute('''
             SELECT code_barre, nom, categorie, prix_achat, prix_vente,
-                   stock_actuel, stock_alerte, type_code_barre, date_ajout,
-                   description, updated_at
+                   stock_alerte, type_code_barre, date_ajout, description, updated_at
             FROM sync_produits
             WHERE licence_key = ? AND machine_id != ? AND synced_at > ?
-        ''', (licence_key, machine_id, depuis)).fetchall()
+        ''', (licence_key, machine_id, depuis_ts)).fetchall()
 
-        result_produits = []
-        for p in produits:
-            result_produits.append({
-                'code_barre': p['code_barre'], 'nom': p['nom'],
-                'categorie': p['categorie'], 'prix_achat': p['prix_achat'],
-                'prix_vente': p['prix_vente'], 'stock_actuel': p['stock_actuel'],
-                'stock_alerte': p['stock_alerte'], 'type_code_barre': p['type_code_barre'],
-                'date_ajout': p['date_ajout'], 'description': p['description'],
-                'updated_at': p['updated_at']
-            })
-
-        # Ventes
+        # Ventes des autres terminaux
         ventes = conn.execute('''
             SELECT numero_vente, date_vente, total, client, statut, deleted_at
             FROM sync_ventes
             WHERE licence_key = ? AND machine_id != ? AND synced_at > ?
-        ''', (licence_key, machine_id, depuis)).fetchall()
+        ''', (licence_key, machine_id, depuis_ts)).fetchall()
 
-        result_ventes = []
-        for v in ventes:
-            result_ventes.append({
-                'numero_vente': v['numero_vente'], 'date_vente': v['date_vente'],
-                'total': v['total'], 'client': v['client'],
-                'statut': v['statut'], 'deleted_at': v['deleted_at']
-            })
-
-        # Details ventes
+        # Détails ventes des autres terminaux
         details = conn.execute('''
             SELECT numero_vente, produit_code_barre, quantite, prix_unitaire, sous_total
             FROM sync_details_ventes
             WHERE licence_key = ? AND machine_id != ? AND synced_at > ?
-        ''', (licence_key, machine_id, depuis)).fetchall()
+        ''', (licence_key, machine_id, depuis_ts)).fetchall()
 
-        result_details = []
-        for d in details:
-            result_details.append({
-                'numero_vente': d['numero_vente'],
-                'produit_code_barre': d['produit_code_barre'],
-                'quantite': d['quantite'], 'prix_unitaire': d['prix_unitaire'],
-                'sous_total': d['sous_total']
-            })
-
-        # Historique stock
-        historique = conn.execute('''
-            SELECT produit_code_barre, quantite_avant, quantite_apres, operation, date_operation
-            FROM sync_historique_stock
-            WHERE licence_key = ? AND machine_id != ? AND synced_at > ?
-        ''', (licence_key, machine_id, depuis)).fetchall()
-
-        result_historique = []
-        for h in historique:
-            result_historique.append({
-                'produit_code_barre': h['produit_code_barre'],
-                'quantite_avant': h['quantite_avant'],
-                'quantite_apres': h['quantite_apres'],
-                'operation': h['operation'], 'date_operation': h['date_operation']
-            })
-
-        # Utilisateurs
+        # Utilisateurs modifiés par d'autres terminaux
         utilisateurs = conn.execute('''
             SELECT nom, prenom, email, mot_de_passe, role, actif,
                    date_creation, dernier_login, updated_at
             FROM sync_utilisateurs
             WHERE licence_key = ? AND machine_id != ? AND synced_at > ?
-        ''', (licence_key, machine_id, depuis)).fetchall()
-
-        result_utilisateurs = []
-        for u in utilisateurs:
-            result_utilisateurs.append({
-                'nom': u['nom'], 'prenom': u['prenom'],
-                'email': u['email'], 'mot_de_passe': u['mot_de_passe'],
-                'role': u['role'], 'actif': u['actif'],
-                'date_creation': u['date_creation'],
-                'dernier_login': u['dernier_login'],
-                'updated_at': u['updated_at']
-            })
+        ''', (licence_key, machine_id, depuis_ts)).fetchall()
 
         conn.close()
 
         return jsonify({
-            'produits': result_produits,
-            'ventes': result_ventes,
-            'details_ventes': result_details,
-            'historique_stock': result_historique,
-            'utilisateurs': result_utilisateurs,
-            'timestamp': datetime.now().isoformat()
+            'stock_events': result_events,
+            'last_event_id': last_event_id,
+            'produits': [dict(p) for p in produits],
+            'ventes': [dict(v) for v in ventes],
+            'details_ventes': [dict(d) for d in details],
+            'utilisateurs': [dict(u) for u in utilisateurs],
+        })
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/sync/bootstrap', methods=['GET'])
+@require_auth
+def bootstrap(licence_key, machine_id):
+    """
+    Retourne un snapshot complet du stock + le max event_id courant.
+    Un nouveau terminal utilise ce snapshot comme état de départ, puis
+    suit le log d'événements à partir de last_event_id.
+    """
+    try:
+        conn = get_sync_db()
+
+        produits = conn.execute('''
+            SELECT code_barre, nom, categorie, prix_achat, prix_vente,
+                   stock_actuel, stock_alerte, type_code_barre, description
+            FROM sync_produits
+            WHERE licence_key = ?
+        ''', (licence_key,)).fetchall()
+
+        last_event = conn.execute(
+            'SELECT MAX(id) as max_id FROM stock_events WHERE licence_key = ?',
+            (licence_key,)
+        ).fetchone()
+
+        conn.close()
+
+        return jsonify({
+            'produits': [dict(p) for p in produits],
+            'last_event_id': last_event['max_id'] or 0,
         })
 
     except Exception as e:

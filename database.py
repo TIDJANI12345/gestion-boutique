@@ -33,6 +33,7 @@ class Database:
         except Exception:
             logger.warning("Connexion perdue, reconnexion...")
             self.connect()
+            self.create_tables()  # Restaure le schéma (critique pour :memory:)
 
     def create_tables(self):
         """Creation des tables"""
@@ -267,6 +268,9 @@ class Database:
         # Migration : ajouter client_id aux ventes
         self.migrer_clients()
 
+        # Migration : ajouter sync_done à historique_stock
+        self.migrer_sync()
+
         # Inserer parametres par defaut
         self.init_parametres()
 
@@ -435,6 +439,17 @@ class Database:
                 logger.info("Migration client_id effectuee sur la table ventes")
         except Exception as e:
             logger.warning(f"Migration clients: {e}")
+
+    def migrer_sync(self):
+        """Ajouter sync_done à historique_stock pour le suivi de synchronisation"""
+        try:
+            colonnes = [row[1] for row in self.cursor.execute("PRAGMA table_info(historique_stock)").fetchall()]
+            if 'sync_done' not in colonnes:
+                self.cursor.execute("ALTER TABLE historique_stock ADD COLUMN sync_done INTEGER DEFAULT 0")
+                self.conn.commit()
+                logger.info("Migration: sync_done ajouté à historique_stock")
+        except Exception as e:
+            logger.warning(f"Migration sync_done: {e}")
 
     def init_parametres(self):
         """Initialiser les parametres par defaut"""

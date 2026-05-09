@@ -50,39 +50,43 @@ class TestEncaisser(unittest.TestCase):
         self.aid = creer_ardoise(self.client_id, 10000)
 
     def test_paiement_partiel(self):
-        ok, msg = encaisser(self.aid, 4000)
+        ok, msg, enc_id = encaisser(self.aid, 4000)
         self.assertTrue(ok)
+        self.assertIsNotNone(enc_id)
         row = database.db.fetch_one("SELECT * FROM ardoise WHERE id = ?", (self.aid,))
         self.assertEqual(row['montant_restant'], 6000)
         self.assertEqual(row['statut'], 'partiel')
 
     def test_paiement_total(self):
-        ok, msg = encaisser(self.aid, 10000)
+        ok, msg, enc_id = encaisser(self.aid, 10000)
         self.assertTrue(ok)
+        self.assertIsNotNone(enc_id)
         row = database.db.fetch_one("SELECT * FROM ardoise WHERE id = ?", (self.aid,))
         self.assertEqual(row['statut'], 'solde')
         self.assertIn("soldée", msg.lower())
 
     def test_paiement_superieur_ajuste(self):
-        # Le montant est capé au restant
-        ok, msg = encaisser(self.aid, 99999)
+        ok, msg, enc_id = encaisser(self.aid, 99999)
         self.assertTrue(ok)
         row = database.db.fetch_one("SELECT * FROM ardoise WHERE id = ?", (self.aid,))
         self.assertEqual(row['statut'], 'solde')
 
     def test_deja_solde_refuse(self):
         encaisser(self.aid, 10000)
-        ok, msg = encaisser(self.aid, 500)
+        ok, msg, enc_id = encaisser(self.aid, 500)
         self.assertFalse(ok)
+        self.assertIsNone(enc_id)
         self.assertIn("déjà", msg.lower())
 
     def test_montant_zero_refuse(self):
-        ok, msg = encaisser(self.aid, 0)
+        ok, msg, enc_id = encaisser(self.aid, 0)
         self.assertFalse(ok)
+        self.assertIsNone(enc_id)
 
     def test_ardoise_inexistante(self):
-        ok, msg = encaisser(9999, 100)
+        ok, msg, enc_id = encaisser(9999, 100)
         self.assertFalse(ok)
+        self.assertIsNone(enc_id)
 
 
 class TestSoldeClient(unittest.TestCase):
